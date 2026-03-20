@@ -8,6 +8,11 @@ import (
 type DataSource interface {
 	Type() string
 	Name() string
-	GetIPv4(context.Context) ([]netip.Addr, error)
-	GetIPv6(context.Context) ([]netip.Addr, error)
+	IP(context.Context) ([]netip.Addr, error)
+}
+
+type DataSourceDualStack interface {
+	DataSource
+	IPv4(ctx context.Context) ([]netip.Addr, error)
+	IPv6(ctx context.Context) ([]netip.Addr, error)
 }

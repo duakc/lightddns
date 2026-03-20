@@ -1,11 +1,20 @@
-package logger
+package zaplog
 
 import (
 	"io"
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+)
+
+const (
+	EnvEnableStackTrace = "ZAP_STACK_TRACE"
+)
+
+var (
+	NOP = zap.NewNop()
 )
 
 func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *zap.Logger {
@@ -24,7 +33,7 @@ func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *za
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	})
 	core := zapcore.NewCore(coreEncoder, zapcore.AddSync(output), level)
-	if stackTraceLevel := os.Getenv("ZAP_STACK_TRACE"); stackTraceLevel != "" {
+	if stackTraceLevel := os.Getenv(EnvEnableStackTrace); stackTraceLevel != "" {
 		parseLevel, err := zapcore.ParseLevel(stackTraceLevel)
 		if err != nil {
 			panic("wrong stack trace level:" + stackTraceLevel)
@@ -32,4 +41,19 @@ func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *za
 		options = append(options, zap.AddStacktrace(parseLevel))
 	}
 	return zap.New(core, options...)
+}
+
+func DoNotPanic(l *zap.Logger) *zap.Logger {
+	if l == nil {
+		return NOP
+	}
+	return l
+}
+
+func ExtendName(l *zap.Logger, name string) *zap.Logger {
+	l = DoNotPanic(l)
+	if strings.Contains(name, ".") {
+		return l.Named("[" + name + "]")
+	}
+	return l.Named(name)
 }

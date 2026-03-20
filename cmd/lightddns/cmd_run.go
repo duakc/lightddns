@@ -9,8 +9,8 @@ import (
 
 	"github.com/duakc/lightddns"
 	"github.com/duakc/lightddns/options"
+	goyaml "github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 type commandArgRunType struct {
@@ -64,7 +64,6 @@ func openConfigBind(file string, opt *options.Options) error {
 		return err
 	}
 	defer open.Close()
-	decoder := yaml.NewDecoder(open)
-	decoder.KnownFields(true)
+	decoder := goyaml.NewDecoder(open, goyaml.DisallowUnknownField())
 	return decoder.Decode(opt)
 }

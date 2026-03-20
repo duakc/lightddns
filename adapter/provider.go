@@ -1,10 +1,13 @@
 package adapter
 
-import "net/netip"
+import (
+	"context"
+	"net/netip"
+)
 
 type Provider interface {
 	Type() string
 	Name() string
-	Diff(addr netip.Addr) (bool, error)
-	Update(addr netip.Addr) error
+	Diff(ctx context.Context, addr []netip.Addr) (bool, error)
+	Update(ctx context.Context, addr []netip.Addr) error
 }
