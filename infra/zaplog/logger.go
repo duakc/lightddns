@@ -13,6 +13,8 @@ const (
 	EnvEnableStackTrace = "ZAP_STACK_TRACE"
 )
 
+type LoggerKey struct{}
+
 var (
 	NOP = zap.NewNop()
 )

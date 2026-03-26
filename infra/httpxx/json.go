@@ -19,7 +19,7 @@ func (d *dummyJSONMarshaler) MarshalJSON() ([]byte, error) {
 
 func JSONRequest[O any](ctx context.Context, do HTTPRequester, req ReqConfig, input any) (O, *http.Response, error) {
 	if input != nil {
-		req.ExtendHeader.Add("Content-Type", "application/json")
+		req.ExtendHeader.Set("Content-Type", "application/json")
 		var JM json.Marshaler
 		if inputJM, ok := input.(json.Marshaler); ok {
 			JM = inputJM
@@ -35,10 +35,10 @@ func JSONRequest[O any](ctx context.Context, do HTTPRequester, req ReqConfig, in
 	}
 	response, err := do.Do(request)
 	if err != nil {
-		return common.Zero[O](), nil, err
+		return common.Zero[O](), nil, NewResponseError(req.Method, request.URL.String(), err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return common.Zero[O](), response, fmt.Errorf("bad status code: %d", response.StatusCode)
+		return common.Zero[O](), response, &BadStatusCodeError{Got: response.StatusCode}
 	}
 	if ct := response.Header.Get("Content-Type"); ct != "application/json" {
 		return common.Zero[O](), response, fmt.Errorf("not a JSON response: Content-Type: %s", ct)

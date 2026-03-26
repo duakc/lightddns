@@ -12,6 +12,9 @@ import (
 	"path"
 	"slices"
 	"strings"
+
+	CST "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/common"
 )
 
 type ReqConfig struct {
@@ -30,6 +33,8 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, ctxCancel := common.ContextWithTimeout(ctx, CST.DefaultHTTPTimeout)
+	defer ctxCancel()
 
 	rc.BaseURL = strings.TrimSuffix(rc.BaseURL, "/") // remove trailing slash
 	url := rc.BaseURL + "/" + path.Join(rc.ExtendPath...)

@@ -2,20 +2,23 @@ package internal
 
 import (
 	"context"
+	"io"
 	"strconv"
 
 	"github.com/duakc/lightddns/infra/httpxx"
 )
 
 type PageConfig[T any] struct {
-	ReqConfig httpxx.ReqConfig
-	Requester httpxx.HTTPRequester
+	reqConfig httpxx.ReqConfig
+	requester httpxx.HTTPRequester
 
 	// internal
 	page    int
 	perPage int
 
 	done bool
+
+	resultInfo ResultInfo
 }
 
 func NewPaging[T any](req httpxx.ReqConfig, do httpxx.HTTPRequester) *PageConfig[T] {
@@ -23,28 +26,33 @@ func NewPaging[T any](req httpxx.ReqConfig, do httpxx.HTTPRequester) *PageConfig
 		panic("nil requester")
 	}
 	return &PageConfig[T]{
-		ReqConfig: req,
-		Requester: do,
+		reqConfig: req,
+		requester: do,
 		perPage:   50,
 	}
 }
 
 func (pc *PageConfig[T]) Next(ctx context.Context) ([]T, error) {
-	type responseType = apiResponse[T]
+	if pc.done {
+		return nil, io.EOF
+	}
 	pc.page++
-	pc.ReqConfig.Query.Set("page", strconv.Itoa(pc.page))
-	pc.ReqConfig.Query.Set("per_page", strconv.Itoa(pc.perPage))
-	result, response, err := httpxx.JSONRequest[responseType](ctx,
-		pc.Requester, pc.ReqConfig, nil)
+	pc.reqConfig.Query.Set("page", strconv.Itoa(pc.page))
+	pc.reqConfig.Query.Set("per_page", strconv.Itoa(pc.perPage))
+	result, response, err := httpxx.JSONRequest[ResponseWithPage[T]](ctx,
+		pc.requester, pc.reqConfig, nil)
 	if response != nil {
 		defer response.Body.Close()
 	}
-	if err != nil {
-		return nil, err
-	} else if err = result.Err(); err != nil {
-		return nil, err
+	if E := result.JoinError(err); E != nil {
+		return nil, E
 	}
-
+	
+	pc.resultInfo = result.ResultInfo
 	pc.done = result.ResultInfo.Page == result.ResultInfo.TotalPages
 	return result.Results, nil
+}
+
+func (pc *PageConfig[T]) TotalCount() int {
+	return pc.resultInfo.TotalCount
 }
