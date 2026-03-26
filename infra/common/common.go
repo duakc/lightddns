@@ -7,6 +7,13 @@ func Zero[T any]() T {
 	return v
 }
 
+func PtrValueOrDefault[T any](v *T) T {
+	if v == nil {
+		return Zero[T]()
+	}
+	return *v
+}
+
 func All[T any, S ~[]T](arr S, fn func(T) bool) bool {
 	for i := 0; i < len(arr); i++ {
 		if !fn(arr[i]) {

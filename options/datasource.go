@@ -5,7 +5,8 @@ import "github.com/goccy/go-yaml"
 type OptionDataSource struct {
 	AbstractProviderOption `yaml:",inline"`
 
-	Raw yaml.RawMessage `yaml:"-"`
+	Option any             `yaml:"-"`
+	Raw    yaml.RawMessage `yaml:"-"`
 }
 
 type AbstractDatasourceOption struct {

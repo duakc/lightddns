@@ -5,7 +5,8 @@ import "encoding/json"
 type OptionProvider struct {
 	AbstractProviderOption `yaml:",inline"`
 
-	Raw json.RawMessage `yaml:"-"`
+	Option any             `yaml:"-"`
+	Raw    json.RawMessage `yaml:"-"`
 }
 
 type AbstractProviderOption struct {

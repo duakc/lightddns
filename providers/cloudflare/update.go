@@ -10,7 +10,7 @@ import (
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 )
 
-func (c *cloudflare) Update(ctx context.Context, domain string, ttl int, addr []netip.Addr) error {
+func (c *Cloudflare) Update(ctx context.Context, domain string, ttl int, addr []netip.Addr) error {
 	if ttl < 0 {
 		ttl = 0
 	}

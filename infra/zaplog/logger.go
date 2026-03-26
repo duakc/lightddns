@@ -34,7 +34,7 @@ func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *za
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	})
-	core := zapcore.NewCore(coreEncoder, zapcore.AddSync(output), level)
+	core := zapcore.NewCore(coreEncoder, zapcore.Lock(zapcore.AddSync(output)), level)
 	if stackTraceLevel := os.Getenv(EnvEnableStackTrace); stackTraceLevel != "" {
 		parseLevel, err := zapcore.ParseLevel(stackTraceLevel)
 		if err != nil {

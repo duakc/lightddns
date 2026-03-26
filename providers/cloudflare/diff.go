@@ -21,11 +21,11 @@ type dnsUpdateRequest struct {
 	toUpdate bool
 }
 
-func (c *cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
+func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
 	return isDiff(c.diff(ctx, domain, addr))
 }
 
-func (c *cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr) ([]dnsUpdateRequest, error) {
+func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr) ([]dnsUpdateRequest, error) {
 	if len(addr) == 0 {
 		return nil, fmt.Errorf("empty address")
 	}

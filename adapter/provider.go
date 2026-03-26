@@ -6,8 +6,11 @@ import (
 )
 
 type Provider interface {
-	Type() string
-	Name() string
+	managedType
 	Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error)
 	Update(ctx context.Context, domain string, ttl int, addr []netip.Addr) error
 }
+
+type ProviderManager = Manager[Provider]
+
+var ProviderRegister = NewRegister[Provider]()

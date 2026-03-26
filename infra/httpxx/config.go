@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	CST "github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common"
 )
 
@@ -33,7 +33,7 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, ctxCancel := common.ContextWithTimeout(ctx, CST.DefaultHTTPTimeout)
+	ctx, ctxCancel := common.ContextWithTimeout(ctx, constpkg.DefaultHTTPTimeout)
 	defer ctxCancel()
 
 	rc.BaseURL = strings.TrimSuffix(rc.BaseURL, "/") // remove trailing slash

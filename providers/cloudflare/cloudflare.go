@@ -18,6 +18,14 @@ import (
 	"go.uber.org/zap"
 )
 
+func init() {
+	adapter.Register(
+		adapter.ProviderRegister,
+		constpkg.ProviderTypeCloudflare,
+		New,
+	)
+}
+
 func New(ctx context.Context, option options.OptionProviderCloudflare) (adapter.Provider, error) {
 	upstreamLogger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
 	logger := zaplog.ExtendName(upstreamLogger, option.Name)
@@ -25,7 +33,7 @@ func New(ctx context.Context, option options.OptionProviderCloudflare) (adapter.
 		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, providerpkg.ErrRequireToken)
 	}
 
-	cf := &cloudflare{
+	cf := &Cloudflare{
 		logger:  logger,
 		client:  internal.NewClient(ctx, option.Token),
 		zones:   new(generic.SyncMap[string, string]),
@@ -36,7 +44,7 @@ func New(ctx context.Context, option options.OptionProviderCloudflare) (adapter.
 	return cf, nil
 }
 
-type cloudflare struct {
+type Cloudflare struct {
 	logger *zap.Logger
 	client *internal.Client
 
@@ -48,15 +56,15 @@ type cloudflare struct {
 	privateRoute bool
 }
 
-func (c *cloudflare) Type() string {
+func (c *Cloudflare) Type() string {
 	return constpkg.ProviderTypeCloudflare
 }
 
-func (c *cloudflare) Name() string {
+func (c *Cloudflare) Name() string {
 	return c.name
 }
 
-func (c *cloudflare) getZoneID(ctx context.Context, domain string) (string, error) {
+func (c *Cloudflare) getZoneID(ctx context.Context, domain string) (string, error) {
 	// TODO: add domain suffix match
 	if existedZoneID, existed := c.zones.Load(domain); existed {
 		return existedZoneID, nil
@@ -69,7 +77,7 @@ func (c *cloudflare) getZoneID(ctx context.Context, domain string) (string, erro
 	return c.updateZoneID(ctx, domain)
 }
 
-func (c *cloudflare) updateZoneID(ctx context.Context, domain string) (string, error) {
+func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, error) {
 	zoneName := c.client.ListZoneName(domain)
 	for page, err := zoneName.Next(ctx); err != io.EOF; page, err = zoneName.Next(ctx) {
 		if err != nil {

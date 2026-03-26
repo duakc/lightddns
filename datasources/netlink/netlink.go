@@ -8,13 +8,23 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/lightddns/infra/ctxservice"
 	"github.com/duakc/lightddns/infra/netinterface"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	"go.uber.org/zap"
 )
 
-func New(logger *zap.Logger, option options.OptionDataSourceNetlink) (adapter.DataSource, error) {
+func init() {
+	adapter.Register(
+		adapter.DataSourceRegister,
+		constpkg.DataSourceTypeNetlink,
+		New,
+	)
+}
+
+func New(ctx context.Context, option options.OptionDataSourceNetlink) (adapter.DataSource, error) {
+	logger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
 	return &netlink{
 		logger:         zaplog.ExtendName(logger, option.Name),
 		name:           option.Name,
