@@ -8,8 +8,8 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/common/generic"
 	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"

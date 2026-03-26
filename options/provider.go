@@ -1,15 +1,31 @@
 package options
 
-import "encoding/json"
+import (
+	"github.com/duakc/lightddns/adapter"
+	goyaml "github.com/goccy/go-yaml"
+)
 
 type OptionProvider struct {
-	AbstractProviderOption `yaml:",inline"`
+	abstractProviderOption `yaml:",inline"`
 
-	Option any             `yaml:"-"`
-	Raw    json.RawMessage `yaml:"-"`
+	Option any `yaml:"-"`
 }
 
-type AbstractProviderOption struct {
+type _OptionProvider OptionProvider
+
+func (O *OptionProvider) UnmarshalYAML(bs []byte) error {
+	err := goyaml.Unmarshal(bs, (*_OptionProvider)(O))
+	if err != nil {
+		return err
+	}
+	O.Option, err = adapter.ProviderRegister.CreateOption(O.Type)
+	if err != nil {
+		return err
+	}
+	return goyaml.Unmarshal(bs, O.Option)
+}
+
+type abstractProviderOption struct {
 	Type string `yaml:"type"`
 	Name string `yaml:"name"`
 }

@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/duakc/lightddns"
@@ -17,6 +20,12 @@ type commandArgRunType struct {
 	options.Options
 
 	Config string
+
+	Once bool
+}
+
+type configTemplateContext struct {
+	Env map[string]string
 }
 
 var (
@@ -30,6 +39,7 @@ var (
 
 func init() {
 	runCommand.Flags().StringVarP(&cmdOption.Config, "config", "c", "", "Set config file path")
+	runCommand.Flags().BoolVar(&cmdOption.Once, "once", false, "Trigger once and quit")
 	// TODO: add a fast way to configure options rather than config file
 }
 
@@ -52,18 +62,39 @@ func runMain() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGQUIT)
 	defer stop()
 	ddns, err := lightddns.New(ctx, cmdOption.Options)
-	_ = ddns
-	_ = err
-
-	return nil
-}
-
-func openConfigBind(file string, opt *options.Options) error {
-	open, err := os.Open(file)
 	if err != nil {
 		return err
 	}
-	defer open.Close()
-	decoder := goyaml.NewDecoder(open, goyaml.DisallowUnknownField())
+	if cmdOption.Once {
+		ddns.Once(ctx)
+		return nil
+	}
+
+	return ddns.Start(ctx)
+}
+
+func openConfigBind(file string, opt *options.Options) error {
+	tempFile, err := template.ParseFiles(file)
+	if err != nil {
+		return err
+	}
+	var tempContext configTemplateContext
+	tempContext.Env = fullEnv()
+	configBuffer := bytes.NewBuffer(nil)
+	if err := tempFile.Execute(configBuffer, tempContext); err != nil {
+		return err
+	}
+
+	decoder := goyaml.NewDecoder(configBuffer, goyaml.DisallowUnknownField())
 	return decoder.Decode(opt)
+}
+
+func fullEnv() map[string]string {
+	var result = make(map[string]string)
+
+	for _, v := range os.Environ() {
+		vv := strings.SplitN(v, "=", 2)
+		result[vv[0]] = vv[1]
+	}
+	return result
 }

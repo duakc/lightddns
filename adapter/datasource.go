@@ -17,5 +17,6 @@ type DataSourceDualStack interface {
 }
 
 type DataSourceManager = Manager[DataSource]
+type DataSourceManagerKey struct{}
 
 var DataSourceRegister = NewRegister[DataSource]()

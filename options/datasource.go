@@ -1,15 +1,31 @@
 package options
 
-import "github.com/goccy/go-yaml"
+import (
+	"github.com/duakc/lightddns/adapter"
+	goyaml "github.com/goccy/go-yaml"
+)
 
 type OptionDataSource struct {
-	AbstractProviderOption `yaml:",inline"`
+	abstractDatasourceOption `yaml:",inline"`
 
-	Option any             `yaml:"-"`
-	Raw    yaml.RawMessage `yaml:"-"`
+	Option any `yaml:"-"`
 }
 
-type AbstractDatasourceOption struct {
+type _OptionDataSource OptionDataSource
+
+func (O *OptionDataSource) UnmarshalYAML(bs []byte) error {
+	err := goyaml.Unmarshal(bs, (*_OptionDataSource)(O))
+	if err != nil {
+		return err
+	}
+	O.Option, err = adapter.DataSourceRegister.CreateOption(O.Type)
+	if err != nil {
+		return err
+	}
+	return goyaml.Unmarshal(bs, O.Option)
+}
+
+type abstractDatasourceOption struct {
 	Type string `yaml:"type"`
 	Name string `yaml:"name"`
 }

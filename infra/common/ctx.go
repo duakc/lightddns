@@ -6,7 +6,9 @@ import (
 )
 
 func ContextWithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	if _, isDeadline := ctx.Deadline(); !isDeadline {
+	now := time.Now()
+	if deadline, isDeadline := ctx.Deadline(); !isDeadline ||
+		deadline.Before(now) || deadline.Sub(now) > timeout {
 		return context.WithTimeout(ctx, timeout)
 	}
 
