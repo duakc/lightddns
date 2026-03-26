@@ -5,8 +5,6 @@ import "context"
 type Registry interface {
 	Store(k, v any)
 	Load(k any) any
-
-	Clear()
 }
 
 type registryKey struct{}
@@ -21,16 +19,9 @@ func Store[K comparable, V any](ctx context.Context, key K, value V) {
 	registry.Store(key, value)
 }
 
-func NewRegistry(ctx context.Context) (context.Context, Registry) {
-	r := ctx.Value(registryKey{})
-	if r == nil {
-		reg := newDefaultRegistry()
-		ctx = context.WithValue(ctx, registryKey{}, r)
-		return ctx, reg
-	}
-	reg := r.(Registry)
-	reg.Clear()
-	return ctx, reg
+func NewRegistry(ctx context.Context, r Registry) context.Context {
+	ctx = context.WithValue(ctx, registryKey{}, r)
+	return ctx
 }
 
 func RegistryFromContext(ctx context.Context) Registry {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/netip"
 
-	CST "github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
@@ -36,7 +36,7 @@ func (c *cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr)
 	}
 	var differentRecords []dnsUpdateRequest
 	if ipv4Addresses := common.Filter(addr, netxx.IsIPv4); len(ipv4Addresses) > 0 {
-		records, err := c.client.ListDNSRecords(domain, zoneID, CST.DNSTypeA)
+		records, err := c.client.ListDNSRecords(domain, zoneID, constpkg.DNSTypeA)
 		if err != nil {
 			return nil, fmt.Errorf("ListDNSRecords: %w", err)
 		}
@@ -47,7 +47,7 @@ func (c *cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr)
 		differentRecords = append(differentRecords, dnsRecords...)
 	}
 	if ipv6Addresses := common.Filter(addr, netxx.IsIPv6); len(ipv6Addresses) > 0 {
-		records, err := c.client.ListDNSRecords(domain, zoneID, CST.DNSTypeAAAA)
+		records, err := c.client.ListDNSRecords(domain, zoneID, constpkg.DNSTypeAAAA)
 		if err != nil {
 			return nil, fmt.Errorf("ListDNSRecords: %w", err)
 		}

@@ -2,23 +2,23 @@ package ctxservice
 
 import "sync"
 
-type defaultRegistry struct {
+type DefaultRegistry struct {
 	m *sync.Map
 }
 
-func newDefaultRegistry() *defaultRegistry {
-	return &defaultRegistry{m: &sync.Map{}}
+func NewDefaultRegistry() *DefaultRegistry {
+	return &DefaultRegistry{m: &sync.Map{}}
 }
 
-func (d *defaultRegistry) Store(k, v any) {
+func (d *DefaultRegistry) Store(k, v any) {
 	d.m.Store(k, v)
 }
 
-func (d *defaultRegistry) Load(k any) any {
+func (d *DefaultRegistry) Load(k any) any {
 	v, _ := d.m.Load(k)
 	return v
 }
 
-func (d *defaultRegistry) Clear() {
+func (d *DefaultRegistry) Clear() {
 	d.m.Clear()
 }

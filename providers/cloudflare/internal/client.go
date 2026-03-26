@@ -23,6 +23,13 @@ func NewClient(ctx context.Context, token string) *Client {
 	}
 }
 
+func (c *Client) NewRequestConfig(method string) httpxx.ReqConfig {
+	return httpxx.ReqConfig{
+		Method:  method,
+		BaseURL: cloudflareApiEndpoint,
+	}
+}
+
 func (c *Client) ListZoneName(name string) *PageConfig[Zone] {
 	r := c.NewRequestConfig(http.MethodGet)
 	r.Query.Set("status", "active")
@@ -60,13 +67,6 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 	}
 
 	return createResult.JoinError(err)
-}
-
-func (c *Client) NewRequestConfig(method string) httpxx.ReqConfig {
-	return httpxx.ReqConfig{
-		Method:  method,
-		BaseURL: cloudflareApiEndpoint,
-	}
 }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID string) error {

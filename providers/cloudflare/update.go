@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 
-	CST "github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 )
@@ -51,9 +51,9 @@ func ipToUpdateDNSRecord(name string, ip netip.Addr, ttl int, PrivateRouting boo
 		Proxied:        Proxied,
 	}
 	if netxx.IsIPv6(ip) {
-		req.Type = CST.DNSTypeAAAA
+		req.Type = constpkg.DNSTypeAAAA
 	} else {
-		req.Type = CST.DNSTypeA
+		req.Type = constpkg.DNSTypeA
 	}
 	return req
 }

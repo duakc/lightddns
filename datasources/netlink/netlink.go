@@ -6,7 +6,7 @@ import (
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter"
-	CST "github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/netinterface"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -33,7 +33,7 @@ type netlink struct {
 }
 
 func (n *netlink) Type() string {
-	return CST.DataSourceTypeNetlink
+	return constpkg.DataSourceTypeNetlink
 }
 
 func (n *netlink) Name() string {

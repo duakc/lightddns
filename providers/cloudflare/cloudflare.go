@@ -7,19 +7,33 @@ import (
 	"sync"
 
 	"github.com/duakc/lightddns/adapter"
-	CST "github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common/generic"
 	"github.com/duakc/lightddns/infra/ctxservice"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+	providerpkg "github.com/duakc/lightddns/providers"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 	"go.uber.org/zap"
 )
 
 func New(ctx context.Context, option options.OptionProviderCloudflare) (adapter.Provider, error) {
-	logger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
+	upstreamLogger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
+	logger := zaplog.ExtendName(upstreamLogger, option.Name)
+	if option.Token == "" {
+		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, providerpkg.ErrRequireToken)
+	}
 
+	cf := &cloudflare{
+		logger:  logger,
+		client:  internal.NewClient(ctx, option.Token),
+		zones:   new(generic.SyncMap[string, string]),
+		name:    option.Name,
+		proxied: option.Proxy,
+	}
+
+	return cf, nil
 }
 
 type cloudflare struct {
@@ -35,7 +49,7 @@ type cloudflare struct {
 }
 
 func (c *cloudflare) Type() string {
-	return CST.ProviderTypeCloudflare
+	return constpkg.ProviderTypeCloudflare
 }
 
 func (c *cloudflare) Name() string {
