@@ -54,7 +54,7 @@ type ResponseWithResult[T any] struct {
 
 type ResponseWithPage[T any] struct {
 	Response   `json:",inline"`
-	Results    []T        `json:"results"`
+	Result     []T        `json:"result"`
 	ResultInfo ResultInfo `json:"result_info"`
 }
 

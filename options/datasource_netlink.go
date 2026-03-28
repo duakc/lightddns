@@ -1,8 +1,9 @@
 package options
 
 type OptionDataSourceNetlink struct {
-	abstractDatasourceOption `yaml:",inline"`
+	AbstractDatasourceOption `yaml:",inline"`
 
-	Interface string `yaml:"interface"`
-	Index     int    `yaml:"index"`
+	Interface    string `yaml:"interface"`
+	Index        int    `yaml:"index"`
+	AllowPrivate bool   `yaml:"allow-private"`
 }

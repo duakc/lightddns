@@ -37,5 +37,5 @@ func (E *ResponseError) Error() string {
 	if E.Message != "" {
 		formatMessage += ": " + E.Message
 	}
-	return fmt.Sprintf(formatMessage+": %w", E.URL, E.Method, E.Err)
+	return fmt.Sprintf(formatMessage+": %s", E.URL, E.Method, E.Err.Error())
 }

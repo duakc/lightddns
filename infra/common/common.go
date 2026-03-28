@@ -1,9 +1,16 @@
 package common
 
-import "slices"
+import (
+	"cmp"
+	"slices"
+)
 
 func Zero[T any]() T {
 	var v T
+	return v
+}
+
+func Comparable[T comparable](v T) T {
 	return v
 }
 
@@ -55,4 +62,25 @@ func Reduce[T any, S ~[]T](arr S, fn func(v1, v2 T) T) T {
 		piovt = fn(piovt, arr[i])
 	}
 	return piovt
+}
+
+func Sum[T cmp.Ordered, S ~[]T](arr S) T {
+	var su T
+	for i := 0; i < len(arr); i++ {
+		su += arr[i]
+	}
+	return su
+}
+
+func MergeMap[K comparable, V any](mm ...map[K]V) map[K]V {
+	allLen := Sum(Map(mm, func(s map[K]V) int {
+		return len(mm)
+	}))
+	res := make(map[K]V, allLen)
+	for _, m := range mm {
+		for k, v := range m {
+			res[k] = v
+		}
+	}
+	return res
 }

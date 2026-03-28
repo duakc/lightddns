@@ -11,7 +11,7 @@ type Provider interface {
 	Update(ctx context.Context, domain string, ttl int, addr []netip.Addr) error
 }
 
-type ProviderManager = Manager[Provider]
+type ProviderManager = DefaultManager[Provider]
 type ProviderManagerKey struct{}
 
 var ProviderRegister = NewRegister[Provider]()

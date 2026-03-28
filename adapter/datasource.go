@@ -16,7 +16,7 @@ type DataSourceDualStack interface {
 	IPv6(ctx context.Context) ([]netip.Addr, error)
 }
 
-type DataSourceManager = Manager[DataSource]
+type DataSourceManager = DefaultManager[DataSource]
 type DataSourceManagerKey struct{}
 
 var DataSourceRegister = NewRegister[DataSource]()

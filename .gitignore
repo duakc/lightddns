@@ -32,4 +32,5 @@ go.work.sum
 .vscode/
 
 *.ignore
+config.d/
 .DS_Store/

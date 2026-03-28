@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common"
 )
 
@@ -33,6 +34,9 @@ func JSONRequest[O any](ctx context.Context, do HTTPRequester, req ReqConfig, in
 	if err != nil {
 		return common.Zero[O](), nil, fmt.Errorf("toRequest: %w", err)
 	}
+	var cancel context.CancelFunc
+	ctx, cancel = common.ContextWithTimeout(ctx, constpkg.DefaultHTTPTimeout)
+	defer cancel()
 	response, err := do.Do(request)
 	if err != nil {
 		return common.Zero[O](), nil, NewResponseError(req.Method, request.URL.String(), err)

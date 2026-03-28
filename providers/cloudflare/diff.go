@@ -26,38 +26,35 @@ func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr)
 }
 
 func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr) ([]dnsUpdateRequest, error) {
-	if len(addr) == 0 {
-		return nil, fmt.Errorf("empty address")
-	}
-
 	zoneID, err := c.getZoneID(ctx, domain)
 	if err != nil {
 		return nil, fmt.Errorf("getZoneID: %w", err)
 	}
 	var differentRecords []dnsUpdateRequest
-	if ipv4Addresses := common.Filter(addr, netxx.IsIPv4); len(ipv4Addresses) > 0 {
-		records, err := c.client.ListDNSRecords(domain, zoneID, constpkg.DNSTypeA)
-		if err != nil {
-			return nil, fmt.Errorf("ListDNSRecords: %w", err)
-		}
-		dnsRecords, err := compareRecords(ctx, ipv4Addresses, records)
+	if ipv4Address := common.Filter(addr, netxx.IsIPv4); len(ipv4Address) > 0 || len(addr) == 0 {
+		diffType, err := c.diffType(ctx, domain, zoneID, ipv4Address, constpkg.DNSTypeA)
 		if err != nil {
 			return nil, err
 		}
-		differentRecords = append(differentRecords, dnsRecords...)
+		differentRecords = append(differentRecords, diffType...)
 	}
-	if ipv6Addresses := common.Filter(addr, netxx.IsIPv6); len(ipv6Addresses) > 0 {
-		records, err := c.client.ListDNSRecords(domain, zoneID, constpkg.DNSTypeAAAA)
-		if err != nil {
-			return nil, fmt.Errorf("ListDNSRecords: %w", err)
-		}
-		dnsRecords, err := compareRecords(ctx, ipv6Addresses, records)
+	if ipv6Address := common.Filter(addr, netxx.IsIPv6); len(ipv6Address) > 0 || len(addr) == 0 {
+		diffType, err := c.diffType(ctx, domain, zoneID, ipv6Address, constpkg.DNSTypeAAAA)
 		if err != nil {
 			return nil, err
 		}
-		differentRecords = append(differentRecords, dnsRecords...)
+		differentRecords = append(differentRecords, diffType...)
 	}
+
 	return differentRecords, nil
+}
+
+func (c *Cloudflare) diffType(ctx context.Context, domain, zoneID string, addr []netip.Addr, typ string) ([]dnsUpdateRequest, error) {
+	records, err := c.client.ListDNSRecords(domain, zoneID, typ)
+	if err != nil {
+		return nil, fmt.Errorf("ListDNSRecords: %w", err)
+	}
+	return compareRecords(ctx, addr, records)
 }
 
 func compareRecords(ctx context.Context, addresses []netip.Addr, records *internal.PageConfig[internal.DNSRecord]) ([]dnsUpdateRequest, error) {
@@ -88,13 +85,21 @@ func compareRecords(ctx context.Context, addresses []netip.Addr, records *intern
 				diffRecords = append(diffRecords, r)
 			}
 		}
-
+	}
+	for i := 0; i < len(diffRecords); i++ {
+		if diffRecords[i].toUpdate {
+			for addr, _ := range addressesMap {
+				diffRecords[i].address = addr
+				delete(addressesMap, addr)
+				break
+			}
+		}
 	}
 
 	for addr, _ := range addressesMap {
 		r := newUpdateRequest(internal.DNSRecord{}, addr)
 		r.toCreate = true
-		diffRecords = append(diffRecords)
+		diffRecords = append(diffRecords, r)
 	}
 	return diffRecords, nil
 }

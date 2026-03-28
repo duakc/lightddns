@@ -27,7 +27,7 @@ type Domain struct {
 	provider   adapter.Provider
 	datasource []adapter.DataSource
 
-	domainNames []string
+	domainNames string
 	ttl         int
 	ipv4        bool
 	ipv6        bool
@@ -36,7 +36,7 @@ type Domain struct {
 }
 
 func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
-	if !opt.Enabled || len(opt.Domain.Value) == 0 {
+	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, errDomainNotEnabled
 	}
 	if len(opt.DataSource.Value) == 0 {
@@ -53,11 +53,8 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 		opt.IPv4 = true
 		opt.IPv6 = true
 	}
-	for i := 0; i < len(opt.Domain.Value); i++ {
-		domain := opt.Domain.Value[i]
-		if !netxx.IsDomainName(domain) {
-			return nil, fmt.Errorf("domain %s not a valid domain name", domain)
-		}
+	if !netxx.IsDomainName(opt.Domain) {
+		return nil, fmt.Errorf("domain %s not a valid domain name", opt.Domain)
 	}
 	var (
 		dataSources    []adapter.DataSource
@@ -67,7 +64,7 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 
 	logger := ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]())
 	providerManager := ctxservice.Lookup[*adapter.ProviderManager](ctx, common.Zero[adapter.ProviderManagerKey]())
-	dataSourceManager := ctxservice.Lookup[*adapter.DataSourceManager](ctx, common.Zero[adapter.DataSourceManager]())
+	dataSourceManager := ctxservice.Lookup[*adapter.DataSourceManager](ctx, common.Zero[adapter.DataSourceManagerKey]())
 
 	if opt.Interval != "" {
 		updateIntervalParsed, err := time.ParseDuration(opt.Interval)
@@ -98,7 +95,7 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 		datasource:     dataSources,
 		updateInterval: updateInterval,
 
-		domainNames: opt.Domain.Value,
+		domainNames: opt.Domain,
 		ttl:         opt.TTL,
 		ipv4:        opt.IPv6,
 		ipv6:        opt.IPv6,
@@ -115,10 +112,8 @@ func (D *Domain) UpdateOnce(ctx context.Context) error {
 		return fmt.Errorf("fetchIP: %w", err)
 	}
 
-	for i := 0; i < len(D.domainNames); i++ {
-		if err := D.provider.Update(ctx, D.domainNames[i], D.ttl, netips); err != nil {
-			return fmt.Errorf("update %s: %w", D.domainNames[i], err)
-		}
+	if err := D.provider.Update(ctx, D.domainNames, D.ttl, netips); err != nil {
+		return fmt.Errorf("update %s: %w", D.domainNames, err)
 	}
 	return nil
 }
@@ -141,6 +136,7 @@ func (D *Domain) UpdateLoop(ctx context.Context) {
 			logger.Warn("quited", zap.Error(ctx.Err()))
 			return
 		}
+		ticker.Reset(D.updateInterval)
 	}
 }
 

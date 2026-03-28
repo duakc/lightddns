@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/duakc/lightddns/adapter"
@@ -65,41 +66,59 @@ func (c *Cloudflare) Name() string {
 }
 
 func (c *Cloudflare) getZoneID(ctx context.Context, domain string) (string, error) {
-	// TODO: add domain suffix match
-	if existedZoneID, existed := c.zones.Load(domain); existed {
+	if !netxx.IsDomainName(domain) {
+		return "", fmt.Errorf("bad domain name")
+	}
+	if existedZoneID := c.fullMatchDomainZoneID(domain); existedZoneID != "" {
 		return existedZoneID, nil
 	}
+
 	c.zoneMutex.Lock()
 	defer c.zoneMutex.Unlock()
-	if existedZoneID, existed := c.zones.Load(domain); existed {
+	if existedZoneID := c.fullMatchDomainZoneID(domain); existedZoneID != "" {
 		return existedZoneID, nil
 	}
 	return c.updateZoneID(ctx, domain)
 }
 
 func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, error) {
-	zoneName := c.client.ListZoneName(domain)
+	logger := c.logger
+	zoneName := c.client.ListZones()
+	zoneID := ""
 	for page, err := zoneName.Next(ctx); err != io.EOF; page, err = zoneName.Next(ctx) {
 		if err != nil {
 			return "", err
 		}
 		for i := 0; i < len(page); i++ {
 			zone := page[i]
-			if len(zone.ID) < 4 {
-				return "",
-					fmt.Errorf("zone id too short for %s", domain)
-			}
-			if !netxx.IsSubDomain(domain, zone.Name) {
+			if !netxx.IsDomainName(zone.Name) {
+				logger.Warn("upstream return a wrong domain",
+					zap.String("domain", zone.Name))
 				continue
 			}
+			if netxx.IsSubDomain(domain, zone.Name) {
+				zoneID = zone.ID
+			}
 
-			c.logger.Info("found zone id",
-				zap.String("domain", domain))
+			logger.Info("found zone id", zap.String("domain", domain))
 
 			c.zones.Store(zone.Name, zone.ID)
 			c.zones.Store(domain, zone.ID)
-			return zone.ID, nil
 		}
 	}
+	if zoneID != "" {
+		return zoneID, nil
+	}
 	return "", fmt.Errorf("not found zone id for %s", domain)
+}
+
+func (c *Cloudflare) fullMatchDomainZoneID(domain string) string {
+	domainToken := strings.Split(domain, ".")
+	for i := len(domainToken) - 1; i > -1; i-- {
+		fullDomain := strings.Join(domainToken[i:], ".")
+		if existedZoneID, existed := c.zones.Load(fullDomain); existed {
+			return existedZoneID
+		}
+	}
+	return ""
 }

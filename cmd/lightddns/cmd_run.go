@@ -11,8 +11,10 @@ import (
 	"syscall"
 
 	"github.com/duakc/lightddns"
+	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/options"
 	goyaml "github.com/goccy/go-yaml"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +43,8 @@ func init() {
 	runCommand.Flags().StringVarP(&cmdOption.Config, "config", "c", "", "Set config file path")
 	runCommand.Flags().BoolVar(&cmdOption.Once, "once", false, "Trigger once and quit")
 	// TODO: add a fast way to configure options rather than config file
+
+	rootCommand.AddCommand(runCommand)
 }
 
 func commandEntryRun(cmd *cobra.Command, args []string) {
@@ -65,8 +69,8 @@ func runMain() error {
 	if err != nil {
 		return err
 	}
+	ddns.Once(ctx)
 	if cmdOption.Once {
-		ddns.Once(ctx)
 		return nil
 	}
 
@@ -95,6 +99,21 @@ func fullEnv() map[string]string {
 	for _, v := range os.Environ() {
 		vv := strings.SplitN(v, "=", 2)
 		result[vv[0]] = vv[1]
+	}
+	if _, err := os.Stat(".env"); err == nil {
+		envFile, err := os.ReadFile(".env")
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr,
+				".env file found but read failed: %s\n", err.Error())
+			return result
+		}
+		unmarshalBytes, err := godotenv.UnmarshalBytes(envFile)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr,
+				".env file parse failed: %s\n", err.Error())
+			return result
+		}
+		result = common.MergeMap(result, unmarshalBytes)
 	}
 	return result
 }

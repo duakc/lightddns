@@ -13,7 +13,12 @@ type managedType interface {
 	Name() string
 }
 
-type Manager[T managedType] struct {
+type Manager[T managedType] interface {
+	Create(ctx context.Context, typ string, opt any) error
+	Lookup(name string) (T, bool)
+}
+
+type DefaultManager[T managedType] struct {
 	access sync.RWMutex
 
 	items      []T
@@ -22,15 +27,15 @@ type Manager[T managedType] struct {
 	register Registry[T]
 }
 
-func NewManager[T managedType](R Registry[T]) *Manager[T] {
-	return &Manager[T]{
+func NewManager[T managedType](R Registry[T]) *DefaultManager[T] {
+	return &DefaultManager[T]{
 		items:      make([]T, 0),
 		itemByName: make(map[string]T),
 		register:   R,
 	}
 }
 
-func (M *Manager[T]) Create(ctx context.Context, typ string, opt any) error {
+func (M *DefaultManager[T]) Create(ctx context.Context, typ string, opt any) error {
 	item, err := M.register.Create(ctx, typ, opt)
 	if err != nil {
 		return err
@@ -51,7 +56,7 @@ func (M *Manager[T]) Create(ctx context.Context, typ string, opt any) error {
 	return nil
 }
 
-func (M *Manager[T]) Lookup(name string) (T, bool) {
+func (M *DefaultManager[T]) Lookup(name string) (T, bool) {
 	M.access.RLock()
 	defer M.access.RUnlock()
 

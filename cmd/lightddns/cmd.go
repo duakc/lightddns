@@ -1,6 +1,10 @@
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"log"
+
+	"github.com/spf13/cobra"
+)
 
 var (
 	rootCommand = &cobra.Command{
@@ -10,6 +14,6 @@ var (
 
 func main() {
 	if err := rootCommand.Execute(); err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
 }

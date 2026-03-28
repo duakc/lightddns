@@ -6,7 +6,7 @@ import (
 )
 
 type OptionProvider struct {
-	abstractProviderOption `yaml:",inline"`
+	AbstractProviderOption `yaml:",inline"`
 
 	Option any `yaml:"-"`
 }
@@ -25,7 +25,7 @@ func (O *OptionProvider) UnmarshalYAML(bs []byte) error {
 	return goyaml.Unmarshal(bs, O.Option)
 }
 
-type abstractProviderOption struct {
+type AbstractProviderOption struct {
 	Type string `yaml:"type"`
 	Name string `yaml:"name"`
 }

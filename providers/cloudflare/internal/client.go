@@ -24,10 +24,13 @@ func NewClient(ctx context.Context, token string) *Client {
 }
 
 func (c *Client) NewRequestConfig(method string) httpxx.ReqConfig {
-	return httpxx.ReqConfig{
-		Method:  method,
-		BaseURL: cloudflareApiEndpoint,
-	}
+	return httpxx.NewReqConfig(method, cloudflareApiEndpoint)
+}
+
+func (c *Client) ListZones() *PageConfig[Zone] {
+	r := c.NewRequestConfig(http.MethodGet)
+	r.Query.Set("status", "active")
+	return NewPaging[Zone](r, c.client)
 }
 
 func (c *Client) ListZoneName(name string) *PageConfig[Zone] {
@@ -71,7 +74,7 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID string) error {
 	r := c.NewRequestConfig(http.MethodDelete)
-	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_record", dnsRecordID)
+	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", dnsRecordID)
 	httpReq, err := r.ToRequestContext(ctx)
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)

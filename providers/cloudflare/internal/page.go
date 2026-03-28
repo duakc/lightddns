@@ -47,10 +47,10 @@ func (pc *PageConfig[T]) Next(ctx context.Context) ([]T, error) {
 	if E := result.JoinError(err); E != nil {
 		return nil, E
 	}
-	
+
 	pc.resultInfo = result.ResultInfo
 	pc.done = result.ResultInfo.Page == result.ResultInfo.TotalPages
-	return result.Results, nil
+	return result.Result, nil
 }
 
 func (pc *PageConfig[T]) TotalCount() int {

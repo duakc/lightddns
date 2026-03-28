@@ -28,8 +28,9 @@ func New(ctx context.Context, option options.OptionDataSourceNetlink) (adapter.D
 	return &netlink{
 		logger:         zaplog.ExtendName(logger, option.Name),
 		name:           option.Name,
-		interfaceName:  option.Name,
+		interfaceName:  option.Interface,
 		interfaceIndex: option.Index,
+		allowPrivate:   option.AllowPrivate,
 	}, nil
 }
 
@@ -40,6 +41,7 @@ type netlink struct {
 
 	interfaceName  string
 	interfaceIndex int
+	allowPrivate   bool
 }
 
 func (n *netlink) Type() string {
@@ -51,6 +53,16 @@ func (n *netlink) Name() string {
 }
 
 func (n *netlink) IP(ctx context.Context) ([]netip.Addr, error) {
+	ip, err := n.ip(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return common.Filter(ip, func(addr netip.Addr) bool {
+		return n.allowPrivate || addr.IsGlobalUnicast()
+	}), nil
+}
+
+func (n *netlink) ip(ctx context.Context) ([]netip.Addr, error) {
 	logger := n.logger
 	if n.interfaceIndex != 0 {
 		logger.Debug("use index", zap.Int("index", n.interfaceIndex))

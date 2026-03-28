@@ -6,12 +6,12 @@ import (
 
 type OptionDomain struct {
 	Enabled  bool   `yaml:"enabled"`
+	Domain   string `yaml:"domain"`
 	Interval string `yaml:"interval"`
 	TTL      int    `yaml:"ttl"`
 	IPv4     bool   `yaml:"ipv4"`
 	IPv6     bool   `yaml:"ipv6"`
 	Provider string `yaml:"provider"`
 
-	Domain     badyaml.Listable[string] `yaml:"domain"`
 	DataSource badyaml.Listable[string] `yaml:"datasource"`
 }

@@ -73,13 +73,11 @@ func (ddns *LightDDNS) Once(ctx context.Context) {
 	logger := ddns.logger
 	defer logger.Sync()
 
-	logger.Info("once")
-
 	for i := 0; i < len(ddns.domains); i++ {
 		domain := ddns.domains[i]
 		err := domain.UpdateOnce(ctx)
 		if err != nil {
-			logger.Error("once update failed", zap.Error(err))
+			logger.Error("update failed", zap.Error(err))
 			return
 		}
 	}

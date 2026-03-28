@@ -1,8 +1,8 @@
 package options
 
 type OptionProviderCloudflare struct {
-	abstractProviderOption `yaml:",inline"`
+	AbstractProviderOption `yaml:",inline"`
 
 	Token string `yaml:"token"`
-	Proxy bool   `yaml:"Proxy"`
+	Proxy bool   `yaml:"proxy"`
 }

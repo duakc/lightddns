@@ -6,7 +6,7 @@ import (
 )
 
 type OptionDataSource struct {
-	abstractDatasourceOption `yaml:",inline"`
+	AbstractDatasourceOption `yaml:",inline"`
 
 	Option any `yaml:"-"`
 }
@@ -25,7 +25,7 @@ func (O *OptionDataSource) UnmarshalYAML(bs []byte) error {
 	return goyaml.Unmarshal(bs, O.Option)
 }
 
-type abstractDatasourceOption struct {
+type AbstractDatasourceOption struct {
 	Type string `yaml:"type"`
 	Name string `yaml:"name"`
 }
