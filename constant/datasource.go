@@ -1,5 +1,9 @@
 package constant
 
 const (
-	DataSourceTypeNetlink = "netlink"
+	DatasourceTypeName = "Datasource"
+)
+
+const (
+	DatasourceTypeNetlink = "netlink"
 )

@@ -71,6 +71,9 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ParseDuration: %w", err)
 		}
+		if updateIntervalParsed < 5*time.Second {
+			return nil, fmt.Errorf("update interval can not lower than 5s")
+		}
 		updateInterval = updateIntervalParsed
 	}
 
@@ -102,32 +105,37 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 	}, nil
 }
 
-func (D *Domain) UpdateOnce(ctx context.Context) error {
+func (d *Domain) UpdateOnce(ctx context.Context) error {
+	logger := d.logger
+	defer logger.Sync()
+
 	var cancel context.CancelFunc
-	ctx, cancel = common.ContextWithTimeout(ctx, D.updateInterval)
+	ctx, cancel = common.ContextWithTimeout(ctx, d.updateInterval)
 	defer cancel()
 
-	netips, err := D.fetchIP(ctx)
+	netips, err := d.fetchIP(ctx)
 	if err != nil {
 		return fmt.Errorf("fetchIP: %w", err)
 	}
+	logger.Debug("found ip",
+		zap.String("domain", d.domainNames), zap.Stringers("ip", netips))
 
-	if err := D.provider.Update(ctx, D.domainNames, D.ttl, netips); err != nil {
-		return fmt.Errorf("update %s: %w", D.domainNames, err)
+	if err := d.provider.Update(ctx, d.domainNames, d.ttl, netips); err != nil {
+		return fmt.Errorf("update %s: %w", d.domainNames, err)
 	}
 	return nil
 }
 
-func (D *Domain) UpdateLoop(ctx context.Context) {
-	logger := D.logger
+func (d *Domain) UpdateLoop(ctx context.Context) {
+	logger := d.logger
 	defer logger.Sync()
-	ticker := time.NewTicker(D.updateInterval)
+	ticker := time.NewTicker(d.updateInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			deadlineCtx, cancel := context.WithTimeout(ctx, D.updateInterval)
-			err := D.UpdateOnce(deadlineCtx)
+			deadlineCtx, cancel := context.WithTimeout(ctx, d.updateInterval)
+			err := d.UpdateOnce(deadlineCtx)
 			if err != nil {
 				logger.Error("update failed", zap.Error(err))
 			}
@@ -136,22 +144,22 @@ func (D *Domain) UpdateLoop(ctx context.Context) {
 			logger.Warn("quited", zap.Error(ctx.Err()))
 			return
 		}
-		ticker.Reset(D.updateInterval)
+		ticker.Reset(d.updateInterval)
 	}
 }
 
-func (D *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
+func (d *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 	var netips []netip.Addr
 
-	for i := 0; i < len(D.datasource); i++ {
+	for i := 0; i < len(d.datasource); i++ {
 
 		var (
-			datasource = D.datasource[i]
+			datasource = d.datasource[i]
 			addresses  []netip.Addr
 			err        error
 		)
 		if dualStackDataSource, ok := datasource.(adapter.DataSourceDualStack); ok {
-			addresses, err = D.fetchIPDualStack(ctx, dualStackDataSource)
+			addresses, err = d.fetchIPDualStack(ctx, dualStackDataSource)
 		} else {
 			addresses, err = datasource.IP(ctx)
 			if err != nil {
@@ -171,10 +179,10 @@ func (D *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 	return netips, nil
 }
 
-func (D *Domain) fetchIPDualStack(ctx context.Context,
+func (d *Domain) fetchIPDualStack(ctx context.Context,
 	dualStackDataSource adapter.DataSourceDualStack) ([]netip.Addr, error) {
 	var netips []netip.Addr
-	if D.ipv4 {
+	if d.ipv4 {
 		addr, err := dualStackDataSource.IPv4(ctx)
 		if err != nil {
 			return nil, &datasourceError{
@@ -185,7 +193,7 @@ func (D *Domain) fetchIPDualStack(ctx context.Context,
 		}
 		netips = append(netips, addr...)
 	}
-	if D.ipv6 {
+	if d.ipv6 {
 		addr, err := dualStackDataSource.IPv4(ctx)
 		if err != nil {
 			return nil, &datasourceError{

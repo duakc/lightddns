@@ -89,6 +89,7 @@ func compareRecords(ctx context.Context, addresses []netip.Addr, records *intern
 	for i := 0; i < len(diffRecords); i++ {
 		if diffRecords[i].toUpdate {
 			for addr, _ := range addressesMap {
+				// pick one and delete
 				diffRecords[i].address = addr
 				delete(addressesMap, addr)
 				break

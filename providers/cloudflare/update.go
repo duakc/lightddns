@@ -14,6 +14,7 @@ import (
 func (c *Cloudflare) Update(ctx context.Context, domain string, ttl int, addr []netip.Addr) error {
 	logger := c.logger
 	defer logger.Sync()
+	logger.Debug("new update request", zap.Stringers("addresses", addr))
 	if ttl < 0 {
 		ttl = 0
 	}
@@ -23,7 +24,8 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl int, addr []
 	}
 	diffRecords, err := c.diff(ctx, domain, addr)
 	if diff, er := isDiff(diffRecords, err); !diff || er != nil {
-		if len(diffRecords) == 0 {
+		if len(diffRecords) == 0 && er == nil {
+			logger.Debug("no difference since last update, skip")
 			return nil
 		}
 		return fmt.Errorf("diff: %w", err)

@@ -29,13 +29,13 @@ func init() {
 
 func New(ctx context.Context, option options.OptionProviderCloudflare) (adapter.Provider, error) {
 	upstreamLogger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
-	logger := zaplog.ExtendName(upstreamLogger, option.Name)
 	if option.Token == "" {
 		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, providerpkg.ErrRequireToken)
 	}
 
 	cf := &Cloudflare{
-		logger:  logger,
+		logger: zaplog.ExtendName(upstreamLogger, option.Name).With(
+			zap.String("type", constpkg.ProviderTypeName)),
 		client:  internal.NewClient(ctx, option.Token),
 		zones:   new(generic.SyncMap[string, string]),
 		name:    option.Name,
@@ -83,8 +83,11 @@ func (c *Cloudflare) getZoneID(ctx context.Context, domain string) (string, erro
 
 func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, error) {
 	logger := c.logger
+	defer logger.Sync()
 	zoneName := c.client.ListZones()
-	zoneID := ""
+
+	logger.Info("search zone id from upstream", zap.String("domain", domain))
+
 	for page, err := zoneName.Next(ctx); err != io.EOF; page, err = zoneName.Next(ctx) {
 		if err != nil {
 			return "", err
@@ -92,24 +95,20 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, e
 		for i := 0; i < len(page); i++ {
 			zone := page[i]
 			if !netxx.IsDomainName(zone.Name) {
-				logger.Warn("upstream return a wrong domain",
-					zap.String("domain", zone.Name))
+				logger.Warn("upstream return a bad domain", zap.String("domain", zone.Name))
 				continue
 			}
-			if netxx.IsSubDomain(domain, zone.Name) {
-				zoneID = zone.ID
-			}
 
-			logger.Info("found zone id", zap.String("domain", domain))
+			logger.Info("found zone id", zap.String("domain", domain), zap.String("zone", zone.Name))
 
 			c.zones.Store(zone.Name, zone.ID)
 			c.zones.Store(domain, zone.ID)
 		}
 	}
-	if zoneID != "" {
+	if zoneID := c.fullMatchDomainZoneID(domain); zoneID != "" {
 		return zoneID, nil
 	}
-	return "", fmt.Errorf("not found zone id for %s", domain)
+	return "", fmt.Errorf("zone id for %s not found", domain)
 }
 
 func (c *Cloudflare) fullMatchDomainZoneID(domain string) string {

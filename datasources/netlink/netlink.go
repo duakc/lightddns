@@ -18,15 +18,17 @@ import (
 func init() {
 	adapter.Register(
 		adapter.DataSourceRegister,
-		constpkg.DataSourceTypeNetlink,
+		constpkg.DatasourceTypeNetlink,
 		New,
 	)
 }
 
 func New(ctx context.Context, option options.OptionDataSourceNetlink) (adapter.DataSource, error) {
 	logger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
+
 	return &netlink{
-		logger:         zaplog.ExtendName(logger, option.Name),
+		logger: zaplog.ExtendName(logger, option.Name).With(
+			zap.String("type", constpkg.DatasourceTypeName)),
 		name:           option.Name,
 		interfaceName:  option.Interface,
 		interfaceIndex: option.Index,
@@ -45,7 +47,7 @@ type netlink struct {
 }
 
 func (n *netlink) Type() string {
-	return constpkg.DataSourceTypeNetlink
+	return constpkg.DatasourceTypeNetlink
 }
 
 func (n *netlink) Name() string {

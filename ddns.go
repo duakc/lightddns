@@ -103,11 +103,17 @@ func newLoggerWithOptions(opt options.OptionLog) (*zap.Logger, error) {
 	if opt.Disabled {
 		return zaplog.NOP, nil
 	}
-
-	level, err := zapcore.ParseLevel(opt.Level)
-	if err != nil {
-		return nil, err
+	var (
+		level = zapcore.InfoLevel
+		err   error
+	)
+	if len(opt.Level) != 0 {
+		level, err = zapcore.ParseLevel(opt.Level)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	var outputFD *os.File
 	switch strings.ToLower(opt.Output) {
 	case "stdout", "":
