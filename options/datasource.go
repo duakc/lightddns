@@ -5,16 +5,16 @@ import (
 	goyaml "github.com/goccy/go-yaml"
 )
 
-type OptionDataSource struct {
+type DatasourceOption struct {
 	AbstractDatasourceOption `yaml:",inline"`
 
 	Option any `yaml:"-"`
 }
 
-type _OptionDataSource OptionDataSource
+type _DatasourceOption DatasourceOption
 
-func (O *OptionDataSource) UnmarshalYAML(bs []byte) error {
-	err := goyaml.Unmarshal(bs, (*_OptionDataSource)(O))
+func (O *DatasourceOption) UnmarshalYAML(bs []byte) error {
+	err := goyaml.Unmarshal(bs, (*_DatasourceOption)(O))
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,6 @@
 package options
 
-type OptionDataSourceNetlink struct {
+type NetlinkDatasourceOption struct {
 	AbstractDatasourceOption `yaml:",inline"`
 
 	Interface    string `yaml:"interface"`

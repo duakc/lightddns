@@ -9,8 +9,10 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/ctxservice"
 	"github.com/duakc/lightddns/infra/generic"
+	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -27,17 +29,31 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.OptionProviderCloudflare) (adapter.Provider, error) {
-	upstreamLogger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
+func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.Provider, error) {
 	if option.Token == "" {
 		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, providerpkg.ErrRequireToken)
 	}
+	dialerOptions, err := option.ConnectOption.Options()
+	if err != nil {
+		return nil, err
+	}
+	clientOptions, err := option.HTTPOption.Options()
+	if err != nil {
+		return nil, err
+	}
+	clientOptions = append(clientOptions,
+		httpxx.ClientOptionWithToken(option.Token),
+		httpxx.ClientOptionWithDialer(
+			netxx.NewDialerWithOption(dialerOptions...)))
 
 	cf := &Cloudflare{
-		logger: zaplog.ExtendName(upstreamLogger, option.Name).With(
-			zap.String("type", constpkg.ProviderTypeName)),
-		client:  internal.NewClient(ctx, option.Token),
-		zones:   new(generic.SyncMap[string, string]),
+		logger: providerpkg.NewLogger(
+			ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]()),
+			option.AbstractProviderOption,
+		),
+		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),
+		zones:  new(generic.SyncMap[string, string]),
+
 		name:    option.Name,
 		proxied: option.Proxy,
 	}
@@ -85,6 +101,7 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, e
 	logger := c.logger
 	defer logger.Sync()
 	zoneName := c.client.ListZones()
+	var zoneID string
 
 	logger.Info("search zone id from upstream", zap.String("domain", domain))
 
@@ -95,17 +112,27 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, e
 		for i := 0; i < len(page); i++ {
 			zone := page[i]
 			if !netxx.IsDomainName(zone.Name) {
-				logger.Warn("upstream return a bad domain", zap.String("domain", zone.Name))
+				logger.Warn("upstream return a bad domain",
+					zap.String("domain", domain),
+					zap.String("zone_name", zone.Name))
+
 				continue
 			}
 
-			logger.Info("found zone id", zap.String("domain", domain), zap.String("zone", zone.Name))
+			logger.Info("found zone id",
+				zap.String("domain", domain),
+				zap.String("zone_name", zone.Name))
+			if zone.Name == domain {
+				zoneID = zone.ID
+			}
 
 			c.zones.Store(zone.Name, zone.ID)
 			c.zones.Store(domain, zone.ID)
 		}
 	}
-	if zoneID := c.fullMatchDomainZoneID(domain); zoneID != "" {
+	if zoneID != "" {
+		return zoneID, nil
+	} else if zoneID = c.fullMatchDomainZoneID(domain); zoneID != "" {
 		return zoneID, nil
 	}
 	return "", fmt.Errorf("zone id for %s not found", domain)
@@ -113,7 +140,7 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, e
 
 func (c *Cloudflare) fullMatchDomainZoneID(domain string) string {
 	domainToken := strings.Split(domain, ".")
-	for i := len(domainToken) - 1; i > -1; i-- {
+	for i := len(domainToken) - 2; i > -1; i-- {
 		fullDomain := strings.Join(domainToken[i:], ".")
 		if existedZoneID, existed := c.zones.Load(fullDomain); existed {
 			return existedZoneID

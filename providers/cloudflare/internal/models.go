@@ -75,7 +75,7 @@ type DNSRecord struct {
 
 type UpdateDNSRecordRequest struct {
 	Name           string `json:"name"`
-	Ttl            int    `json:"ttl"`
+	Ttl            uint32 `json:"ttl"`
 	Type           string `json:"type"`
 	Comment        string `json:"comment"`
 	Content        string `json:"content"`

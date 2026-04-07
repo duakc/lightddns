@@ -4,14 +4,14 @@ import (
 	"github.com/duakc/lightddns/infra/badyaml"
 )
 
-type OptionDomain struct {
+type DomainOption struct {
 	Enabled  bool   `yaml:"enabled"`
-	Domain   string `yaml:"domain"`
-	Interval string `yaml:"interval"`
-	TTL      int    `yaml:"ttl"`
+	TTL      uint32 `yaml:"ttl"`
 	IPv4     bool   `yaml:"ipv4"`
 	IPv6     bool   `yaml:"ipv6"`
 	Provider string `yaml:"provider"`
 
+	Domain     badyaml.DomainName       `yaml:"domain"`
+	Interval   badyaml.Duration         `yaml:"interval"`
 	DataSource badyaml.Listable[string] `yaml:"datasource"`
 }

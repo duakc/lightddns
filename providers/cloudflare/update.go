@@ -11,10 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *Cloudflare) Update(ctx context.Context, domain string, ttl int, addr []netip.Addr) error {
+func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) error {
 	logger := c.logger
 	defer logger.Sync()
-	logger.Debug("new update request", zap.Stringers("addresses", addr))
+	logger.Debug("new update request",
+		zap.Stringers("addresses", addr),
+		zap.String("domain", domain))
 	if ttl < 0 {
 		ttl = 0
 	}
@@ -25,7 +27,7 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl int, addr []
 	diffRecords, err := c.diff(ctx, domain, addr)
 	if diff, er := isDiff(diffRecords, err); !diff || er != nil {
 		if len(diffRecords) == 0 && er == nil {
-			logger.Debug("no difference since last update, skip")
+			logger.Debug("no difference since last updated, skip")
 			return nil
 		}
 		return fmt.Errorf("diff: %w", err)
@@ -54,7 +56,7 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl int, addr []
 	return nil
 }
 
-func ipToUpdateDNSRecord(name string, ip netip.Addr, ttl int, PrivateRouting bool, Proxied bool) internal.UpdateDNSRecordRequest {
+func ipToUpdateDNSRecord(name string, ip netip.Addr, ttl uint32, PrivateRouting bool, Proxied bool) internal.UpdateDNSRecordRequest {
 	req := internal.UpdateDNSRecordRequest{
 		Comment:        "This Record is Managed By Lightddns",
 		Name:           name,

@@ -7,9 +7,10 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/ctxservice"
-	"github.com/duakc/lightddns/infra/netinterface"
+	"github.com/duakc/lightddns/infra/netxx/control"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	"go.uber.org/zap"
@@ -23,38 +24,40 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.OptionDataSourceNetlink) (adapter.DataSource, error) {
-	logger := ctxservice.Lookup[*zap.Logger](ctx, zaplog.LoggerKey{})
+func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.DataSource, error) {
 
-	return &netlink{
-		logger: zaplog.ExtendName(logger, option.Name).With(
-			zap.String("type", constpkg.DatasourceTypeName)),
-		name:           option.Name,
-		interfaceName:  option.Interface,
-		interfaceIndex: option.Index,
-		allowPrivate:   option.AllowPrivate,
+	return &Netlink{
+		logger: datasourcepkg.NewLogger(
+			ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]()),
+			option.AbstractDatasourceOption,
+		),
+		interfaceFinder: control.NewDefaultInterfaceFinder(),
+		name:            option.Name,
+		interfaceName:   option.Interface,
+		interfaceIndex:  option.Index,
+		allowPrivate:    option.AllowPrivate,
 	}, nil
 }
 
-type netlink struct {
+type Netlink struct {
 	logger *zap.Logger
+	name   string
 
-	name string
-
-	interfaceName  string
-	interfaceIndex int
-	allowPrivate   bool
+	interfaceFinder control.InterfaceFinder
+	interfaceName   string
+	interfaceIndex  int
+	allowPrivate    bool
 }
 
-func (n *netlink) Type() string {
+func (n *Netlink) Type() string {
 	return constpkg.DatasourceTypeNetlink
 }
 
-func (n *netlink) Name() string {
+func (n *Netlink) Name() string {
 	return n.name
 }
 
-func (n *netlink) IP(ctx context.Context) ([]netip.Addr, error) {
+func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 	ip, err := n.ip(ctx)
 	if err != nil {
 		return nil, err
@@ -64,11 +67,16 @@ func (n *netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 	}), nil
 }
 
-func (n *netlink) ip(ctx context.Context) ([]netip.Addr, error) {
+func (n *Netlink) ip(ctx context.Context) ([]netip.Addr, error) {
 	logger := n.logger
+	defer logger.Sync()
+	interfaceFinder := n.interfaceFinder
+	if err := interfaceFinder.Update(); err != nil {
+		return nil, fmt.Errorf("update interfaceFinder: %w", err)
+	}
 	if n.interfaceIndex != 0 {
 		logger.Debug("use index", zap.Int("index", n.interfaceIndex))
-		index, err := netinterface.FindInterfaceByIndex(n.interfaceIndex)
+		index, err := interfaceFinder.ByIndex(n.interfaceIndex)
 		if err != nil {
 			if n.interfaceName != "" {
 				logger.Debug("use index failed, fallback to use name", zap.Error(err))
@@ -81,7 +89,7 @@ func (n *netlink) ip(ctx context.Context) ([]netip.Addr, error) {
 useName:
 	if n.interfaceName != "" {
 		logger.Debug("use interfaceName", zap.String("name", n.interfaceName))
-		index, err := netinterface.FindInterfaceByName(n.interfaceName)
+		index, err := interfaceFinder.ByName(n.interfaceName)
 		if err != nil {
 			return nil, fmt.Errorf("by name: %w", err)
 		}

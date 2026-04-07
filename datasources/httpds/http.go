@@ -1,0 +1,237 @@
+package httpds
+
+import (
+	"bytes"
+	"cmp"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/netip"
+	"regexp"
+
+	"github.com/duakc/lightddns/adapter"
+	constpkg "github.com/duakc/lightddns/constant"
+	datasourcepkg "github.com/duakc/lightddns/datasources"
+	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/httpxx"
+	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/zaplog"
+	"github.com/duakc/lightddns/options"
+	"github.com/itchyny/gojq"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
+
+func init() {
+	adapter.Register(
+		adapter.DataSourceRegister,
+		constpkg.DatasourceTypeHTTP,
+		New,
+	)
+}
+
+func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.DataSource, error) {
+	if option.Method == "" {
+		option.Method = http.MethodGet
+	}
+	dialerOptions, err := option.ConnectOption.Options()
+	if err != nil {
+		return nil, fmt.Errorf("dialer: %w", err)
+	}
+	httpOptions, err := option.HTTPOption.Options()
+	if err != nil {
+		return nil, fmt.Errorf("http: %w", err)
+	}
+
+	c := &Httpds{
+		logger: datasourcepkg.NewLogger(
+			ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]()),
+			option.AbstractDatasourceOption,
+		),
+		name: option.Name,
+	}
+	dialStrategy, _ := netxx.DialStrategyFromString(option.DialStrategy)
+	if dialStrategy != netxx.DialOnlyIPv4 {
+		// enable ipv6
+		dialer := netxx.NewDialerWithOption(append(dialerOptions,
+			netxx.DialerOptionWithDialStrategy(netxx.DialOnlyIPv6))...)
+		httpClient := httpxx.NewClient(append(httpOptions,
+			httpxx.ClientOptionWithDialer(dialer))...)
+		c.v6, err = newRequestContext(string(option.Method), option.Url.Raw,
+			option.Headers.Header, httpClient,
+			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V6),
+			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V6))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if dialStrategy != netxx.DialOnlyIPv6 {
+		// enable ipv4
+		dialer := netxx.NewDialerWithOption(append(dialerOptions,
+			netxx.DialerOptionWithDialStrategy(netxx.DialOnlyIPv4))...)
+		httpClient := httpxx.NewClient(append(httpOptions,
+			httpxx.ClientOptionWithDialer(dialer))...)
+		c.v4, err = newRequestContext(string(option.Method), option.Url.Raw,
+			option.Headers.Header, httpClient,
+			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V4),
+			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V4))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if c.logger.Level() <= zapcore.DebugLevel {
+		defer c.logger.Sync()
+
+		c.logger.Debug("created",
+			zap.Bool("ipv4", c.v4 != nil), zap.Bool("ipv6", c.v6 != nil))
+	}
+	return c, nil
+}
+
+type Httpds struct {
+	logger *zap.Logger
+	name   string
+
+	v4 *requestContext
+	v6 *requestContext
+}
+
+func (c *Httpds) IPv4(ctx context.Context) ([]netip.Addr, error) {
+	if c.v4 == nil {
+		return []netip.Addr{}, nil
+	}
+	logger := c.logger
+	defer logger.Sync()
+
+	logger.Debug("ipv4 request")
+	return c.v4.Handle(ctx)
+}
+
+func (c *Httpds) IPv6(ctx context.Context) ([]netip.Addr, error) {
+	if c.v6 == nil {
+		return []netip.Addr{}, nil
+	}
+	logger := c.logger
+	defer logger.Sync()
+
+	logger.Debug("ipv6 request")
+	return c.v6.Handle(ctx)
+}
+
+func (c *Httpds) Type() string {
+	return constpkg.DatasourceTypeHTTP
+}
+
+func (c *Httpds) Name() string {
+	return c.name
+}
+
+func (c *Httpds) IP(ctx context.Context) ([]netip.Addr, error) {
+	return adapter.MergeDualStackDatasourceIP(ctx, c)
+}
+
+type requestContext struct {
+	method  string
+	url     string
+	headers http.Header
+
+	requester httpxx.HTTPRequester
+
+	jsonMatch  *gojq.Query
+	regexMatch *regexp.Regexp
+}
+
+func newRequestContext(method string, url string, headers http.Header,
+	requester httpxx.HTTPRequester, jq string, re string) (*requestContext, error) {
+	R := new(requestContext)
+	var err error
+	if jq != "" {
+		if R.jsonMatch, err = gojq.Parse(jq); err != nil {
+			return nil, fmt.Errorf("MatchJson: %w", err)
+		}
+	}
+	if re != "" {
+		if R.regexMatch, err = regexp.Compile(re); err != nil {
+			return nil, fmt.Errorf("MatchRegex: %w", err)
+		}
+	}
+	R.method = method
+	R.url = url
+	R.headers = headers
+	R.requester = requester
+
+	return R, nil
+}
+
+func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, err error) {
+	R := httpxx.NewReqConfig(rc.method, rc.url)
+	R.ExtendHeader = rc.headers
+	request, err := R.ToRequestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	response, err := rc.requester.Do(request)
+	if err != nil {
+		return nil, httpxx.NewBaseResponseError(err, R.Method, "get ip from remote")
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, &httpxx.BadStatusCodeError{Got: response.StatusCode}
+	}
+	const maxBodySize = 10 * 1024 * 1024
+
+	if response.Header.Get("Content-Type") == "application/json" && rc.jsonMatch != nil {
+		var jsonObject any
+		if err := json.NewDecoder(io.LimitReader(response.Body, maxBodySize)).Decode(&jsonObject); err != nil {
+			return nil, fmt.Errorf("decode JSON: %w", err)
+		}
+		iter := rc.jsonMatch.RunWithContext(ctx, jsonObject)
+		for val, ok := iter.Next(); ok; val, ok = iter.Next() {
+			switch x := val.(type) {
+			case error:
+				var haltErr *gojq.HaltError
+				if errors.As(x, &haltErr) && haltErr.Value() == nil {
+					break
+				}
+				return nil, fmt.Errorf("jq execution error: %w", x)
+			case string:
+				addr, err := netip.ParseAddr(x)
+				if err != nil {
+					return nil, err
+				}
+				addresses = append(addresses, addr)
+			}
+		}
+	} else {
+		buffer, err := io.ReadAll(io.LimitReader(response.Body, maxBodySize))
+		if err != nil {
+			return nil, fmt.Errorf("read response.Body: %w", err)
+		}
+
+		if rc.regexMatch != nil {
+			for _, x := range rc.regexMatch.FindAllSubmatch(buffer, -1) {
+				if len(x) > 1 {
+					xx := x[1]
+					addr, err := netip.ParseAddr(string(xx))
+					if err != nil {
+						return nil, err
+					}
+					addresses = append(addresses, addr)
+				}
+
+			}
+		} else {
+			addr, err := netip.ParseAddr(string(bytes.TrimSpace(buffer)))
+			if err != nil {
+				return nil, err
+			}
+			addresses = append(addresses, addr)
+		}
+	}
+	return addresses, nil
+}

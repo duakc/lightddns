@@ -5,16 +5,16 @@ import (
 	goyaml "github.com/goccy/go-yaml"
 )
 
-type OptionProvider struct {
+type ProviderOption struct {
 	AbstractProviderOption `yaml:",inline"`
 
 	Option any `yaml:"-"`
 }
 
-type _OptionProvider OptionProvider
+type _ProviderOption ProviderOption
 
-func (O *OptionProvider) UnmarshalYAML(bs []byte) error {
-	err := goyaml.Unmarshal(bs, (*_OptionProvider)(O))
+func (O *ProviderOption) UnmarshalYAML(bs []byte) error {
+	err := goyaml.Unmarshal(bs, (*_ProviderOption)(O))
 	if err != nil {
 		return err
 	}

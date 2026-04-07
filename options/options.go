@@ -1,8 +1,8 @@
 package options
 
 type Options struct {
-	Log         OptionLog          `yaml:"log"`
-	DataSources []OptionDataSource `yaml:"datasource"`
-	Providers   []OptionProvider   `yaml:"provider"`
-	Domains     []OptionDomain     `yaml:"domain"`
+	Log         LogOption          `yaml:"log"`
+	DataSources []DatasourceOption `yaml:"datasource"`
+	Providers   []ProviderOption   `yaml:"provider"`
+	Domains     []DomainOption     `yaml:"domain"`
 }

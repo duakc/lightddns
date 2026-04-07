@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/duakc/lightddns/infra/common"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -41,6 +42,9 @@ func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *za
 			panic("wrong stack trace level:" + stackTraceLevel)
 		}
 		options = append(options, zap.AddStacktrace(parseLevel))
+	}
+	if common.IsDebug {
+		options = append(options, zap.Development())
 	}
 	return zap.New(core, options...)
 }

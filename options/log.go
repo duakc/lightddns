@@ -1,6 +1,6 @@
 package options
 
-type OptionLog struct {
+type LogOption struct {
 	Level    string `yaml:"level"`
 	Disabled bool   `yaml:"disabled"`
 	Output   string `yaml:"output"`

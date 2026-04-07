@@ -2,7 +2,9 @@ package common
 
 import (
 	"cmp"
+	"maps"
 	"slices"
+	"strings"
 )
 
 func Zero[T any]() T {
@@ -40,7 +42,7 @@ func Or[T any, S ~[]T](arr S, fn func(T) bool) bool {
 }
 
 func Filter[T any, S ~[]T](arr S, fn func(T) bool) S {
-	return slices.DeleteFunc(arr, func(t T) bool {
+	return slices.DeleteFunc(slices.Clone(arr), func(t T) bool {
 		return !fn(t)
 	})
 }
@@ -83,4 +85,13 @@ func MergeMap[K comparable, V any](mm ...map[K]V) map[K]V {
 		}
 	}
 	return res
+}
+
+func UnquoteString(s string) string {
+	trim := strings.Trim(s, "'\"\n\r\t")
+	return strings.TrimSpace(trim)
+}
+
+func Distinct[T comparable, S ~[]T](arr S) S {
+	return slices.Collect(maps.Keys(ToMap(arr)))
 }

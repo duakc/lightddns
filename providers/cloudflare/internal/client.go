@@ -14,12 +14,9 @@ type Client struct {
 	client httpxx.HTTPRequester
 }
 
-func NewClient(ctx context.Context, token string) *Client {
+func NewClient(ctx context.Context, client httpxx.HTTPRequester) *Client {
 	return &Client{
-		client: &httpxx.ValidClient{HTTPRequester: &httpxx.TokenClient{
-			HTTPRequester: http.DefaultClient,
-			Token:         token,
-		}},
+		client: client,
 	}
 }
 
@@ -85,7 +82,7 @@ func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return &httpxx.ResponseError{Err: err, URL: httpReq.URL.String(), Method: r.Method}
+		return &httpxx.BaseResponseError{Err: err, URL: httpReq.URL.String(), Method: r.Method}
 	}
 	if resp != nil && resp.StatusCode != http.StatusOK {
 		return &httpxx.BadStatusCodeError{

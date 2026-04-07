@@ -6,4 +6,5 @@ const (
 
 const (
 	DatasourceTypeNetlink = "netlink"
+	DatasourceTypeHTTP    = "http"
 )

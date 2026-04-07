@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
-
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var (
@@ -14,6 +14,6 @@ var (
 
 func main() {
 	if err := rootCommand.Execute(); err != nil {
-		log.Fatalln(err)
+		zaplog.Fatal("Execute failed", zap.Error(err))
 	}
 }

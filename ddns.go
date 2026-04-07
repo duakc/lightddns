@@ -27,9 +27,9 @@ type LightDDNS struct {
 func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	logger, err := newLoggerWithOptions(opt.Log)
 	if err != nil {
-		return nil, fmt.Errorf("log: %w", err)
+		return nil, fmt.Errorf("create logger: %w", err)
 	}
-	ctx = ctxservice.NewRegistry(ctx, ctxservice.NewDefaultRegistry())
+	defer logger.Sync()
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
 	dataSourceManager := adapter.NewManager[adapter.DataSource](adapter.DataSourceRegister)
@@ -37,17 +37,23 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	ctxservice.Store(ctx, common.Zero[adapter.ProviderManagerKey](), providerManager)
 	ctxservice.Store(ctx, common.Zero[adapter.DataSourceManagerKey](), dataSourceManager)
 
+	logger = zaplog.ExtendName(logger, "main")
+
 	for i := 0; i < len(opt.Providers); i++ {
 		providerOption := opt.Providers[i]
 		if err := providerManager.Create(ctx, providerOption.Type, providerOption.Option); err != nil {
 			return nil, fmt.Errorf("create provider[%d]: %w", i, err)
 		}
+		logger.Debug("new provider created", zap.String("type", providerOption.Type),
+			zap.String("name", providerOption.Name))
 	}
 	for i := 0; i < len(opt.DataSources); i++ {
 		datasourceOption := opt.DataSources[i]
 		if err := dataSourceManager.Create(ctx, datasourceOption.Type, datasourceOption.Option); err != nil {
 			return nil, fmt.Errorf("create datasource[%d]: %w", i, err)
 		}
+		logger.Debug("new datasource created", zap.String("type", datasourceOption.Type),
+			zap.String("name", datasourceOption.Name))
 	}
 	var domains []*Domain
 	for i := 0; i < len(opt.Domains); i++ {
@@ -59,11 +65,10 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	}
 
 	ddns := &LightDDNS{
-		logger:  zaplog.ExtendName(logger, "main"),
-		domains: domains,
-
-		providerManager:   (*adapter.ProviderManager)(providerManager),
-		datasourceManager: (*adapter.DataSourceManager)(dataSourceManager),
+		providerManager:   providerManager,
+		datasourceManager: dataSourceManager,
+		logger:            logger,
+		domains:           domains,
 	}
 
 	return ddns, nil
@@ -91,7 +96,7 @@ func (ddns *LightDDNS) Start(ctx context.Context) error {
 		domain := ddns.domains[i]
 		go domain.UpdateLoop(ctx)
 	}
-	logger.Warn("started")
+	logger.Info("started")
 	<-ctx.Done()
 	if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
@@ -99,7 +104,7 @@ func (ddns *LightDDNS) Start(ctx context.Context) error {
 	return nil
 }
 
-func newLoggerWithOptions(opt options.OptionLog) (*zap.Logger, error) {
+func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 	if opt.Disabled {
 		return zaplog.NOP, nil
 	}

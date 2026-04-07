@@ -39,7 +39,7 @@ func JSONRequest[O any](ctx context.Context, do HTTPRequester, req ReqConfig, in
 	defer cancel()
 	response, err := do.Do(request)
 	if err != nil {
-		return common.Zero[O](), nil, NewResponseError(req.Method, request.URL.String(), err)
+		return common.Zero[O](), nil, NewBaseResponseError(err, req.Method, "")
 	}
 	if response.StatusCode != http.StatusOK {
 		return common.Zero[O](), response, &BadStatusCodeError{Got: response.StatusCode}

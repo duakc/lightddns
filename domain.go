@@ -27,15 +27,21 @@ type Domain struct {
 	provider   adapter.Provider
 	datasource []adapter.DataSource
 
-	domainNames string
-	ttl         int
-	ipv4        bool
-	ipv6        bool
-
+	domainName     string
 	updateInterval time.Duration
+
+	ttl  uint32
+	ipv4 bool
+	ipv6 bool
 }
 
-func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
+func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
+	var (
+		dataSources    []adapter.DataSource
+		provider       adapter.Provider
+		updateInterval = constpkg.DefaultUpdateInterval
+	)
+
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, errDomainNotEnabled
 	}
@@ -45,37 +51,18 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 	if len(opt.Provider) == 0 {
 		return nil, fmt.Errorf("no provider configured")
 	}
-	if opt.TTL < 0 {
-		opt.TTL = 0
-	}
 	if !opt.IPv4 && !opt.IPv6 {
 		// enable dual stack default
 		opt.IPv4 = true
 		opt.IPv6 = true
 	}
-	if !netxx.IsDomainName(opt.Domain) {
-		return nil, fmt.Errorf("domain %s not a valid domain name", opt.Domain)
+	if time.Duration(opt.Interval) != 0 {
+		updateInterval = time.Duration(opt.Interval)
 	}
-	var (
-		dataSources    []adapter.DataSource
-		provider       adapter.Provider
-		updateInterval time.Duration = constpkg.DefaultUpdateInterval
-	)
 
 	logger := ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]())
 	providerManager := ctxservice.Lookup[*adapter.ProviderManager](ctx, common.Zero[adapter.ProviderManagerKey]())
 	dataSourceManager := ctxservice.Lookup[*adapter.DataSourceManager](ctx, common.Zero[adapter.DataSourceManagerKey]())
-
-	if opt.Interval != "" {
-		updateIntervalParsed, err := time.ParseDuration(opt.Interval)
-		if err != nil {
-			return nil, fmt.Errorf("ParseDuration: %w", err)
-		}
-		if updateIntervalParsed < 5*time.Second {
-			return nil, fmt.Errorf("update interval can not lower than 5s")
-		}
-		updateInterval = updateIntervalParsed
-	}
 
 	for i := 0; i < len(opt.DataSource.Value); i++ {
 		dataSourceName := opt.DataSource.Value[i]
@@ -93,15 +80,15 @@ func NewDomain(ctx context.Context, opt options.OptionDomain) (*Domain, error) {
 	}
 
 	return &Domain{
-		logger:         logger,
+		logger:         zaplog.ExtendName(logger, string(opt.Domain)),
 		provider:       provider,
 		datasource:     dataSources,
 		updateInterval: updateInterval,
 
-		domainNames: opt.Domain,
-		ttl:         opt.TTL,
-		ipv4:        opt.IPv6,
-		ipv6:        opt.IPv6,
+		domainName: string(opt.Domain),
+		ttl:        opt.TTL,
+		ipv4:       opt.IPv4,
+		ipv6:       opt.IPv6,
 	}, nil
 }
 
@@ -118,10 +105,11 @@ func (d *Domain) UpdateOnce(ctx context.Context) error {
 		return fmt.Errorf("fetchIP: %w", err)
 	}
 	logger.Debug("found ip",
-		zap.String("domain", d.domainNames), zap.Stringers("ip", netips))
+		zap.String("domain", d.domainName), zap.Stringers("ip", netips))
 
-	if err := d.provider.Update(ctx, d.domainNames, d.ttl, netips); err != nil {
-		return fmt.Errorf("update %s: %w", d.domainNames, err)
+	if err := d.provider.Update(ctx, d.domainName, d.ttl, netips); err != nil {
+		return fmt.Errorf("update domain(%s),provider(%s,%s) failed: %w",
+			d.domainName, d.provider.Type(), d.provider.Name(), err)
 	}
 	return nil
 }
@@ -144,6 +132,7 @@ func (d *Domain) UpdateLoop(ctx context.Context) {
 			logger.Warn("quited", zap.Error(ctx.Err()))
 			return
 		}
+		logger.Sync()
 		ticker.Reset(d.updateInterval)
 	}
 }
@@ -152,7 +141,6 @@ func (d *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 	var netips []netip.Addr
 
 	for i := 0; i < len(d.datasource); i++ {
-
 		var (
 			datasource = d.datasource[i]
 			addresses  []netip.Addr
@@ -163,12 +151,7 @@ func (d *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 		} else {
 			addresses, err = datasource.IP(ctx)
 			if err != nil {
-				err = &datasourceError{
-					Err:  err,
-					IPv4: true,
-					IPv6: true,
-					Name: datasource.Name(),
-				}
+				err = newDatasourceError(err, "4/6", datasource)
 			}
 		}
 		if err != nil {
@@ -176,7 +159,12 @@ func (d *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 		}
 		netips = append(netips, addresses...)
 	}
-	return netips, nil
+
+	netips = common.Filter(netips, func(addr netip.Addr) bool {
+		return addr.IsValid() &&
+			(d.ipv6 && netxx.IsIPv6(addr) || d.ipv4 && netxx.IsIPv4(addr))
+	})
+	return common.Distinct(netips), nil
 }
 
 func (d *Domain) fetchIPDualStack(ctx context.Context,
@@ -185,22 +173,14 @@ func (d *Domain) fetchIPDualStack(ctx context.Context,
 	if d.ipv4 {
 		addr, err := dualStackDataSource.IPv4(ctx)
 		if err != nil {
-			return nil, &datasourceError{
-				Err:  err,
-				IPv4: true,
-				Name: dualStackDataSource.Name(),
-			}
+			return nil, newDatasourceError(err, "4", dualStackDataSource)
 		}
 		netips = append(netips, addr...)
 	}
 	if d.ipv6 {
-		addr, err := dualStackDataSource.IPv4(ctx)
+		addr, err := dualStackDataSource.IPv6(ctx)
 		if err != nil {
-			return nil, &datasourceError{
-				Err:  err,
-				IPv6: true,
-				Name: dualStackDataSource.Name(),
-			}
+			return nil, newDatasourceError(err, "6", dualStackDataSource)
 		}
 		netips = append(netips, addr...)
 	}
@@ -208,24 +188,24 @@ func (d *Domain) fetchIPDualStack(ctx context.Context,
 }
 
 type datasourceError struct {
-	Err  error
-	IPv4 bool
-	IPv6 bool
-	Name string
+	Err       error
+	IPVersion string
+	Name      string
+	Type      string
+}
+
+func newDatasourceError(err error, ipVersion string, ds adapter.DataSource) *datasourceError {
+	return &datasourceError{
+		Err:       err,
+		IPVersion: ipVersion,
+		Name:      ds.Name(),
+		Type:      ds.Type(),
+	}
 }
 
 func (e *datasourceError) Error() string {
-	ipVersion := ""
-	switch {
-	case e.IPv4 && e.IPv6:
-		// nop
-	case e.IPv6:
-		ipVersion = "6"
-	case e.IPv4:
-		ipVersion = "4"
-	}
-	return fmt.Sprintf("get ipv%s addresses from datasource(%s) failed: %s",
-		ipVersion, e.Name, e.Err.Error())
+	return fmt.Sprintf("get ipv%s addresses from datasource(%s,%s) failed: %s",
+		e.IPVersion, e.Type, e.Name, e.Err.Error())
 }
 
 func (e *datasourceError) Unwrap() error {

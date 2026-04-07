@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"html/template"
 	"os"
 	"os/signal"
@@ -12,10 +11,13 @@ import (
 
 	"github.com/duakc/lightddns"
 	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	goyaml "github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 type commandArgRunType struct {
@@ -53,18 +55,21 @@ func commandEntryRun(cmd *cobra.Command, args []string) {
 		return
 	}
 	if err := openConfigBind(cmdOption.Config, &cmdOption.Options); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "err: %s", err.Error())
+		zaplog.Fatal("read config file failed", zap.String("file", cmdOption.Config), zap.Error(err))
 		return
 	}
 
 	if err := runMain(); err != nil {
-		panic(err)
+		zaplog.Fatal("start failed", zap.Error(err))
 	}
 }
 
 func runMain() error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGQUIT)
+	ctx := ctxservice.NewRegistry(context.Background(), ctxservice.NewDefaultRegistry())
+	ctx, stop := signal.NotifyContext(ctx,
+		os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGQUIT)
 	defer stop()
+
 	ddns, err := lightddns.New(ctx, cmdOption.Options)
 	if err != nil {
 		return err
@@ -103,14 +108,12 @@ func fullEnv() map[string]string {
 	if _, err := os.Stat(".env"); err == nil {
 		envFile, err := os.ReadFile(".env")
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr,
-				".env file found but read failed: %s\n", err.Error())
+			zaplog.Warn(".env file found but read failed", zap.Error(err))
 			return result
 		}
 		unmarshalBytes, err := godotenv.UnmarshalBytes(envFile)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr,
-				".env file parse failed: %s\n", err.Error())
+			zaplog.Warn(".env file parse failed", zap.Error(err))
 			return result
 		}
 		result = common.MergeMap(result, unmarshalBytes)
