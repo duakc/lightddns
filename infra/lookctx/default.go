@@ -1,6 +1,8 @@
-package ctxservice
+package lookctx
 
 import "sync"
+
+var _ Registry = (*DefaultRegistry)(nil)
 
 type DefaultRegistry struct {
 	m *sync.Map

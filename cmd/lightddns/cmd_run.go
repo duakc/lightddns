@@ -11,7 +11,7 @@ import (
 
 	"github.com/duakc/lightddns"
 	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	goyaml "github.com/goccy/go-yaml"
@@ -65,7 +65,7 @@ func commandEntryRun(cmd *cobra.Command, args []string) {
 }
 
 func runMain() error {
-	ctx := ctxservice.NewRegistry(context.Background(), ctxservice.NewDefaultRegistry())
+	ctx := lookctx.NewRegistry(context.Background(), lookctx.NewDefaultRegistry())
 	ctx, stop := signal.NotifyContext(ctx,
 		os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGQUIT)
 	defer stop()

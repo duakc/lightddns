@@ -9,10 +9,9 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/ctxservice"
 	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/httpxx"
+	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -48,7 +47,7 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 
 	cf := &Cloudflare{
 		logger: providerpkg.NewLogger(
-			ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]()),
+			lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx),
 			option.AbstractProviderOption,
 		),
 		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),

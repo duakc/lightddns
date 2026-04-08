@@ -15,9 +15,8 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
-	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/ctxservice"
 	"github.com/duakc/lightddns/infra/httpxx"
+	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -28,13 +27,13 @@ import (
 
 func init() {
 	adapter.Register(
-		adapter.DataSourceRegister,
+		adapter.DatasourceRegister,
 		constpkg.DatasourceTypeHTTP,
 		New,
 	)
 }
 
-func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.DataSource, error) {
+func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Datasource, error) {
 	if option.Method == "" {
 		option.Method = http.MethodGet
 	}
@@ -49,7 +48,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 
 	c := &Httpds{
 		logger: datasourcepkg.NewLogger(
-			ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]()),
+			lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx),
 			option.AbstractDatasourceOption,
 		),
 		name: option.Name,

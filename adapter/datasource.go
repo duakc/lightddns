@@ -5,23 +5,23 @@ import (
 	"net/netip"
 )
 
-type DataSource interface {
+type Datasource interface {
 	managedType
 	IP(context.Context) ([]netip.Addr, error)
 }
 
-type DataSourceDualStack interface {
-	DataSource
+type DatasourceDualStack interface {
+	Datasource
 	IPv4(ctx context.Context) ([]netip.Addr, error)
 	IPv6(ctx context.Context) ([]netip.Addr, error)
 }
 
-type DataSourceManager = DefaultManager[DataSource]
-type DataSourceManagerKey struct{}
+type DatasourceManager = DefaultManager[Datasource]
+type DatasourceManagerKey struct{}
 
-var DataSourceRegister = NewRegister[DataSource]()
+var DatasourceRegister = NewRegister[Datasource]()
 
-func MergeDualStackDatasourceIP(ctx context.Context, s DataSourceDualStack) ([]netip.Addr, error) {
+func MergeDualStackDatasourceIP(ctx context.Context, s DatasourceDualStack) ([]netip.Addr, error) {
 	ipv4, err := s.IPv4(ctx)
 	if err != nil {
 		return nil, err

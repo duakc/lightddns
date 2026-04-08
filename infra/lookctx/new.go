@@ -1,6 +1,10 @@
-package ctxservice
+package lookctx
 
-import "context"
+import (
+	"context"
+
+	"github.com/duakc/lightddns/infra/common"
+)
 
 type Registry interface {
 	Store(k, v any)
@@ -9,19 +13,18 @@ type Registry interface {
 
 type registryKey struct{}
 
-func Lookup[V any](ctx context.Context, key any) V {
+func Lookup[K comparable, V any](ctx context.Context) V {
 	registry := RegistryFromContext(ctx)
-	return registry.Load(key).(V)
+	return registry.Load(common.Zero[K]()).(V)
 }
 
-func Store[K comparable, V any](ctx context.Context, key K, value V) {
+func Store[K comparable, V any](ctx context.Context, value V) {
 	registry := RegistryFromContext(ctx)
-	registry.Store(key, value)
+	registry.Store(common.Zero[K](), value)
 }
 
 func NewRegistry(ctx context.Context, r Registry) context.Context {
-	ctx = context.WithValue(ctx, registryKey{}, r)
-	return ctx
+	return context.WithValue(ctx, registryKey{}, r)
 }
 
 func RegistryFromContext(ctx context.Context) Registry {

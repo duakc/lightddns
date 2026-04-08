@@ -10,7 +10,7 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netxx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -25,7 +25,7 @@ type Domain struct {
 	logger *zap.Logger
 
 	provider   adapter.Provider
-	datasource []adapter.DataSource
+	datasource []adapter.Datasource
 
 	domainName     string
 	updateInterval time.Duration
@@ -37,7 +37,7 @@ type Domain struct {
 
 func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	var (
-		dataSources    []adapter.DataSource
+		dataSources    []adapter.Datasource
 		provider       adapter.Provider
 		updateInterval = constpkg.DefaultUpdateInterval
 	)
@@ -60,9 +60,9 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		updateInterval = time.Duration(opt.Interval)
 	}
 
-	logger := ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]())
-	providerManager := ctxservice.Lookup[*adapter.ProviderManager](ctx, common.Zero[adapter.ProviderManagerKey]())
-	dataSourceManager := ctxservice.Lookup[*adapter.DataSourceManager](ctx, common.Zero[adapter.DataSourceManagerKey]())
+	logger := lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx)
+	providerManager := lookctx.Lookup[adapter.ProviderManagerKey, *adapter.ProviderManager](ctx)
+	dataSourceManager := lookctx.Lookup[adapter.DatasourceManagerKey, *adapter.DatasourceManager](ctx)
 
 	for i := 0; i < len(opt.DataSource.Value); i++ {
 		dataSourceName := opt.DataSource.Value[i]
@@ -146,7 +146,7 @@ func (d *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 			addresses  []netip.Addr
 			err        error
 		)
-		if dualStackDataSource, ok := datasource.(adapter.DataSourceDualStack); ok {
+		if dualStackDataSource, ok := datasource.(adapter.DatasourceDualStack); ok {
 			addresses, err = d.fetchIPDualStack(ctx, dualStackDataSource)
 		} else {
 			addresses, err = datasource.IP(ctx)
@@ -168,7 +168,7 @@ func (d *Domain) fetchIP(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (d *Domain) fetchIPDualStack(ctx context.Context,
-	dualStackDataSource adapter.DataSourceDualStack) ([]netip.Addr, error) {
+	dualStackDataSource adapter.DatasourceDualStack) ([]netip.Addr, error) {
 	var netips []netip.Addr
 	if d.ipv4 {
 		addr, err := dualStackDataSource.IPv4(ctx)
@@ -194,7 +194,7 @@ type datasourceError struct {
 	Type      string
 }
 
-func newDatasourceError(err error, ipVersion string, ds adapter.DataSource) *datasourceError {
+func newDatasourceError(err error, ipVersion string, ds adapter.Datasource) *datasourceError {
 	return &datasourceError{
 		Err:       err,
 		IPVersion: ipVersion,

@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	"go.uber.org/zap"
@@ -21,7 +20,7 @@ type LightDDNS struct {
 	domains []*Domain
 
 	providerManager   *adapter.ProviderManager
-	datasourceManager *adapter.DataSourceManager
+	datasourceManager *adapter.DatasourceManager
 }
 
 func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
@@ -32,10 +31,10 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	defer logger.Sync()
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
-	dataSourceManager := adapter.NewManager[adapter.DataSource](adapter.DataSourceRegister)
-	ctxservice.Store(ctx, common.Zero[zaplog.LoggerKey](), logger)
-	ctxservice.Store(ctx, common.Zero[adapter.ProviderManagerKey](), providerManager)
-	ctxservice.Store(ctx, common.Zero[adapter.DataSourceManagerKey](), dataSourceManager)
+	dataSourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
+	lookctx.Store[zaplog.LoggerKey](ctx, logger)
+	lookctx.Store[adapter.ProviderManagerKey](ctx, providerManager)
+	lookctx.Store[adapter.DatasourceManagerKey](ctx, dataSourceManager)
 
 	logger = zaplog.ExtendName(logger, "main")
 

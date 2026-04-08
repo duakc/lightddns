@@ -82,7 +82,7 @@ func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return &httpxx.BaseResponseError{Err: err, URL: httpReq.URL.String(), Method: r.Method}
+		return &httpxx.BaseResponseError{Err: err, Method: r.Method}
 	}
 	if resp != nil && resp.StatusCode != http.StatusOK {
 		return &httpxx.BadStatusCodeError{

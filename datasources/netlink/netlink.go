@@ -9,7 +9,7 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/ctxservice"
+	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netxx/control"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -18,17 +18,17 @@ import (
 
 func init() {
 	adapter.Register(
-		adapter.DataSourceRegister,
+		adapter.DatasourceRegister,
 		constpkg.DatasourceTypeNetlink,
 		New,
 	)
 }
 
-func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.DataSource, error) {
+func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.Datasource, error) {
 
 	return &Netlink{
 		logger: datasourcepkg.NewLogger(
-			ctxservice.Lookup[*zap.Logger](ctx, common.Zero[zaplog.LoggerKey]()),
+			lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx),
 			option.AbstractDatasourceOption,
 		),
 		interfaceFinder: control.NewDefaultInterfaceFinder(),

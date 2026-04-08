@@ -18,7 +18,7 @@ func (O *DatasourceOption) UnmarshalYAML(bs []byte) error {
 	if err != nil {
 		return err
 	}
-	O.Option, err = adapter.DataSourceRegister.CreateOption(O.Type)
+	O.Option, err = adapter.DatasourceRegister.CreateOption(O.Type)
 	if err != nil {
 		return err
 	}
