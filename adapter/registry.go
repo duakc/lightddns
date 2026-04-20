@@ -6,9 +6,11 @@ import (
 	"sync"
 
 	"github.com/duakc/lightddns/infra/common"
+	"go.uber.org/zap"
 )
 
 func Register[T managedType, O any](R Registry[T], typ string, constructor GenericObjectConstructor[T, O]) {
+	managerLogger.Trace("new type registered", zap.String("type", typ))
 	R.registry(typ, func() any {
 		return new(O)
 	}, func(ctx context.Context, option any) (T, error) {
@@ -56,7 +58,20 @@ func (R *defaultRegistry[T]) Create(ctx context.Context, typ string, option any)
 	if create == nil {
 		return common.Zero[T](), fmt.Errorf("unregistered type: %s", typ)
 	}
-	return create(ctx, option)
+
+	returned, err := create(ctx, option)
+	if err != nil {
+		return common.Zero[T](), err
+	}
+	if err == nil && common.IsDebug && returned.Type() != typ {
+		panic("mismatch type excepted: " + typ + ", got: " + returned.Type())
+	}
+
+	managerLogger.Trace("registered object created",
+		zap.String("type", typ),
+		zap.String("name", returned.Name()))
+
+	return returned, nil
 }
 
 func (R *defaultRegistry[T]) CreateOption(typ string) (any, error) {
@@ -67,6 +82,7 @@ func (R *defaultRegistry[T]) CreateOption(typ string) (any, error) {
 	if create == nil {
 		return nil, fmt.Errorf("unregistered type: %s", typ)
 	}
+	managerLogger.Trace("new option created", zap.String("type", typ))
 	return create(), nil
 }
 

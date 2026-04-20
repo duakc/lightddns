@@ -7,4 +7,7 @@ const (
 const (
 	DatasourceTypeNetlink = "netlink"
 	DatasourceTypeHTTP    = "http"
+
+	DatasourceGroupTypeSum      = "sum"
+	DatasourceGroupTypeFailover = "failover"
 )

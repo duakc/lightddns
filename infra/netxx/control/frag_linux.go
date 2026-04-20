@@ -2,6 +2,7 @@ package control
 
 import (
 	"os"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/unix"

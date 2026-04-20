@@ -3,7 +3,6 @@ package zaplog
 import (
 	"io"
 	"os"
-	"strings"
 
 	"github.com/duakc/lightddns/infra/common"
 	"go.uber.org/zap"
@@ -16,9 +15,7 @@ const (
 
 type LoggerKey struct{}
 
-var (
-	NOP = zap.NewNop()
-)
+var NOP = zap.NewNop()
 
 func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *zap.Logger {
 	coreEncoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
@@ -46,20 +43,13 @@ func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *za
 	if common.IsDebug {
 		options = append(options, zap.Development())
 	}
+	options = append(options, zap.WithFastSync())
 	return zap.New(core, options...)
 }
 
-func DoNotPanic(l *zap.Logger) *zap.Logger {
-	if l == nil {
+func DoNotPanic(logger *zap.Logger) *zap.Logger {
+	if logger == nil {
 		return NOP
 	}
-	return l
-}
-
-func ExtendName(l *zap.Logger, name string) *zap.Logger {
-	l = DoNotPanic(l)
-	if strings.Contains(name, ".") {
-		return l.Named("[" + name + "]")
-	}
-	return l.Named(name)
+	return logger
 }

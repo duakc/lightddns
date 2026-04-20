@@ -13,7 +13,6 @@ import (
 
 func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) error {
 	logger := c.logger
-	defer logger.Sync()
 	logger.Debug("new update request",
 		zap.Stringers("addresses", addr),
 		zap.String("domain", domain))

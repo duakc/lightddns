@@ -34,3 +34,5 @@ go.work.sum
 *.ignore
 config.d/
 .DS_Store/
+
+bin/

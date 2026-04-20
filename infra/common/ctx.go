@@ -14,3 +14,12 @@ func ContextWithTimeout(ctx context.Context, timeout time.Duration) (context.Con
 
 	return ctx, func() {}
 }
+
+func Done(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}

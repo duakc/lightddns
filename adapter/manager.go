@@ -6,11 +6,31 @@ import (
 	"sync"
 
 	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/lightddns/infra/zaplog"
 )
+
+var managerLogger = zaplog.NewPackage("adapter.manager")
 
 type managedType interface {
 	Type() string
 	Name() string
+}
+
+type AbstractManagedType struct {
+	name string
+	typ  string
+}
+
+func NewManagedType(typ, name string) AbstractManagedType {
+	return AbstractManagedType{name, typ}
+}
+
+func (a AbstractManagedType) Type() string {
+	return a.name
+}
+
+func (a AbstractManagedType) Name() string {
+	return a.typ
 }
 
 type Manager[T managedType] interface {
@@ -49,7 +69,7 @@ func (M *DefaultManager[T]) Create(ctx context.Context, typ string, opt any) err
 	M.access.Lock()
 	defer M.access.Unlock()
 	if _, existed := M.itemByName[item.Name()]; existed {
-		return fmt.Errorf("duplicated item: type=%s, name=%s", item.Type(), item.Name())
+		return fmt.Errorf("duplicated: %q", item.Name())
 	}
 	M.items = append(M.items, item)
 	M.itemByName[item.Name()] = item

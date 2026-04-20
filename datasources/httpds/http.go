@@ -22,13 +22,14 @@ import (
 	"github.com/duakc/lightddns/options"
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
+
+const DatasourceType = constpkg.DatasourceTypeHTTP
 
 func init() {
 	adapter.Register(
 		adapter.DatasourceRegister,
-		constpkg.DatasourceTypeHTTP,
+		DatasourceType,
 		New,
 	)
 }
@@ -45,14 +46,11 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	if err != nil {
 		return nil, fmt.Errorf("http: %w", err)
 	}
+	var (
+		logger = datasourcepkg.NewLogger(lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx), option.AbstractDatasourceOption)
+		v4, v6 *requestContext
+	)
 
-	c := &Httpds{
-		logger: datasourcepkg.NewLogger(
-			lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx),
-			option.AbstractDatasourceOption,
-		),
-		name: option.Name,
-	}
 	dialStrategy, _ := netxx.DialStrategyFromString(option.DialStrategy)
 	if dialStrategy != netxx.DialOnlyIPv4 {
 		// enable ipv6
@@ -60,7 +58,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			netxx.DialerOptionWithDialStrategy(netxx.DialOnlyIPv6))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(dialer))...)
-		c.v6, err = newRequestContext(string(option.Method), option.Url.Raw,
+		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
 			option.Headers.Header, httpClient,
 			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V6),
 			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V6))
@@ -74,7 +72,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			netxx.DialerOptionWithDialStrategy(netxx.DialOnlyIPv4))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(dialer))...)
-		c.v4, err = newRequestContext(string(option.Method), option.Url.Raw,
+		v4, err = newRequestContext(string(option.Method), option.Url.Raw,
 			option.Headers.Header, httpClient,
 			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V4),
 			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V4))
@@ -82,21 +80,22 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			return nil, err
 		}
 	}
-	if c.logger.Level() <= zapcore.DebugLevel {
-		defer c.logger.Sync()
-
-		c.logger.Debug("created",
-			zap.Bool("ipv4", c.v4 != nil), zap.Bool("ipv6", c.v6 != nil))
+	httpds := &Httpds{
+		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
+		logger:              logger,
+		v4:                  v4,
+		v6:                  v6,
 	}
-	return c, nil
+	logger.Debug("created", zap.Bool("ipv4", v4 != nil), zap.Bool("ipv6", v6 != nil))
+	return httpds, nil
 }
 
 type Httpds struct {
-	logger *zap.Logger
-	name   string
+	adapter.AbstractManagedType
 
-	v4 *requestContext
-	v6 *requestContext
+	logger *zap.Logger
+	v4     *requestContext
+	v6     *requestContext
 }
 
 func (c *Httpds) IPv4(ctx context.Context) ([]netip.Addr, error) {
@@ -104,7 +103,6 @@ func (c *Httpds) IPv4(ctx context.Context) ([]netip.Addr, error) {
 		return []netip.Addr{}, nil
 	}
 	logger := c.logger
-	defer logger.Sync()
 
 	logger.Debug("ipv4 request")
 	return c.v4.Handle(ctx)
@@ -115,18 +113,9 @@ func (c *Httpds) IPv6(ctx context.Context) ([]netip.Addr, error) {
 		return []netip.Addr{}, nil
 	}
 	logger := c.logger
-	defer logger.Sync()
 
 	logger.Debug("ipv6 request")
 	return c.v6.Handle(ctx)
-}
-
-func (c *Httpds) Type() string {
-	return constpkg.DatasourceTypeHTTP
-}
-
-func (c *Httpds) Name() string {
-	return c.name
 }
 
 func (c *Httpds) IP(ctx context.Context) ([]netip.Addr, error) {

@@ -98,7 +98,6 @@ func (c *Cloudflare) getZoneID(ctx context.Context, domain string) (string, erro
 
 func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, error) {
 	logger := c.logger
-	defer logger.Sync()
 	zoneName := c.client.ListZones()
 	var zoneID string
 

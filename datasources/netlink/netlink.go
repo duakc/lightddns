@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"sync"
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
@@ -16,23 +17,24 @@ import (
 	"go.uber.org/zap"
 )
 
+const DatasourceType = constpkg.DatasourceTypeNetlink
+
 func init() {
 	adapter.Register(
 		adapter.DatasourceRegister,
-		constpkg.DatasourceTypeNetlink,
+		DatasourceType,
 		New,
 	)
 }
 
 func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.Datasource, error) {
-
 	return &Netlink{
+		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		logger: datasourcepkg.NewLogger(
 			lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx),
 			option.AbstractDatasourceOption,
 		),
 		interfaceFinder: control.NewDefaultInterfaceFinder(),
-		name:            option.Name,
 		interfaceName:   option.Interface,
 		interfaceIndex:  option.Index,
 		allowPrivate:    option.AllowPrivate,
@@ -40,21 +42,16 @@ func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.D
 }
 
 type Netlink struct {
+	adapter.AbstractManagedType
+
 	logger *zap.Logger
-	name   string
 
 	interfaceFinder control.InterfaceFinder
 	interfaceName   string
 	interfaceIndex  int
 	allowPrivate    bool
-}
 
-func (n *Netlink) Type() string {
-	return constpkg.DatasourceTypeNetlink
-}
-
-func (n *Netlink) Name() string {
-	return n.name
+	finderAccess sync.Mutex
 }
 
 func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
@@ -69,11 +66,13 @@ func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 
 func (n *Netlink) ip(ctx context.Context) ([]netip.Addr, error) {
 	logger := n.logger
-	defer logger.Sync()
 	interfaceFinder := n.interfaceFinder
+	n.finderAccess.Lock()
 	if err := interfaceFinder.Update(); err != nil {
+		n.finderAccess.Unlock()
 		return nil, fmt.Errorf("update interfaceFinder: %w", err)
 	}
+	n.finderAccess.Unlock()
 	if n.interfaceIndex != 0 {
 		logger.Debug("use index", zap.Int("index", n.interfaceIndex))
 		index, err := interfaceFinder.ByIndex(n.interfaceIndex)

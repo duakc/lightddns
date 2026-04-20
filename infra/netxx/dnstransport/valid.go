@@ -16,7 +16,6 @@ type ValidTransport struct {
 
 func (v *ValidTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error) {
 	logger := zaplog.DoNotPanic(v.Logger)
-	defer logger.Sync()
 	if message == nil {
 		panic("nil message")
 	}
