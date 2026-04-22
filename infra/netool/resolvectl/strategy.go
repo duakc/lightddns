@@ -5,7 +5,7 @@ import "fmt"
 type ResolveStrategy uint
 
 const (
-	ResolveAsis = iota
+	ResolveAsis ResolveStrategy = iota
 	ResolveIPv6
 	ResolveIPv4
 )

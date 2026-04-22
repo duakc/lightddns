@@ -11,7 +11,6 @@ import (
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -33,10 +32,12 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 	if len(option.Datasources) == 0 {
 		return nil, &datasourcepkg.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
-	logger := datasourcepkg.NewLogger(lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx), option.AbstractDatasourceOption)
+	logger := datasourcepkg.NewLogger(
+		lookctx.LookupPtr[zap.Logger](ctx),
+		option.AbstractDatasourceOption)
 
 	var datasources []adapter.Datasource
-	manager := lookctx.Lookup[adapter.DatasourceManagerKey, adapter.DatasourceManager](ctx)
+	manager := lookctx.Lookup[adapter.DatasourceManager](ctx)
 	for i := 0; i < len(option.Datasources); i++ {
 		name := option.Datasources[i]
 		if baseDatasource, found := manager.Lookup(name); found {
@@ -58,8 +59,7 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 type FailOver struct {
 	adapter.AbstractManagedType
 
-	logger *zap.Logger
-
+	logger      *zap.Logger
 	datasources []adapter.Datasource
 	lastSuccess int
 	access      sync.Mutex

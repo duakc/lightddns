@@ -7,6 +7,7 @@ import (
 
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netool/dialerx"
 
 	"github.com/duakc/mt"
 
@@ -35,8 +36,8 @@ func TestRequestContext_Handle(t *testing.T) {
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
 				"https://api.ip.sb/ip", nil, httpxx.NewClient(
-					httpxx.ClientOptionWithDialer(netool.NewDialerWithOption(
-						netool.DialerOptionWithDialStrategy(netool.DialOnlyIPv4)))),
+					httpxx.ClientOptionWithDialer(dialerx.NewDialerWithOption(
+						dialerx.WithDialStrategy(dialerx.DialOnlyIPv4)))),
 				"", "")),
 			ipVersion: "4",
 		},

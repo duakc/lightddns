@@ -11,18 +11,21 @@ import (
 	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/netool/transport"
+	"github.com/duakc/lightddns/infra/netool/transports"
 	"github.com/duakc/lightddns/infra/zaplog"
+
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/debug"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/go-freelru"
 	mDns "github.com/miekg/dns"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const defaultCacheSize = 1024
+
+var resolverLogger = zaplog.NewPackage("netool/resolvectl")
 
 type RcodeError struct {
 	Code     int
@@ -33,8 +36,10 @@ func (e *RcodeError) Error() string {
 	return fmt.Sprintf("bad rcode: %s, excepted: %s", mDns.RcodeToString[e.Code], mDns.RcodeToString[e.Excepted])
 }
 
+var DefaultResolveClient = NewResolver(context.Background())
+
 type ResolveClient interface {
-	Lookup(ctx context.Context, transport transport.Transport, domain string, strategy ResolveStrategy) (addresses []netip.Addr, err error)
+	Lookup(ctx context.Context, transport transports.Transport, domain string, strategy ResolveStrategy) (addresses []netip.Addr, err error)
 }
 
 type dnsCacheMessage struct {
@@ -51,17 +56,22 @@ type defaultResolveClient struct {
 	cache    freelru.Cache[mDns.Question, dnsCacheMessage]
 }
 
-func NewDefaultDNSResolver(ctx context.Context) ResolveClient {
+func NewResolver(ctx context.Context) ResolveClient {
 	seed := maphash.MakeSeed()
+	logger := lookctx.LookupPtr[zap.Logger](ctx)
+	if logger == nil {
+		logger = resolverLogger
+	}
+
 	return &defaultResolveClient{
-		logger: lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx).Named("resolver"),
+		logger: logger.Named("resolver"),
 		cache: mt.Must(freelru.NewSharded[mDns.Question, dnsCacheMessage](defaultCacheSize,
 			(&bindSeed[mDns.Question]{seed}).hash())),
 		cacheMax: defaultCacheSize,
 	}
 }
 
-func (r *defaultResolveClient) Lookup(ctx context.Context, transport transport.Transport,
+func (r *defaultResolveClient) Lookup(ctx context.Context, transport transports.Transport,
 	domain string, strategy ResolveStrategy,
 ) (addresses []netip.Addr, err error) {
 	//
@@ -102,7 +112,7 @@ func (r *defaultResolveClient) Lookup(ctx context.Context, transport transport.T
 }
 
 func (r *defaultResolveClient) lookupFast(ctx context.Context,
-	transport transport.Transport,
+	transport transports.Transport,
 	fqdn string, strategy ResolveStrategy,
 ) (addresses []netip.Addr, err error) {
 	if debug.Enabled && strategy != ResolveIPv4 && strategy != ResolveIPv6 {
@@ -125,7 +135,7 @@ func (r *defaultResolveClient) lookupFast(ctx context.Context,
 }
 
 func (r *defaultResolveClient) lookupToExchange(ctx context.Context,
-	dnsTransport transport.Transport,
+	dnsTransport transports.Transport,
 	fqdn string, typ uint16,
 ) (addresses []netip.Addr, err error) {
 	question := mDns.Question{
@@ -149,10 +159,10 @@ func (r *defaultResolveClient) lookupToExchange(ctx context.Context,
 	if response.Rcode != mDns.RcodeSuccess {
 		return nil, &RcodeError{Code: response.Rcode, Excepted: mDns.RcodeSuccess}
 	}
-	return transport.MessageToAddresses(response), nil
+	return transports.MessageToAddresses(response), nil
 }
 
-func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transport.Transport,
+func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transports.Transport,
 	message *mDns.Msg,
 ) (response *mDns.Msg, err error) {
 	logger := r.logger
@@ -171,8 +181,8 @@ func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transp
 		ttl := cacheMessage.expire.Sub(now) / time.Second
 		copiedMessage := cacheMessage.message.Copy()
 		copiedMessage.Id = message.Id
-		transport.OverwriteTTL(copiedMessage, uint32(ttl))
-		return transport.EdnsBackwards(message, copiedMessage), nil
+		transports.OverwriteTTL(copiedMessage, uint32(ttl))
+		return transports.EdnsBackwards(message, copiedMessage), nil
 	}
 exchange:
 	exchangedMessage, err, _ := r.sf.Do(question, func() (*mDns.Msg, error) {
@@ -185,7 +195,7 @@ exchange:
 		if err != nil {
 			return nil, err
 		}
-		ttl := transport.CalculateTTL(responseMessage)
+		ttl := transports.CalculateTTL(responseMessage)
 		if r.cache.Len() > r.cacheMax {
 			r.cache.RemoveOldest()
 		}
@@ -208,7 +218,7 @@ exchange:
 	// Copy on write, so here doesn't need a lock
 	copiedMessage := exchangedMessage.Copy()
 	copiedMessage.Id = message.Id
-	return transport.EdnsBackwards(message, copiedMessage), nil
+	return transports.EdnsBackwards(message, copiedMessage), nil
 }
 
 type bindSeed[T comparable] struct {

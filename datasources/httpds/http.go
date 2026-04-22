@@ -17,8 +17,7 @@ import (
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/zaplog"
+	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/itchyny/gojq"
@@ -48,15 +47,15 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		return nil, fmt.Errorf("http: %w", err)
 	}
 	var (
-		logger = datasourcepkg.NewLogger(lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx), option.AbstractDatasourceOption)
+		logger = datasourcepkg.NewLogger(lookctx.LookupPtr[zap.Logger](ctx), option.AbstractDatasourceOption)
 		v4, v6 *requestContext
 	)
 
-	dialStrategy, _ := netool.DialStrategyFromString(option.DialStrategy)
-	if dialStrategy != netool.DialOnlyIPv4 {
+	dialStrategy, _ := dialerx.DialStrategyFromString(option.DialStrategy)
+	if dialStrategy != dialerx.DialOnlyIPv4 {
 		// enable ipv6
-		dialer := netool.NewDialerWithOption(append(dialerOptions,
-			netool.DialerOptionWithDialStrategy(netool.DialOnlyIPv6))...)
+		dialer := dialerx.NewDialerWithOption(append(dialerOptions,
+			dialerx.WithDialStrategy(dialerx.DialOnlyIPv6))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(dialer))...)
 		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
@@ -67,10 +66,10 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			return nil, err
 		}
 	}
-	if dialStrategy != netool.DialOnlyIPv6 {
+	if dialStrategy != dialerx.DialOnlyIPv6 {
 		// enable ipv4
-		dialer := netool.NewDialerWithOption(append(dialerOptions,
-			netool.DialerOptionWithDialStrategy(netool.DialOnlyIPv4))...)
+		dialer := dialerx.NewDialerWithOption(append(dialerOptions,
+			dialerx.WithDialStrategy(dialerx.DialOnlyIPv4))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(dialer))...)
 		v4, err = newRequestContext(string(option.Method), option.Url.Raw,

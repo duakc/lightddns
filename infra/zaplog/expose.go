@@ -9,9 +9,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var defaultLogger = createDefault(zapcore.TraceLevel)
+var (
+	defaultLevel  = zap.NewAtomicLevelAt(zapcore.TraceLevel)
+	defaultLogger = createDefault(defaultLevel)
+)
 
-func createDefault(lvl zapcore.Level) *zap.Logger {
+func createDefault(lvl zapcore.LevelEnabler) *zap.Logger {
 	var options []zap.Option
 	if debug.Enabled {
 		options = append(options, zap.Development())
@@ -23,7 +26,7 @@ func createDefault(lvl zapcore.Level) *zap.Logger {
 }
 
 func DefaultLevel(lvl zapcore.Level) {
-	defaultLogger = createDefault(lvl)
+	defaultLevel.SetLevel(lvl)
 }
 
 func NewPackage(pkg string) *zap.Logger {

@@ -8,7 +8,6 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"go.uber.org/zap"
@@ -29,9 +28,11 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 		return nil, &datasourcepkg.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	logger := datasourcepkg.NewLogger(lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx), option.AbstractDatasourceOption)
+	logger := datasourcepkg.NewLogger(
+		lookctx.LookupPtr[zap.Logger](ctx),
+		option.AbstractDatasourceOption)
 
-	datasourceManager := lookctx.Lookup[adapter.DatasourceManagerKey, *adapter.DatasourceManager](ctx)
+	datasourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
 	var datasources []adapter.Datasource
 
 	for i := 0; i < len(option.Datasources); i++ {

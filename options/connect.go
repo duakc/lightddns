@@ -5,66 +5,67 @@ import (
 	"net/netip"
 
 	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/control"
-	"github.com/duakc/lightddns/infra/netool/transport"
+	"github.com/duakc/lightddns/infra/netool/dialerx"
 )
 
 type ConnectOption struct {
+	FwManirk uint `yaml:"fwmark"`
+
 	DialStrategy string `yaml:"dial-strategy"`
 	BindAddress4 string `yaml:"bind-address4"`
 	BindAddress6 string `yaml:"bind-address6"`
 
 	BindInterface badyaml.StringOrNumber `yaml:"bind-interface"`
-	FwManirk      uint                   `yaml:"fwmark"`
-	DNS           string                 `yaml:"dns"`
+	// DNS noop now
+	DNS string `yaml:"dns"`
 }
 
-func (co ConnectOption) Options() ([]netool.DialerOption, error) {
-	var options []netool.DialerOption
+func (co ConnectOption) Options() ([]dialerx.DialerOption, error) {
+	var options []dialerx.DialerOption
 
-	if dialStrategy, ok := netool.DialStrategyFromString(co.DialStrategy); ok {
-		options = append(options, netool.DialerOptionWithDialStrategy(dialStrategy))
+	if dialStrategy, ok := dialerx.DialStrategyFromString(co.DialStrategy); ok {
+		options = append(options, dialerx.WithDialStrategy(dialStrategy))
 	}
-	if co.BindAddress4 != "" {
-		inet4Address, err := netip.ParseAddr(co.BindAddress4)
-		if err != nil {
-			return nil, fmt.Errorf("inet4Address: %w", err)
+	if co.BindAddress4 != "" || co.BindAddress6 != "" {
+		var (
+			address4 netip.Addr
+			address6 netip.Addr
+			err      error
+		)
+
+		if co.BindAddress4 != "" {
+			address4, err = netip.ParseAddr(co.BindAddress4)
+			if err != nil {
+				return nil, fmt.Errorf("ConnectOption.BindAddress4: %w", err)
+			}
 		}
-		options = append(options, netool.DialerOptionBindAddress4(inet4Address))
-	}
-	if co.BindAddress6 != "" {
-		inet6Address, err := netip.ParseAddr(co.BindAddress6)
-		if err != nil {
-			return nil, fmt.Errorf("inet6Address: %w", err)
+		if co.BindAddress6 != "" {
+			address6, err = netip.ParseAddr(co.BindAddress6)
+			if err != nil {
+				return nil, fmt.Errorf("ConnectOption.BindAddress6: %w", err)
+			}
 		}
-		options = append(options, netool.DialerOptionBindAddress6(inet6Address))
+		options = append(options, dialerx.WithBindAddress(address4, address6))
 	}
 	if co.BindInterface.Num != 0 {
 		index := co.BindInterface.Num
 		_, err := control.NewDefaultInterfaceFinder().ByIndex(int(index))
 		if err != nil {
-			return nil, fmt.Errorf("interface index: %d not found: %w", index, err)
+			return nil, fmt.Errorf("ConnectOption.BindInterface(index): %w", err)
 		}
-		options = append(options, netool.DialerOptionWithBindInterfaceIndex(int(index)))
+		options = append(options, dialerx.WithBindInterfaceIndex(int(index)))
 	} else if co.BindInterface.Str != "" {
 		name := co.BindInterface.Str
 		_, err := control.NewDefaultInterfaceFinder().ByName(name)
 		if err != nil {
-			return nil, fmt.Errorf("interface name: %s not found: %w", name, err)
+			return nil, fmt.Errorf("ConnectOption.BindInterface(name): %w", err)
 		}
-		options = append(options, netool.DialerOptionWithBindInterfaceName(name))
+		options = append(options, dialerx.WithBindInterfaceName(co.BindInterface.Str))
 	}
 
 	if co.FwManirk != 0 {
-		options = append(options, netool.DialerOptionFwmark(uint32(co.FwManirk)))
-	}
-	if co.DNS != "" {
-		transport, err := transport.NewDNSTransport(co.DNS)
-		if err != nil {
-			return nil, fmt.Errorf("build dns transport: %w", err)
-		}
-		options = append(options, netool.DialerOptionWithTransport(transport))
+		options = append(options, dialerx.WithFwmark(uint32(co.FwManirk)))
 	}
 
 	return options, nil

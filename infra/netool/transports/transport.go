@@ -1,8 +1,7 @@
-package transport
+package transports
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/netip"
 	"strings"
@@ -14,33 +13,6 @@ import (
 
 type Transport interface {
 	Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error)
-}
-
-func NewDNSTransport(buildString string) (Transport, error) {
-	if buildString == "" {
-		return &SystemTransport{}, nil
-	}
-	var schema, value string
-	if idx := strings.Index(buildString, "://"); idx > 0 {
-		schema = buildString[:idx]
-		value = buildString[idx+len("://"):]
-	} else {
-		if buildString == "system" {
-			schema = "system"
-		} else if idx == 0 {
-			buildString = buildString[len("://"):]
-			schema = "udp"
-		}
-		value = buildString
-	}
-	_ = value
-	switch schema {
-	case "system":
-		return &SystemTransport{}, nil
-	default:
-		// TODO: add more transport
-		return nil, fmt.Errorf("transport build failed for: %s", buildString)
-	}
 }
 
 func CalculateTTL(message *mDns.Msg) (ttl uint32) {

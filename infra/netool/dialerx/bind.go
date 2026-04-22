@@ -1,11 +1,8 @@
 package dialerx
 
 import (
-	"context"
 	"net"
 	"net/netip"
-	"slices"
-	"strings"
 
 	"github.com/duakc/lightddns/infra/netool/control"
 	"github.com/duakc/lightddns/infra/netool/internal"
@@ -17,71 +14,27 @@ type bindDialer struct {
 
 	v4TcpDialer net.Dialer
 	v6TcpDialer net.Dialer
-
 	v4UdpDialer net.Dialer
 	v6UdpDialer net.Dialer
-
-	v4L3Dialer net.Dialer
-	v6L3Dialer net.Dialer
-}
-
-func (b *bindDialer) DialContextAddrPort(ctx context.Context, network string, address netip.AddrPort) (net.Conn, error) {
-	hostAddress := address.Addr()
-
-	var (
-		dialer        net.Dialer
-		addressIsIpv4 = internal.IsIPv4(hostAddress)
-		networkIsUdp  = strings.HasPrefix(network, "udp")
-		networkIsL3   = !slices.Contains(l4NetworkList, network)
-	)
-	if addressIsIpv4 {
-		switch {
-		case networkIsL3:
-			dialer = b.v4L3Dialer
-		case networkIsUdp:
-			dialer = b.v4UdpDialer
-		default:
-			dialer = b.v4TcpDialer
-		}
-	} else {
-		switch {
-		case networkIsL3:
-			dialer = b.v6L3Dialer
-		case networkIsUdp:
-			dialer = b.v6UdpDialer
-		default:
-			dialer = b.v6TcpDialer
-		}
-	}
-	return dialer.DialContext(ctx, network, address.String())
-}
-
-func (b *bindDialer) DialContext(ctx context.Context, network string, address string) (net.Conn, error) {
-	if b.useInterface {
-		return b.interfaceDialer.DialContext(ctx, network, address)
-	}
-
-	addrPort, err := netip.ParseAddrPort(address)
-	if err != nil {
-		return nil, err
-	}
-	return b.DialContextAddrPort(ctx, network, addrPort)
+	v4L3Dialer  net.Dialer
+	v6L3Dialer  net.Dialer
 }
 
 func newInterfaceBindDialer(this net.Dialer,
 	networkInfName string, networkInfIndex int,
-	finder control.InterfaceFinder) *bindDialer {
+	finder control.InterfaceFinder,
+) bindDialer {
 	if finder == nil {
 		finder = control.NewDefaultInterfaceFinder()
 	}
 	this.Control = control.Append(this.Control, control.BindToInterface(finder, networkInfName, networkInfIndex))
-	return &bindDialer{useInterface: true, interfaceDialer: this}
+	return bindDialer{useInterface: true, interfaceDialer: this}
 }
 
 func newAddressesBindDialer(this net.Dialer,
 	address4 netip.Addr, address6 netip.Addr,
-) *bindDialer {
-	b := &bindDialer{
+) bindDialer {
+	b := bindDialer{
 		v4TcpDialer: this, v6TcpDialer: this,
 		v4UdpDialer: this, v6UdpDialer: this,
 		v4L3Dialer: this, v6L3Dialer: this,

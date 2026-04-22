@@ -12,8 +12,7 @@ type Provider interface {
 }
 
 type (
-	ProviderManager    = DefaultManager[Provider]
-	ProviderManagerKey struct{}
+	ProviderManager = Manager[Provider]
 )
 
 var ProviderRegister = NewRegister[Provider]()

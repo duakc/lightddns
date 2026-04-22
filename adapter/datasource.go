@@ -23,8 +23,7 @@ type DatasourceDualStack interface {
 }
 
 type (
-	DatasourceManager    = DefaultManager[Datasource]
-	DatasourceManagerKey struct{}
+	DatasourceManager = Manager[Datasource]
 )
 
 var DatasourceRegister = NewRegister[Datasource]()

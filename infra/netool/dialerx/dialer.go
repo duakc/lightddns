@@ -2,22 +2,20 @@ package dialerx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
 	"slices"
 	"strconv"
-	"time"
+	"strings"
 
 	"github.com/duakc/lightddns/infra/netool/internal"
 )
 
 var (
-	l4NetworkList = []string{"tcp", "udp", "tcp4", "tcp6", "udp4", "udp6"}
-)
-
-var (
-	ErrAddressIsDomainName = "address is a domain name"
+	ErrAddressIsDomainName = errors.New("address is a domain name")
+	ErrNoAddressToDialer   = errors.New("no address to dial")
 )
 
 type Dialer interface {
@@ -26,34 +24,77 @@ type Dialer interface {
 
 type AddrPortDialer interface {
 	Dialer
-	DialContextAddrPort(ctx context.Context, network string, address netip.AddrPort) (net.Conn, error)
+	DialAddrPort(ctx context.Context, network string, addr netip.Addr, port uint16) (net.Conn, error)
 }
 
-type defaultDialer struct {
-	dialer net.Dialer
-	bind   *bindDialer
-
-	fallbackDelay time.Duration
-	dialStrategy  DialStrategy
+type ParallelDialer interface {
+	Dialer
+	DialParallel(ctx context.Context, addresses []netip.Addr, port uint16) (net.Conn, error)
 }
 
-func (d *defaultDialer) DialContextAddrPort(ctx context.Context, network string, address netip.AddrPort) (net.Conn, error) {
-	if d.bind != nil {
-		return d.bind.DialContextAddrPort(ctx, network, address)
-	}
-	return d.dialer.DialContext(ctx, network, address.String())
+type systemDialer struct {
+	bindDialer
+	happyEyeballConf
+
+	dialer  net.Dialer
+	useBind bool
 }
 
-func (d *defaultDialer) DialContext(ctx context.Context, network string, address string) (net.Conn, error) {
-	var this Dialer = &d.dialer
-	if d.bind != nil {
-		this = d.bind
+func (r *systemDialer) dialAddress(ctx context.Context, network string, addr netip.Addr, port uint16) (net.Conn, error) {
+	addrPort := netip.AddrPortFrom(addr.Unmap(), port)
+	if !r.useBind {
+		return r.dialer.DialContext(ctx, network, addrPort.String())
+	}
+	if r.useInterface {
+		return r.interfaceDialer.DialContext(ctx, network, addrPort.String())
 	}
 
-	if !slices.Contains(l4NetworkList, network) {
-		return this.DialContext(ctx, network, address)
+	hostAddress := addrPort.Addr()
+
+	var (
+		dialer        net.Dialer
+		addressIsIpv4 = internal.IsIPv4(hostAddress)
+		networkIsUdp  = strings.HasPrefix(network, "udp")
+		networkIsL3   = !slices.Contains(internal.L4NetworkList, network)
+	)
+	if addressIsIpv4 {
+		switch {
+		case networkIsL3:
+			dialer = r.v4L3Dialer
+		case networkIsUdp:
+			dialer = r.v4UdpDialer
+		default:
+			dialer = r.v4TcpDialer
+		}
+	} else {
+		switch {
+		case networkIsL3:
+			dialer = r.v6L3Dialer
+		case networkIsUdp:
+			dialer = r.v6UdpDialer
+		default:
+			dialer = r.v6TcpDialer
+		}
+	}
+	return dialer.DialContext(ctx, network, addrPort.String())
+}
+
+func (r *systemDialer) DialParallel(ctx context.Context, addresses []netip.Addr, port uint16) (net.Conn, error) {
+	if len(addresses) > 1 && r.fallbackDelay >= 0 {
+		return DialParallel(ctx, r, addresses, port, r.dialStrategy == DialPreferIPv6, r.fallbackDelay)
 	}
 
+	return DialSerial(ctx, r, "tcp", addresses, port)
+}
+
+func (r *systemDialer) DialAddrPort(ctx context.Context, network string, addr netip.Addr, port uint16) (net.Conn, error) {
+	return r.dialAddress(ctx, network, addr, port)
+}
+
+func (r *systemDialer) DialContext(ctx context.Context, network string, address string) (net.Conn, error) {
+	if len(address) == 0 {
+		return nil, ErrNoAddressToDialer
+	}
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -65,9 +106,12 @@ func (d *defaultDialer) DialContext(ctx context.Context, network string, address
 	}
 
 	if internal.IsDomainName(host) {
+		if !slices.Contains(internal.L4NetworkList, network) {
+			return nil, fmt.Errorf("address not resolved with network %s: %s", network, host)
+		}
 		addresses, err = internal.LocalLookup(ctx, host,
-			network != "udp6" && network != "tcp6" && d.dialStrategy != DialOnlyIPv6,
-			network != "udp4" && network != "tcp4" && d.dialStrategy != DialOnlyIPv4)
+			network != "udp6" && network != "tcp6" && r.dialStrategy != DialOnlyIPv6,
+			network != "udp4" && network != "tcp4" && r.dialStrategy != DialOnlyIPv4)
 		if err != nil {
 			return nil, fmt.Errorf("parse address: %s: lookup %s: %w", address, host, err)
 		}
@@ -76,31 +120,42 @@ func (d *defaultDialer) DialContext(ctx context.Context, network string, address
 		if addr, err = netip.ParseAddr(host); err != nil {
 			return nil, fmt.Errorf("parse address %s: %w", address, err)
 		}
-		if internal.IsIPv4(addr) && d.dialStrategy != DialOnlyIPv6 ||
-			internal.IsIPv6(addr) && d.dialStrategy != DialOnlyIPv4 {
-			return nil, fmt.Errorf("dialStrategy=%s,addr=%s: no address to dial",
-				d.dialStrategy, addr)
+		if internal.IsIPv4(addr) && r.dialStrategy != DialOnlyIPv6 ||
+			internal.IsIPv6(addr) && r.dialStrategy != DialOnlyIPv4 {
+			return nil, fmt.Errorf("dialStrategy=%s,addr=%s: %w",
+				r.dialStrategy, addr, ErrNoAddressToDialer)
 		}
 		addresses = []netip.Addr{addr}
 	}
 
-	if len(addresses) > 1 && d.fallbackDelay >= 0 {
-		return DialParallel(ctx, this, network, addresses, uint16(hostPort),
-			d.dialStrategy == DialPreferIPv6, d.fallbackDelay)
+	if len(addresses) > 1 && r.fallbackDelay >= 0 && network == "tcp" {
+		return r.DialParallel(ctx, addresses, uint16(hostPort))
 	}
 
-	return DialSerial(ctx, this, network, addresses, uint16(hostPort))
+	return DialSerial(ctx, r, network, addresses, uint16(hostPort))
 }
 
 func NewDialerWithOption(opt ...DialerOption) Dialer {
-	d := &defaultDialer{
-		dialer:        net.Dialer{},
-		fallbackDelay: defaultFallbackDelay,
-		dialStrategy:  DialPreferIPv6,
+	d := &systemDialer{
+		dialer: net.Dialer{},
+		happyEyeballConf: happyEyeballConf{
+			fallbackDelay: internal.DefaultHappyEyeballFallbackDelay,
+			dialStrategy:  DialPreferIPv6,
+		},
 	}
 
+	var delayedOption []DialerOption
 	for i := 0; i < len(opt); i++ {
 		o := opt[i]
+		if o.RequireDialer() {
+			delayedOption = append(delayedOption, o)
+			continue
+		}
+		o.Apply(d)
+	}
+
+	for i := 0; i < len(delayedOption); i++ {
+		o := delayedOption[i]
 		o.Apply(d)
 	}
 

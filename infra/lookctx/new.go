@@ -13,14 +13,44 @@ type Registry interface {
 
 type registryKey struct{}
 
-func Lookup[K comparable, V any](ctx context.Context) V {
+func LookupDefault[K comparable](ctx context.Context, dft K) K {
 	registry := RegistryFromContext(ctx)
-	return registry.Load(mt.Zero[K]()).(V)
+	if registry == nil {
+		return dft
+	}
+	if v := registry.Load(mt.Zero[*K]()); v != nil {
+		return v.(K)
+	}
+	return dft
 }
 
-func Store[K comparable, V any](ctx context.Context, value V) {
+func Lookup[K comparable](ctx context.Context) K {
+	return LookupDefault(ctx, mt.Zero[K]())
+}
+
+func LookupPtrDefault[K comparable](ctx context.Context, dft *K) *K {
 	registry := RegistryFromContext(ctx)
-	registry.Store(mt.Zero[K](), value)
+	if registry == nil {
+		return dft
+	}
+	if v := registry.Load(mt.Zero[*K]()); v != nil {
+		return v.(*K)
+	}
+	return dft
+}
+
+func LookupPtr[K comparable](ctx context.Context) *K {
+	return LookupPtrDefault[K](ctx, nil)
+}
+
+func Store[K comparable](ctx context.Context, value K) {
+	registry := RegistryFromContext(ctx)
+	registry.Store(mt.Zero[*K](), value)
+}
+
+func StorePtr[K comparable](ctx context.Context, value *K) {
+	registry := RegistryFromContext(ctx)
+	registry.Store(mt.Zero[*K](), value)
 }
 
 func NewRegistry(ctx context.Context, r Registry) context.Context {
@@ -29,5 +59,8 @@ func NewRegistry(ctx context.Context, r Registry) context.Context {
 
 func RegistryFromContext(ctx context.Context) Registry {
 	registry := ctx.Value(registryKey{})
+	if registry == nil {
+		return nil
+	}
 	return registry.(Registry)
 }

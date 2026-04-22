@@ -20,8 +20,8 @@ type LightDDNS struct {
 	logger  *zap.Logger
 	domains []*Domain
 
-	providerManager   *adapter.ProviderManager
-	datasourceManager *adapter.DatasourceManager
+	providerManager   adapter.ProviderManager
+	datasourceManager adapter.DatasourceManager
 }
 
 func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
@@ -29,12 +29,14 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create logger: %w", err)
 	}
+	zaplog.DefaultLevel(logger.Level())
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
 	dataSourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
-	lookctx.Store[zaplog.LoggerKey](ctx, logger)
-	lookctx.Store[adapter.ProviderManagerKey](ctx, providerManager)
-	lookctx.Store[adapter.DatasourceManagerKey](ctx, dataSourceManager)
+
+	lookctx.StorePtr[zap.Logger](ctx, logger)
+	lookctx.Store[adapter.ProviderManager](ctx, providerManager)
+	lookctx.Store[adapter.DatasourceManager](ctx, dataSourceManager)
 
 	logger = logger.Named("main")
 	resortedDatasources, err := resortDatasources(opt.DataSources)

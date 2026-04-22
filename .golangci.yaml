@@ -22,6 +22,11 @@ linters:
     - tagalign
     - tagliatelle
   settings:
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+          yaml: kebab
     staticcheck:
       checks:
         - all

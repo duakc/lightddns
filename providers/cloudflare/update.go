@@ -17,9 +17,6 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr
 	logger.Debug("new update request",
 		zap.Stringers("addresses", addr),
 		zap.String("domain", domain))
-	if ttl < 0 {
-		ttl = 0
-	}
 	zoneID, err := c.getZoneID(ctx, domain)
 	if err != nil {
 		return fmt.Errorf("getZoneID: %w", err)

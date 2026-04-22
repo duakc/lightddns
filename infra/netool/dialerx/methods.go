@@ -9,17 +9,16 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/infra/netool/internal"
+
 	"github.com/duakc/mt"
 )
 
-const defaultFallbackDelay = 300 * time.Millisecond
-
 func DialParallel(ctx context.Context, dialer Dialer,
-	network string, addresses []netip.Addr, port uint16,
+	addresses []netip.Addr, port uint16,
 	preferIPv6 bool, fallbackDelay time.Duration,
 ) (net.Conn, error) {
 	if fallbackDelay == 0 {
-		fallbackDelay = defaultFallbackDelay
+		fallbackDelay = internal.DefaultHappyEyeballFallbackDelay
 	}
 
 	returned := make(chan struct{})
@@ -29,7 +28,7 @@ func DialParallel(ctx context.Context, dialer Dialer,
 	addresses6 := mt.Filter(addresses, internal.IsIPv6)
 
 	if len(addresses4) == 0 || len(addresses6) == 0 {
-		return DialSerial(ctx, dialer, network, addresses, port)
+		return DialSerial(ctx, dialer, "tcp", addresses, port)
 	}
 
 	var primaries, fallbacks []netip.Addr
@@ -53,7 +52,7 @@ func DialParallel(ctx context.Context, dialer Dialer,
 		if !primary {
 			ras = fallbacks
 		}
-		c, err := DialSerial(ctx, dialer, network, ras, port)
+		c, err := DialSerial(ctx, dialer, "tcp", ras, port)
 		select {
 		case results <- dialResult{Conn: c, error: err, primary: primary, done: true}:
 		case <-returned:
@@ -104,11 +103,10 @@ func DialSerial(ctx context.Context, this Dialer, network string, address []neti
 	for _, addr := range address {
 		var conn net.Conn
 		var err error
-		addrPort := netip.AddrPortFrom(addr.Unmap(), port)
 		if addrPortDialer, isAddrPortDialer := this.(AddrPortDialer); isAddrPortDialer {
-			conn, err = addrPortDialer.DialContextAddrPort(ctx, network, addrPort)
+			conn, err = addrPortDialer.DialAddrPort(ctx, network, addr, port)
 		} else {
-			conn, err = this.DialContext(ctx, network, addrPort.String())
+			conn, err = this.DialContext(ctx, network, netip.AddrPortFrom(addr, port).String())
 		}
 		if err == nil {
 			return conn, nil

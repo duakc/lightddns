@@ -10,7 +10,6 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	providerpkg "github.com/duakc/lightddns/providers"
 
@@ -56,9 +55,9 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		updateInterval = time.Duration(opt.Interval)
 	}
 
-	logger := lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx)
-	dataSourceManager := lookctx.Lookup[adapter.DatasourceManagerKey, *adapter.DatasourceManager](ctx)
-	providerManager := lookctx.Lookup[adapter.ProviderManagerKey, *adapter.ProviderManager](ctx)
+	logger := lookctx.LookupPtr[zap.Logger](ctx)
+	dataSourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
+	providerManager := lookctx.Lookup[adapter.ProviderManager](ctx)
 
 	var (
 		provider   adapter.Provider

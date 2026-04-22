@@ -6,7 +6,7 @@ import (
 	urlpkg "net/url"
 	"time"
 
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netool/dialerx"
 
 	"golang.org/x/net/http/httpproxy"
 )
@@ -95,7 +95,7 @@ func ClientOptionEnableProxy() HTTPClientOption {
 	})
 }
 
-func ClientOptionWithDialer(d netool.Dialer) HTTPClientOption {
+func ClientOptionWithDialer(d dialerx.Dialer) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
 		c.Client.Transport.(*http.Transport).DialContext = d.DialContext
 	})

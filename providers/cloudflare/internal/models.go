@@ -50,11 +50,13 @@ func (r *Response) JoinError(err error) error {
 
 type ResponseWithResult[T any] struct {
 	Response `json:",inline"`
-	Result   T `json:"result"`
+
+	Result T `json:"result"`
 }
 
 type ResponseWithPage[T any] struct {
-	Response   `json:",inline"`
+	Response `json:",inline"`
+
 	Result     []T        `json:"result"`
 	ResultInfo ResultInfo `json:"result_info"`
 }

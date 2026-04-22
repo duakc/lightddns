@@ -13,7 +13,7 @@ import (
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/zaplog"
+	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/options"
 	providerpkg "github.com/duakc/lightddns/providers"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
@@ -44,11 +44,11 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 	clientOptions = append(clientOptions,
 		httpxx.ClientOptionWithToken(option.Token),
 		httpxx.ClientOptionWithDialer(
-			netool.NewDialerWithOption(dialerOptions...)))
+			dialerx.NewDialerWithOption(dialerOptions...)))
 
 	cf := &Cloudflare{
 		logger: providerpkg.NewLogger(
-			lookctx.Lookup[zaplog.LoggerKey, *zap.Logger](ctx),
+			lookctx.LookupPtr[zap.Logger](ctx),
 			option.AbstractProviderOption,
 		),
 		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),

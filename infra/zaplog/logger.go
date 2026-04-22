@@ -18,7 +18,7 @@ type LoggerKey struct{}
 
 var NOP = zap.NewNop()
 
-func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *zap.Logger {
+func NewDefault(output io.Writer, level zapcore.LevelEnabler, options []zap.Option) *zap.Logger {
 	coreEncoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		TimeKey:        "ts",
 		LevelKey:       "level",
