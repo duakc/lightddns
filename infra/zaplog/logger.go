@@ -4,7 +4,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt/debug"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -40,7 +41,7 @@ func NewDefault(output io.Writer, level zapcore.Level, options []zap.Option) *za
 		}
 		options = append(options, zap.AddStacktrace(parseLevel))
 	}
-	if common.IsDebug {
+	if debug.Enabled {
 		options = append(options, zap.Development())
 	}
 	options = append(options, zap.WithFastSync())

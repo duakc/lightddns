@@ -9,17 +9,17 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
-	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	providerpkg "github.com/duakc/lightddns/providers"
+
+	"github.com/duakc/mt"
+
 	"go.uber.org/zap"
 )
 
-var (
-	errDomainNotEnabled = errors.New("not enabled")
-)
+var errDomainNotEnabled = errors.New("not enabled")
 
 type Domain struct {
 	logger *zap.Logger
@@ -36,7 +36,7 @@ type Domain struct {
 }
 
 func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
-	var updateInterval = constpkg.DefaultUpdateInterval
+	updateInterval := constpkg.DefaultUpdateInterval
 
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, errDomainNotEnabled
@@ -90,7 +90,7 @@ func (o *Domain) UpdateOnce(ctx context.Context) error {
 	// TODO: here needs some optimization
 	logger := o.logger
 	var cancel context.CancelFunc
-	ctx, cancel = common.ContextWithTimeout(ctx, o.updateInterval)
+	ctx, cancel = mt.Timeout(ctx, o.updateInterval)
 	defer cancel()
 
 	netips, err := adapter.MergeDatasources(ctx,

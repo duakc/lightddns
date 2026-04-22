@@ -9,11 +9,13 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
-	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+
+	"github.com/duakc/mt"
+
 	"go.uber.org/zap"
 )
 
@@ -103,7 +105,7 @@ func (f *FailOver) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, e
 			}
 		} else {
 			ips, err = succeedDatasource.IP(ctx)
-			ips = netxx.FilterAddress(ips, ipv4, ipv6)
+			ips = netool.FilterAddress(ips, ipv4, ipv6)
 		}
 		if err == nil {
 			f.lastSuccess = (f.lastSuccess + walked) % len(f.datasources)
@@ -115,7 +117,7 @@ func (f *FailOver) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, e
 			zap.String("failed_datasource_type", succeedDatasource.Type()),
 			zap.Int("walked", walked))
 		f.lastSuccess++
-		if common.Done(ctx) {
+		if mt.Done(ctx) {
 			if walked+1 < len(f.datasources)/onceFailPercentage {
 				logger.Info("failover retry continued, but context deadline exceeded")
 			}

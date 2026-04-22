@@ -1,9 +1,9 @@
-package netxx
+package internal
 
 import (
 	"net/netip"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
 )
 
 func IsIPv4(ip netip.Addr) bool {
@@ -22,7 +22,7 @@ func FilterAddress(ips []netip.Addr, ipv4, ipv6 bool) []netip.Addr {
 		return []netip.Addr{}
 	}
 
-	return common.Filter(ips, func(v netip.Addr) bool {
+	return mt.Filter(ips, func(v netip.Addr) bool {
 		return v.IsValid() && (ipv6 && ipv4 ||
 			((ipv4 && IsIPv4(v)) || (ipv6 && IsIPv6(v))))
 	})

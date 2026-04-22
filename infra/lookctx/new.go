@@ -3,7 +3,7 @@ package lookctx
 import (
 	"context"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
 )
 
 type Registry interface {
@@ -15,12 +15,12 @@ type registryKey struct{}
 
 func Lookup[K comparable, V any](ctx context.Context) V {
 	registry := RegistryFromContext(ctx)
-	return registry.Load(common.Zero[K]()).(V)
+	return registry.Load(mt.Zero[K]()).(V)
 }
 
 func Store[K comparable, V any](ctx context.Context, value V) {
 	registry := RegistryFromContext(ctx)
-	registry.Store(common.Zero[K](), value)
+	registry.Store(mt.Zero[K](), value)
 }
 
 func NewRegistry(ctx context.Context, r Registry) context.Context {

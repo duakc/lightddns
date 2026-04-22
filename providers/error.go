@@ -5,9 +5,7 @@ import (
 	"fmt"
 )
 
-var (
-	ErrRequireToken = errors.New("token required")
-)
+var ErrRequireToken = errors.New("token required")
 
 type ProviderNotFoundError struct {
 	Name string

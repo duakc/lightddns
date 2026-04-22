@@ -6,8 +6,9 @@ import (
 	"net/netip"
 
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
+
 	"go.uber.org/zap"
 )
 
@@ -35,8 +36,10 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr
 		var err error
 		rc := diffRecords[i]
 		updateRequest := ipToUpdateDNSRecord(domain, rc.address, ttl, c.privateRoute, c.proxied)
-		logFields := []zap.Field{zap.String("ip", updateRequest.Content),
-			zap.String("domain", updateRequest.Name)}
+		logFields := []zap.Field{
+			zap.String("ip", updateRequest.Content),
+			zap.String("domain", updateRequest.Name),
+		}
 		switch {
 		case rc.toCreate:
 			logger.Info("create", logFields...)
@@ -64,7 +67,7 @@ func ipToUpdateDNSRecord(name string, ip netip.Addr, ttl uint32, PrivateRouting 
 		PrivateRouting: PrivateRouting,
 		Proxied:        Proxied,
 	}
-	if netxx.IsIPv6(ip) {
+	if netool.IsIPv6(ip) {
 		req.Type = constpkg.DNSTypeAAAA
 	} else {
 		req.Type = constpkg.DNSTypeA

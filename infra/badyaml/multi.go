@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
+
 	goyaml "github.com/goccy/go-yaml"
 )
 
@@ -14,7 +15,7 @@ type StringOrNumber struct {
 }
 
 func (bn *StringOrNumber) UnmarshalYAML(data []byte) error {
-	unquoted := common.UnquoteString(string(data))
+	unquoted := mt.UnquoteString(string(data))
 	*bn = StringOrNumber{} // reset
 	if num, err := strconv.ParseInt(unquoted, 10, 64); err == nil {
 		bn.Num = num

@@ -2,6 +2,7 @@ package options
 
 import (
 	"github.com/duakc/lightddns/adapter"
+
 	goyaml "github.com/goccy/go-yaml"
 )
 

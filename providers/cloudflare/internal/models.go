@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
 )
 
 type BaseError struct {
@@ -16,8 +16,9 @@ func (e *BaseError) Error() string {
 	return fmt.Sprintf("code=%d, message=%s", e.Code, e.Message)
 }
 
-type Message struct {
+type MessageError struct {
 	BaseError
+
 	DocumentationUrl string `json:"documentation_url"`
 	// other doesn't needed fields are ignored
 }
@@ -31,13 +32,13 @@ type ResultInfo struct {
 }
 
 type Response struct {
-	Success  bool      `json:"success"`
-	Errors   []Message `json:"errors"`
-	Messages []Message `json:"messages"`
+	Success  bool           `json:"success"`
+	Errors   []MessageError `json:"errors"`
+	Messages []MessageError `json:"messages"`
 }
 
 func (r *Response) Error() error {
-	return errors.Join(common.Map(r.Errors, func(s Message) error {
+	return errors.Join(mt.Map(r.Errors, func(s MessageError) error {
 		return &s
 	})...)
 }

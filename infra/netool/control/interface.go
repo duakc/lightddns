@@ -4,7 +4,7 @@ import (
 	"errors"
 	"syscall"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
 )
 
 type Func = func(network, address string, conn syscall.RawConn) error
@@ -34,7 +34,7 @@ func Conn(conn syscall.Conn, block func(fd uintptr) error) error {
 func Conn0[T any](conn syscall.Conn, block func(fd uintptr) (T, error)) (T, error) {
 	rawConn, err := conn.SyscallConn()
 	if err != nil {
-		return common.Zero[T](), err
+		return mt.Zero[T](), err
 	}
 	return Raw0[T](rawConn, block)
 }

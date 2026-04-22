@@ -1,4 +1,4 @@
-package netxx
+package dialerx
 
 import (
 	"context"
@@ -8,15 +8,16 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/mt"
 )
 
 const defaultFallbackDelay = 300 * time.Millisecond
 
 func DialParallel(ctx context.Context, dialer Dialer,
 	network string, addresses []netip.Addr, port uint16,
-	preferIPv6 bool, fallbackDelay time.Duration) (net.Conn, error) {
-
+	preferIPv6 bool, fallbackDelay time.Duration,
+) (net.Conn, error) {
 	if fallbackDelay == 0 {
 		fallbackDelay = defaultFallbackDelay
 	}
@@ -24,8 +25,8 @@ func DialParallel(ctx context.Context, dialer Dialer,
 	returned := make(chan struct{})
 	defer close(returned)
 
-	addresses4 := common.Filter(addresses, IsIPv4)
-	addresses6 := common.Filter(addresses, IsIPv6)
+	addresses4 := mt.Filter(addresses, internal.IsIPv4)
+	addresses6 := mt.Filter(addresses, internal.IsIPv6)
 
 	if len(addresses4) == 0 || len(addresses6) == 0 {
 		return DialSerial(ctx, dialer, network, addresses, port)
@@ -100,8 +101,15 @@ func DialSerial(ctx context.Context, this Dialer, network string, address []neti
 	if len(address) == 0 {
 		return nil, fmt.Errorf("no address to dial")
 	}
-	for _, aa := range address {
-		conn, err := this.DialContext(ctx, network, netip.AddrPortFrom(aa.Unmap(), port).String())
+	for _, addr := range address {
+		var conn net.Conn
+		var err error
+		addrPort := netip.AddrPortFrom(addr.Unmap(), port)
+		if addrPortDialer, isAddrPortDialer := this.(AddrPortDialer); isAddrPortDialer {
+			conn, err = addrPortDialer.DialContextAddrPort(ctx, network, addrPort)
+		} else {
+			conn, err = this.DialContext(ctx, network, addrPort.String())
+		}
 		if err == nil {
 			return conn, nil
 		}

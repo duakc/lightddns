@@ -7,7 +7,8 @@ import (
 	"net/http"
 
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/common"
+
+	"github.com/duakc/mt"
 )
 
 type dummyJSONMarshaler struct {
@@ -29,29 +30,30 @@ func JSONRequest[O any](ctx context.Context, do HTTPRequester, req ReqConfig, in
 		}
 		req.Body = JM
 	}
+	var cancel context.CancelFunc
+	ctx, cancel = mt.Timeout(ctx, constpkg.DefaultHTTPTimeout)
+	defer cancel()
 
 	request, err := req.ToRequestContext(ctx)
 	if err != nil {
-		return common.Zero[O](), nil, fmt.Errorf("toRequest: %w", err)
+		return mt.Zero[O](), nil, fmt.Errorf("toRequest: %w", err)
 	}
-	var cancel context.CancelFunc
-	ctx, cancel = common.ContextWithTimeout(ctx, constpkg.DefaultHTTPTimeout)
-	defer cancel()
+
 	response, err := do.Do(request)
 	if err != nil {
-		return common.Zero[O](), nil, NewBaseResponseError(err, req.Method, "")
+		return mt.Zero[O](), nil, NewBaseResponseError(err, req.Method, "")
 	}
 	if response.StatusCode != http.StatusOK {
-		return common.Zero[O](), response, &BadStatusCodeError{Got: response.StatusCode}
+		return mt.Zero[O](), response, &BadStatusCodeError{Got: response.StatusCode}
 	}
 	if ct := response.Header.Get("Content-Type"); ct != "application/json" {
-		return common.Zero[O](), response, fmt.Errorf("not a JSON response: Content-Type: %s", ct)
+		return mt.Zero[O](), response, fmt.Errorf("not a JSON response: Content-Type: %s", ct)
 	}
 	decoder := json.NewDecoder(response.Body)
 	var output O
 	err = decoder.Decode(&output)
 	if err != nil {
-		return common.Zero[O](), response, fmt.Errorf("decode JSON: %w", err)
+		return mt.Zero[O](), response, fmt.Errorf("decode JSON: %w", err)
 	}
 	return output, response, nil
 }

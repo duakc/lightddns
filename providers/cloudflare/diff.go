@@ -7,9 +7,10 @@ import (
 	"net/netip"
 
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
+
+	"github.com/duakc/mt"
 )
 
 type dnsUpdateRequest struct {
@@ -31,14 +32,14 @@ func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr)
 		return nil, fmt.Errorf("getZoneID: %w", err)
 	}
 	var differentRecords []dnsUpdateRequest
-	if ipv4Address := common.Filter(addr, netxx.IsIPv4); len(ipv4Address) > 0 || len(addr) == 0 {
+	if ipv4Address := mt.Filter(addr, netool.IsIPv4); len(ipv4Address) > 0 || len(addr) == 0 {
 		diffType, err := c.diffType(ctx, domain, zoneID, ipv4Address, constpkg.DNSTypeA)
 		if err != nil {
 			return nil, err
 		}
 		differentRecords = append(differentRecords, diffType...)
 	}
-	if ipv6Address := common.Filter(addr, netxx.IsIPv6); len(ipv6Address) > 0 || len(addr) == 0 {
+	if ipv6Address := mt.Filter(addr, netool.IsIPv6); len(ipv6Address) > 0 || len(addr) == 0 {
 		diffType, err := c.diffType(ctx, domain, zoneID, ipv6Address, constpkg.DNSTypeAAAA)
 		if err != nil {
 			return nil, err
@@ -60,7 +61,7 @@ func (c *Cloudflare) diffType(ctx context.Context, domain, zoneID string, addr [
 func compareRecords(ctx context.Context, addresses []netip.Addr, records *internal.PageConfig[internal.DNSRecord]) ([]dnsUpdateRequest, error) {
 	var (
 		diffRecords  []dnsUpdateRequest
-		addressesMap = common.ToMap(addresses)
+		addressesMap = mt.Set(addresses)
 	)
 
 	for page, err := records.Next(ctx); err != io.EOF; page, err = records.Next(ctx) {
@@ -88,7 +89,7 @@ func compareRecords(ctx context.Context, addresses []netip.Addr, records *intern
 	}
 	for i := 0; i < len(diffRecords); i++ {
 		if diffRecords[i].toUpdate {
-			for addr, _ := range addressesMap {
+			for addr := range addressesMap {
 				// pick one and delete
 				diffRecords[i].address = addr
 				delete(addressesMap, addr)
@@ -97,7 +98,7 @@ func compareRecords(ctx context.Context, addresses []netip.Addr, records *intern
 		}
 	}
 
-	for addr, _ := range addressesMap {
+	for addr := range addressesMap {
 		r := newUpdateRequest(internal.DNSRecord{}, addr)
 		r.toCreate = true
 		diffRecords = append(diffRecords, r)

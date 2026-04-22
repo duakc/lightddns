@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/duakc/lightddns/options"
+
 	"go.uber.org/zap"
 )
 

@@ -7,15 +7,17 @@ import (
 	urlpkg "net/url"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/common"
-	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/netool"
+
+	"github.com/duakc/mt"
+
 	goyaml "github.com/goccy/go-yaml"
 )
 
 type HTTPMethod string
 
 func (m *HTTPMethod) UnmarshalYAML(data []byte) error {
-	method := strings.ToUpper(common.UnquoteString(string(data)))
+	method := strings.ToUpper(mt.UnquoteString(string(data)))
 	switch method {
 	case "", http.MethodGet, http.MethodPost, http.MethodPut, http.MethodConnect,
 		http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPatch,
@@ -42,14 +44,14 @@ func (h *HTTPHeader) UnmarshalYAML(data []byte) error {
 	for k, v := range m {
 		switch val := v.(type) {
 		case string:
-			val = common.UnquoteString(val)
+			val = mt.UnquoteString(val)
 			h.Header.Add(k, val)
 		case []any:
 			for _, item := range val {
 				if s, ok := item.(string); ok {
-					h.Header.Add(k, common.UnquoteString(s))
+					h.Header.Add(k, mt.UnquoteString(s))
 				} else {
-					h.Header.Add(k, common.UnquoteString(fmt.Sprintf(s)))
+					h.Header.Add(k, mt.UnquoteString(fmt.Sprint(s)))
 				}
 			}
 		}
@@ -63,7 +65,7 @@ type URL struct {
 }
 
 func (m *URL) UnmarshalYAML(data []byte) error {
-	url := common.UnquoteString(string(data))
+	url := mt.UnquoteString(string(data))
 	parse, err := urlpkg.Parse(url)
 	if err != nil {
 		return err
@@ -76,8 +78,8 @@ func (m *URL) UnmarshalYAML(data []byte) error {
 type DomainName string
 
 func (d *DomainName) UnmarshalYAML(data []byte) error {
-	s := common.UnquoteString(string(data))
-	if !netxx.IsDomainName(s) {
+	s := mt.UnquoteString(string(data))
+	if !netool.IsDomainName(s) {
 		return fmt.Errorf("invalid domain name: %s", s)
 	}
 	*d = DomainName(s)

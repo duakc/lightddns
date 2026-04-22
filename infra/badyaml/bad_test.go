@@ -10,7 +10,6 @@ import (
 )
 
 func TestListable(t *testing.T) {
-
 	type Case[T any] struct {
 		Input    string
 		Excepted T
@@ -28,7 +27,8 @@ payload:
   - "e2"
 `,
 			Excepted: schema{
-				Payload: Listable[string]{[]string{"e1", "e2"}}},
+				Payload: Listable[string]{[]string{"e1", "e2"}},
+			},
 		},
 		{
 			Input:    "payload: ['e1','e2','e3']",

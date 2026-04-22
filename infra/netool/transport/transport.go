@@ -1,4 +1,4 @@
-package dnstransport
+package transport
 
 import (
 	"context"
@@ -7,32 +7,31 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
+
 	mDns "github.com/miekg/dns"
 )
 
-type DNSTransport interface {
+type Transport interface {
 	Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error)
 }
 
-func NewDNSTransport(build string) (DNSTransport, error) {
-	if build == "" {
+func NewDNSTransport(buildString string) (Transport, error) {
+	if buildString == "" {
 		return &SystemTransport{}, nil
 	}
-	var (
-		schema, value string
-	)
-	if idx := strings.Index(build, "://"); idx > 0 {
-		schema = build[:idx]
-		value = build[idx+len("://"):]
+	var schema, value string
+	if idx := strings.Index(buildString, "://"); idx > 0 {
+		schema = buildString[:idx]
+		value = buildString[idx+len("://"):]
 	} else {
-		if build == "system" {
+		if buildString == "system" {
 			schema = "system"
 		} else if idx == 0 {
-			build = build[len("://"):]
+			buildString = buildString[len("://"):]
+			schema = "udp"
 		}
-		schema = "udp"
-		value = build
+		value = buildString
 	}
 	_ = value
 	switch schema {
@@ -40,7 +39,7 @@ func NewDNSTransport(build string) (DNSTransport, error) {
 		return &SystemTransport{}, nil
 	default:
 		// TODO: add more transport
-		return nil, fmt.Errorf("transport build failed for: %s", build)
+		return nil, fmt.Errorf("transport build failed for: %s", buildString)
 	}
 }
 
@@ -67,7 +66,7 @@ func EdnsBackwards(req *mDns.Msg, resp *mDns.Msg) *mDns.Msg {
 	requestEdns0 := req.IsEdns0()
 	responseEdns0 := resp.IsEdns0()
 	if responseEdns0 != nil && (requestEdns0 == nil || requestEdns0.Version() < responseEdns0.Version()) {
-		resp.Extra = common.Filter(resp.Extra, func(it mDns.RR) bool {
+		resp.Extra = mt.Filter(resp.Extra, func(it mDns.RR) bool {
 			return it.Header().Rrtype != mDns.TypeOPT
 		})
 		if requestEdns0 != nil {
@@ -138,7 +137,7 @@ func MessageToAddresses(response *mDns.Msg) (addresses []netip.Addr) {
 		case *mDns.HTTPS:
 			for _, value := range answer.SVCB.Value {
 				if value.Key() == mDns.SVCB_IPV4HINT || value.Key() == mDns.SVCB_IPV6HINT {
-					addresses = append(addresses, common.Map[string, netip.Addr](strings.Split(value.String(), ","), func(it string) netip.Addr {
+					addresses = append(addresses, mt.Map[string, netip.Addr](strings.Split(value.String(), ","), func(it string) netip.Addr {
 						a, _ := netip.ParseAddr(it)
 						return a
 					})...)

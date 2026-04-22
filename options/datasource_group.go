@@ -6,7 +6,8 @@ type DatasourceIsGroup interface {
 
 type AbstractDatasourceGroupOption struct {
 	AbstractDatasourceOption `yaml:",inline"`
-	Datasources              []string `yaml:"datasources"`
+
+	Datasources []string `yaml:"datasources"`
 }
 
 func (x AbstractDatasourceGroupOption) Group() []string {

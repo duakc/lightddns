@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
+	"github.com/duakc/mt/debug"
+
 	"go.uber.org/zap"
 )
 
@@ -18,7 +20,7 @@ func Register[T managedType, O any](R Registry[T], typ string, constructor Gener
 		if option != nil {
 			opt = option.(*O)
 		}
-		return constructor(ctx, common.PtrValueOrDefault(opt))
+		return constructor(ctx, mt.PtrValueOrDefault(opt))
 	})
 }
 
@@ -56,14 +58,14 @@ func (R *defaultRegistry[T]) Create(ctx context.Context, typ string, option any)
 
 	create := R.typeToObject[typ]
 	if create == nil {
-		return common.Zero[T](), fmt.Errorf("unregistered type: %s", typ)
+		return mt.Zero[T](), fmt.Errorf("unregistered type: %s", typ)
 	}
 
 	returned, err := create(ctx, option)
 	if err != nil {
-		return common.Zero[T](), err
+		return mt.Zero[T](), err
 	}
-	if err == nil && common.IsDebug && returned.Type() != typ {
+	if err == nil && debug.Enabled && returned.Type() != typ {
 		panic("mismatch type excepted: " + typ + ", got: " + returned.Type())
 	}
 

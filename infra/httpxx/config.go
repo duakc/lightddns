@@ -45,13 +45,13 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 	if q := rc.Query.Encode(); q != "" {
 		url += "?" + q
 	}
-	var (
-		body        io.Reader
-		contentType = rc.ExtendHeader.Get("Content-Type")
-	)
+
+	var body io.Reader
+	contentType := rc.ExtendHeader.Get("Content-Type")
 	if rc.Body != nil && slices.Contains([]string{
 		http.MethodPost, http.MethodPut, http.MethodPatch,
 	}, rc.Method) {
+
 		switch x := rc.Body.(type) {
 		case json.Marshaler:
 			if contentType == "" {
@@ -96,6 +96,9 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 		for i := 0; i < len(v); i++ {
 			req.Header.Add(h, v[i])
 		}
+	}
+	if contentType != "" {
+		req.Header.Add("Content-Type", contentType)
 	}
 	return req, nil
 }

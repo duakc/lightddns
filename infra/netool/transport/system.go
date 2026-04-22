@@ -1,4 +1,4 @@
-package dnstransport
+package transport
 
 import (
 	"context"

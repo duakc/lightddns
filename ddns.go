@@ -11,6 +11,7 @@ import (
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -131,7 +132,7 @@ func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 	case "stderr":
 		outputFD = os.Stderr
 	default:
-		outputFD, err = os.OpenFile(opt.Output, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		outputFD, err = os.OpenFile(opt.Output, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o666)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +152,6 @@ func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 //     via rdeps → enqueue newly-zero nodes.
 //  5. len(result) < len(ds) implies a cycle.
 func resortDatasources(ds []options.DatasourceOption) ([]options.DatasourceOption, error) {
-
 	dsMap := make(map[string]options.DatasourceOption, len(ds))
 	for _, d := range ds {
 		dsMap[d.Name] = d

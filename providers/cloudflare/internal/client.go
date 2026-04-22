@@ -46,7 +46,8 @@ func (c *Client) ListDNSRecords(name string, zoneID string, qtype string) (*Page
 }
 
 func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
-	content UpdateDNSRecordRequest) error {
+	content UpdateDNSRecordRequest,
+) error {
 	r := c.NewRequestConfig(http.MethodPost)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records")
 	createResult, response, err := httpxx.JSONRequest[Response](ctx, c.client, r, content)
@@ -58,7 +59,8 @@ func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 }
 
 func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID string,
-	content UpdateDNSRecordRequest) error {
+	content UpdateDNSRecordRequest,
+) error {
 	r := c.NewRequestConfig(http.MethodPatch)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", recordID)
 	createResult, response, err := httpxx.JSONRequest[Response](ctx, c.client, r, content)

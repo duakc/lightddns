@@ -17,9 +17,10 @@ import (
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
 )
@@ -51,11 +52,11 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		v4, v6 *requestContext
 	)
 
-	dialStrategy, _ := netxx.DialStrategyFromString(option.DialStrategy)
-	if dialStrategy != netxx.DialOnlyIPv4 {
+	dialStrategy, _ := netool.DialStrategyFromString(option.DialStrategy)
+	if dialStrategy != netool.DialOnlyIPv4 {
 		// enable ipv6
-		dialer := netxx.NewDialerWithOption(append(dialerOptions,
-			netxx.DialerOptionWithDialStrategy(netxx.DialOnlyIPv6))...)
+		dialer := netool.NewDialerWithOption(append(dialerOptions,
+			netool.DialerOptionWithDialStrategy(netool.DialOnlyIPv6))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(dialer))...)
 		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
@@ -66,10 +67,10 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			return nil, err
 		}
 	}
-	if dialStrategy != netxx.DialOnlyIPv6 {
+	if dialStrategy != netool.DialOnlyIPv6 {
 		// enable ipv4
-		dialer := netxx.NewDialerWithOption(append(dialerOptions,
-			netxx.DialerOptionWithDialStrategy(netxx.DialOnlyIPv4))...)
+		dialer := netool.NewDialerWithOption(append(dialerOptions,
+			netool.DialerOptionWithDialStrategy(netool.DialOnlyIPv4))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(dialer))...)
 		v4, err = newRequestContext(string(option.Method), option.Url.Raw,
@@ -134,7 +135,8 @@ type requestContext struct {
 }
 
 func newRequestContext(method string, url string, headers http.Header,
-	requester httpxx.HTTPRequester, jq string, re string) (*requestContext, error) {
+	requester httpxx.HTTPRequester, jq string, re string,
+) (*requestContext, error) {
 	R := new(requestContext)
 	var err error
 	if jq != "" {
@@ -211,7 +213,6 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 					}
 					addresses = append(addresses, addr)
 				}
-
 			}
 		} else {
 			addr, err := netip.ParseAddr(string(bytes.TrimSpace(buffer)))

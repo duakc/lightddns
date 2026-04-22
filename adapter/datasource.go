@@ -8,7 +8,7 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/duakc/lightddns/infra/netxx"
+	"github.com/duakc/lightddns/infra/netool"
 )
 
 type Datasource interface {
@@ -22,8 +22,10 @@ type DatasourceDualStack interface {
 	IPv6(ctx context.Context) ([]netip.Addr, error)
 }
 
-type DatasourceManager = DefaultManager[Datasource]
-type DatasourceManagerKey struct{}
+type (
+	DatasourceManager    = DefaultManager[Datasource]
+	DatasourceManagerKey struct{}
+)
 
 var DatasourceRegister = NewRegister[Datasource]()
 
@@ -59,7 +61,7 @@ func MergeDatasources(ctx context.Context, datasources []Datasource, ipv4, ipv6,
 		}
 		for _, v := range addr {
 			if v.IsValid() && (ipv6 && ipv4 ||
-				((ipv4 && netxx.IsIPv4(v)) || (ipv6 && netxx.IsIPv6(v)))) {
+				((ipv4 && netool.IsIPv4(v)) || (ipv6 && netool.IsIPv6(v)))) {
 				merged[v] = struct{}{}
 			}
 		}

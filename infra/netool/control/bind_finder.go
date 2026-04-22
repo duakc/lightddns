@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"unsafe"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt"
 )
 
 type InterfaceFinder interface {
@@ -45,7 +45,7 @@ func InterfaceFromNet(iif net.Interface) (Interface, error) {
 	if err != nil {
 		return Interface{}, err
 	}
-	return InterfaceFromNetAddrs(iif, common.Map(ifAddrs, prefixFromNet)), nil
+	return InterfaceFromNetAddrs(iif, mt.Map(ifAddrs, prefixFromNet)), nil
 }
 
 func InterfaceFromNetAddrs(iif net.Interface, addresses []netip.Prefix) Interface {

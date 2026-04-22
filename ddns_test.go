@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/options"
+
+	"github.com/duakc/mt"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,11 +20,13 @@ func (f fakeDatasourceGroup) Group() []string {
 }
 
 func TestResortDatasource(t *testing.T) {
-	var newDatasourceOption = func(name string, deps []string) options.DatasourceOption {
+	newDatasourceOption := func(name string, deps []string) options.DatasourceOption {
 		opt := options.DatasourceOption{
-			AbstractDatasourceOption: options.AbstractDatasourceOption{Type: "test",
+			AbstractDatasourceOption: options.AbstractDatasourceOption{
+				Type: "test",
 				Name: name,
-			}, Option: new(int)} // use new(int) as a fake option
+			}, Option: new(int),
+		} // use new(int) as a fake option
 
 		if len(deps) > 0 {
 			opt.Option = &fakeDatasourceGroup{group: deps}
@@ -35,7 +39,7 @@ func TestResortDatasource(t *testing.T) {
 		Output []string
 		Err    string
 	}
-	var cases = []Case{
+	cases := []Case{
 		{
 			Input: []options.DatasourceOption{
 				newDatasourceOption("ds1", nil),
@@ -100,7 +104,7 @@ func TestResortDatasource(t *testing.T) {
 			assert.NotNilf(t, err, "testCase.index=%d", i)
 			assert.EqualErrorf(t, err, c.Err, "testCase.index=%d", i)
 		} else if len(c.Output) > 0 {
-			assert.Equalf(t, c.Output, common.Map(resorted, func(s options.DatasourceOption) string {
+			assert.Equalf(t, c.Output, mt.Map(resorted, func(s options.DatasourceOption) string {
 				return s.Name
 			}), "testCase.index=%d", i)
 		}

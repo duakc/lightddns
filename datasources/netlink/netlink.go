@@ -9,11 +9,13 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	datasourcepkg "github.com/duakc/lightddns/datasources"
-	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/netxx/control"
+	"github.com/duakc/lightddns/infra/netool/control"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+
+	"github.com/duakc/mt"
+
 	"go.uber.org/zap"
 )
 
@@ -59,7 +61,7 @@ func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return common.Filter(ip, func(addr netip.Addr) bool {
+	return mt.Filter(ip, func(addr netip.Addr) bool {
 		return n.allowPrivate || addr.IsGlobalUnicast()
 	}), nil
 }
@@ -83,7 +85,7 @@ func (n *Netlink) ip(ctx context.Context) ([]netip.Addr, error) {
 			}
 			return nil, fmt.Errorf("by index: %w", err)
 		}
-		return common.Map(index.Addresses, netip.Prefix.Addr), nil
+		return mt.Map(index.Addresses, netip.Prefix.Addr), nil
 	}
 useName:
 	if n.interfaceName != "" {
@@ -92,7 +94,7 @@ useName:
 		if err != nil {
 			return nil, fmt.Errorf("by name: %w", err)
 		}
-		return common.Map(index.Addresses, netip.Prefix.Addr), nil
+		return mt.Map(index.Addresses, netip.Prefix.Addr), nil
 	}
 	return nil, fmt.Errorf("not configured for netlink datasource")
 }

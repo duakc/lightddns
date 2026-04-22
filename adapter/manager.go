@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/zaplog"
+
+	"github.com/duakc/mt"
 )
 
 var managerLogger = zaplog.NewPackage("adapter.manager")
@@ -83,5 +84,5 @@ func (M *DefaultManager[T]) Lookup(name string) (T, bool) {
 	if v, ok := M.itemByName[name]; ok {
 		return v, true
 	}
-	return common.Zero[T](), false
+	return mt.Zero[T](), false
 }

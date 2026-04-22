@@ -3,22 +3,27 @@ package zaplog
 import (
 	"os"
 
-	"github.com/duakc/lightddns/infra/common"
+	"github.com/duakc/mt/debug"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var defaultLogger = createDefault()
+var defaultLogger = createDefault(zapcore.TraceLevel)
 
-func createDefault() *zap.Logger {
+func createDefault(lvl zapcore.Level) *zap.Logger {
 	var options []zap.Option
-	if common.IsDebug {
+	if debug.Enabled {
 		options = append(options, zap.Development())
 	}
 	options = append(options, zap.AddCallerSkip(1))
 
-	return NewDefault(os.Stderr, zapcore.TraceLevel, options).
+	return NewDefault(os.Stderr, lvl, options).
 		Named("default")
+}
+
+func DefaultLevel(lvl zapcore.Level) {
+	defaultLogger = createDefault(lvl)
 }
 
 func NewPackage(pkg string) *zap.Logger {
@@ -36,9 +41,11 @@ func Debug(msg string, fields ...zap.Field) {
 func Info(msg string, fields ...zap.Field) {
 	defaultLogger.Info(msg, fields...)
 }
+
 func Warn(msg string, fields ...zap.Field) {
 	defaultLogger.Warn(msg, fields...)
 }
+
 func Error(msg string, fields ...zap.Field) {
 	defaultLogger.Error(msg, fields...)
 }

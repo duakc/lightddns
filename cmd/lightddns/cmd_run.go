@@ -9,11 +9,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/duakc/lightddns"
-	"github.com/duakc/lightddns/infra/common"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+
+	"github.com/duakc/lightddns"
+	"github.com/duakc/mt/mtmap"
+
 	goyaml "github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -99,7 +101,7 @@ func openConfigBind(file string, opt *options.Options) error {
 }
 
 func fullEnv() map[string]string {
-	var result = make(map[string]string)
+	result := make(map[string]string)
 
 	for _, v := range os.Environ() {
 		vv := strings.SplitN(v, "=", 2)
@@ -116,7 +118,7 @@ func fullEnv() map[string]string {
 			zaplog.Warn(".env file parse failed", zap.Error(err))
 			return result
 		}
-		result = common.MergeMap(result, unmarshalBytes)
+		result = mtmap.MergeMap(result, unmarshalBytes)
 	}
 	return result
 }
