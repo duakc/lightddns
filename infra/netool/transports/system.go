@@ -8,8 +8,6 @@ import (
 	mDns "github.com/miekg/dns"
 )
 
-const defaultTTL = 600
-
 type SystemTransport struct{}
 
 func (t *SystemTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error) {
@@ -21,5 +19,5 @@ func (t *SystemTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDn
 	if err != nil {
 		return nil, err
 	}
-	return FixedResponse(message.Id, question, ip, defaultTTL), nil
+	return FixedResponse(message.Id, question, ip, 0), nil
 }

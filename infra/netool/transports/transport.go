@@ -2,11 +2,15 @@ package transports
 
 import (
 	"context"
+	"encoding/binary"
+	"io"
 	"net"
 	"net/netip"
 	"strings"
 
+	"github.com/duakc/lightddns/infra/netool/internal"
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/freebuf"
 
 	mDns "github.com/miekg/dns"
 )
@@ -56,6 +60,10 @@ func FqdnToDomain(fqdn string) string {
 }
 
 func FixedResponse(id uint16, question mDns.Question, addresses []net.IP, timeToLive uint32) *mDns.Msg {
+	if timeToLive == 0 {
+		timeToLive = internal.DefaultDNSTTL
+	}
+
 	response := mDns.Msg{
 		MsgHdr: mDns.MsgHdr{
 			Id:                 id,
@@ -118,4 +126,50 @@ func MessageToAddresses(response *mDns.Msg) (addresses []netip.Addr) {
 		}
 	}
 	return addresses
+}
+
+func WriteMessage(w io.Writer, messageID uint16, message *mDns.Msg) error {
+	exMessage := *message
+	exMessage.Id = messageID
+	exMessage.Compress = true
+	exMessageLen := exMessage.Len()
+	buf := freebuf.New(3 + exMessage.Len())
+	defer buf.FreeMe()
+	if err := binary.Write(buf, binary.BigEndian, uint16(exMessageLen)); err != nil {
+		return err
+	}
+	packedMessage, err := exMessage.PackBuffer(buf.FreeBytes())
+	if err != nil {
+		return err
+	}
+	nn, err := w.Write(packedMessage)
+	if nn < len(packedMessage) && err == nil {
+		err = io.ErrShortWrite
+	}
+	return err
+}
+
+func ReadMessage(r io.Reader) (*mDns.Msg, error) {
+	var responseLen uint16
+	err := binary.Read(r, binary.BigEndian, &responseLen)
+	if err != nil {
+		return nil, err
+	}
+	if responseLen < 10 {
+		return nil, mDns.ErrShortRead
+	}
+	buffer := freebuf.New(int(responseLen))
+	defer buffer.FreeMe()
+	var nn int
+	nn, err = io.ReadFull(r, buffer.FreeBytes())
+	if err != nil {
+		return nil, err
+	}
+	if nn < int(responseLen) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	buffer.Truncated(nn)
+	var message mDns.Msg
+	err = message.Unpack(buffer.Bytes())
+	return &message, err
 }

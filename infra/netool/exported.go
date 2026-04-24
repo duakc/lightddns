@@ -12,4 +12,5 @@ var (
 
 const (
 	DefaultHappyEyeballFallbackDelay = internal.DefaultHappyEyeballFallbackDelay
+	DefaultDNSTTL                    = internal.DefaultDNSTTL
 )

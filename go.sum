@@ -3,6 +3,10 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/duakc/mt v0.0.0-20260421161913-9adc6029b1b0 h1:TdlbK8+ztDsz1fDJOnVqYi5mK7rI+bVBQorETgHcivE=
 github.com/duakc/mt v0.0.0-20260421161913-9adc6029b1b0/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260424163707-e53c737b2f7d h1:Y9MyitlT9uAujvhwxeQukjeZRVYgpmlc2vyX0XrgLlY=
+github.com/duakc/mt v0.0.0-20260424163707-e53c737b2f7d/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260424170526-ffd4747a231c h1:V6NERw/6KNrbchwf5jhBRHfcx85CSwx7R2tR0PM6upM=
+github.com/duakc/mt v0.0.0-20260424170526-ffd4747a231c/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/zap v0.0.0-20260409023011-7d65ec09a648 h1:nXKDz+iP5jLdtvvIuMThNdGLKVT0mb2llfDFTvO1cYM=
 github.com/duakc/zap v0.0.0-20260409023011-7d65ec09a648/go.mod h1:rDLpOi171uODNm/mxFcuYWxDsqWSAVkFdX4XojSKg/Q=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
