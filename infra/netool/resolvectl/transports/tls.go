@@ -12,6 +12,7 @@ import (
 	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+
 	mDns "github.com/miekg/dns"
 	"go.uber.org/zap"
 )

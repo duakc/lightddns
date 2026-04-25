@@ -18,6 +18,7 @@ import (
 	"github.com/duakc/lightddns/options"
 	providerpkg "github.com/duakc/lightddns/providers"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
+
 	"github.com/duakc/mt"
 
 	"go.uber.org/zap"

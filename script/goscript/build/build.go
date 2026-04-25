@@ -1,12 +1,16 @@
-package main
+package build
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 )
 
 type BuildTarget struct {
@@ -30,21 +34,20 @@ type BuildTarget struct {
 }
 
 var (
+	version string
+
 	binaryName string
 
 	workingDir string
 	outputDir  string
 	verbose    bool
+
+	buildAll bool
 )
 
 var allTarget []BuildTarget
 
 func init() {
-	flag.StringVar(&workingDir, "wd", ".", "working directory")
-	flag.StringVar(&outputDir, "output", ".", "output directory")
-	flag.StringVar(&binaryName, "binary", "", "binary name")
-	flag.BoolVar(&verbose, "verbose", false, "verbose output")
-
 	// darwin
 	allTarget = append(allTarget, []BuildTarget{
 		{GOOS: "darwin", GOARCH: "amd64"},
@@ -80,6 +83,7 @@ func init() {
 
 	// linux-amd64
 	allTarget = append(allTarget, []BuildTarget{
+		{GOOS: "linux", GOARCH: "amd64"},
 		{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 1},
 		{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 2},
 		{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 3},
@@ -153,70 +157,98 @@ func init() {
 	}...)
 }
 
-func main() {
+func Run() {
+	const Main = "../../"
+
+	flag.StringVar(&version, "version", "0.0.1", "version")
+	flag.StringVar(&workingDir, "wd", "cmd/lightddns/", "working directory")
+	flag.StringVar(&outputDir, "output", "bin/build", "output directory")
+	flag.StringVar(&binaryName, "binary", "lightddns", "binary name")
+	flag.BoolVar(&verbose, "verbose", false, "verbose output")
+	flag.BoolVar(&buildAll, "all", false, "build all")
+
 	flag.Parse()
 
-	workingDir, err := filepath.Abs(workingDir)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Join(Main, outputDir), 0o755); err != nil {
+		fatalErrorf("mkdir: %s", err.Error())
 	}
-	outputDir = filepath.Join(workingDir, workingDir)
-	if outputDir == "" {
-		outputDir = "."
-	} else {
-		if err := os.MkdirAll(outputDir, 0o755); err != nil {
-			fmt.Printf("mkdir failed: %v\n", err)
-			os.Exit(1)
-		}
-	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill,
+		syscall.SIGINT, syscall.SIGABRT, syscall.SIGHUP)
+	defer cancel()
 
 	for _, target := range allTarget {
+		// defaults
+		target.LDFlags = append(target.LDFlags, "-w", "-s",
+			fmt.Sprintf("-X github.com/duakc/lightddns/constant.Version=%s", version))
+		//
+
 		goos := target.GOOS
 		goarch := target.GOARCH
-		ext := ""
-		if goos == "windows" {
-			ext = ".exe"
+		if !buildAll && !(runtime.GOARCH == goarch && runtime.GOOS == goos) {
+			continue
 		}
-		outFile := filepath.Join(outputDir, binaryName+"-"+goos+"-"+goarch+ext)
-		args := []string{"build", "-o", outFile}
-		if len(target.TAGS) > 0 {
-			args = append(args, "-tags="+strings.Join(target.TAGS, ","))
-		}
-		if len(target.LDFlags) > 0 {
-			args = append(args, "-ldflags="+strings.Join(target.LDFlags, " "))
-		}
-		if target.Debug {
-			args = append(args, "-gcflags=all=-N -l")
-		}
-		env := append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch)
+
+		binNameJoin := []string{binaryName, goos, goarch}
+		env := append([]string{}, "GOOS="+goos, "GOARCH="+goarch)
 		cgo := "0"
 		if target.CGO {
 			cgo = "1"
 		}
 		env = append(env, "CGO_ENABLED="+cgo)
-		if target.GOAMD64Version != 0 {
+		if target.GOAMD64Version != 0 && target.GOARCH == "amd64" {
+			binNameJoin = append(binNameJoin, fmt.Sprintf("v%d", target.GOAMD64Version))
 			env = append(env, fmt.Sprintf("GOAMD64=v%d", target.GOAMD64Version))
 		}
-		if target.SoftFloat {
+		if target.SoftFloat && target.GOARCH == "mips" {
+			binNameJoin = append(binNameJoin, "softfloat")
 			env = append(env, "GOMIPS=softfloat")
+		} else if target.GOARCH == "mips" || target.GOARCH == "mipsle" {
+			binNameJoin = append(binNameJoin, "hardfloat")
 		}
+
+		if target.GOARMVersion > 0 && target.GOARCH == "arm" {
+			binNameJoin = append(binNameJoin, fmt.Sprintf("v%d", target.GOARMVersion))
+			env = append(env, fmt.Sprintf("GOARM=v%d", target.GOARMVersion))
+		}
+
+		args := []string{"build", "-C", Main, "-trimpath"}
+
+		if target.Debug {
+			target.TAGS = append(target.TAGS, "debug")
+		}
+
+		if len(target.TAGS) > 0 {
+			args = append(args, "-tags="+strings.Join(target.TAGS, ","))
+		}
+
+		if len(target.LDFlags) > 0 {
+			args = append(args, "-ldflags="+strings.Join(target.LDFlags, " "))
+		}
+
+		binName := strings.Join([]string{binaryName, goos, goarch}, "-")
+		if goos == "windows" {
+			binName += ".exe"
+		}
+		args = append(args,
+			"-o", filepath.Join(outputDir, binName), ".")
 		if verbose {
-			fmt.Printf("Building for %s/%s -> %s\n", goos, goarch, outFile)
+			fmt.Printf("$ %s %s\n",
+				strings.Join(env, " "),
+				strings.Join(append([]string{"go"}, args...), " "))
 		}
-		cmd := exec.Command("go", args...)
-		cmd.Env = env
+		cmd := exec.CommandContext(ctx, "go", args...)
+		cmd.Env = append(os.Environ(), env...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
 		if err := cmd.Run(); err != nil {
-			fmt.Printf("Build failed for %s/%s: %v\n", goos, goarch, err)
-			os.Exit(1)
+			fatalErrorf("build failed :%q : %#v", fmt.Sprintf("go %s",
+				strings.Join(args, " ")), target)
 		}
 	}
 }
 
-func verboseMessage(format string, vv ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, "verbose: "+format, vv)
-}
-
-func fatalError(format string, vv ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, "fatal: "+format, vv)
+func fatalErrorf(format string, vv ...any) {
+	_, _ = fmt.Fprintf(os.Stderr, ">>>>Fatal: "+format+"\n", vv...)
+	os.Exit(1)
 }

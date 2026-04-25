@@ -21,6 +21,7 @@ import (
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
+
 	"github.com/duakc/mt"
 
 	"github.com/itchyny/gojq"

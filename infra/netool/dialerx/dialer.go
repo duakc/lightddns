@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/infra/netool/internal"
+
 	"github.com/duakc/mt"
 )
 

@@ -3,6 +3,7 @@ package control
 import (
 	"errors"
 	"os"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows"

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/infra/netool/internal"
+
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
 

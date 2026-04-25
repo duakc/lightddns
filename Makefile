@@ -17,3 +17,15 @@ fmt:
 .PHONY: lint
 lint: fmt
 	@golangci-lint run
+
+.PHONY: clean
+clean:
+	rm -r ./bin/build/
+
+.PHONY: build-all
+build-all:
+	@go run -C script/goscript . build -verbose -all
+
+.PHONY: build
+build:
+	@go run -C script/goscript . build -verbose

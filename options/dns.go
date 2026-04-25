@@ -11,6 +11,7 @@ import (
 
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+
 	"github.com/duakc/mt"
 )
 
