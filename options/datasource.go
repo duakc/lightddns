@@ -2,6 +2,7 @@ package options
 
 import (
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/infra/badyaml"
 
 	goyaml "github.com/goccy/go-yaml"
 )
@@ -15,7 +16,7 @@ type DatasourceOption struct {
 type _DatasourceOption DatasourceOption
 
 func (O *DatasourceOption) UnmarshalYAML(bs []byte) error {
-	err := goyaml.Unmarshal(bs, (*_DatasourceOption)(O))
+	err := badyaml.Unmarshal(bs, (*_DatasourceOption)(O))
 	if err != nil {
 		return err
 	}

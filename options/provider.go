@@ -2,6 +2,7 @@ package options
 
 import (
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/infra/badyaml"
 
 	goyaml "github.com/goccy/go-yaml"
 )
@@ -15,7 +16,7 @@ type ProviderOption struct {
 type _ProviderOption ProviderOption
 
 func (O *ProviderOption) UnmarshalYAML(bs []byte) error {
-	err := goyaml.Unmarshal(bs, (*_ProviderOption)(O))
+	err := badyaml.Unmarshal(bs, (*_ProviderOption)(O))
 	if err != nil {
 		return err
 	}

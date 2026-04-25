@@ -1,3 +1,6 @@
+.PHONY: all
+all: clean generate test build-all
+
 .PHONY: test
 test: lint
 	@go test ./...

@@ -1,4 +1,4 @@
-package httpds
+package http
 
 import (
 	"bytes"

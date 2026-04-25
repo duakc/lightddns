@@ -5,8 +5,6 @@ import (
 	"strconv"
 
 	"github.com/duakc/mt"
-
-	goyaml "github.com/goccy/go-yaml"
 )
 
 type StringOrNumber struct {
@@ -31,10 +29,10 @@ type StringOrObject[T any] struct {
 }
 
 func (s *StringOrObject[T]) UnmarshalYAML(data []byte) error {
-	if err := goyaml.UnmarshalWithOptions(data, &s.Obj, goyaml.DisallowUnknownField()); err == nil {
+	if err := Unmarshal(data, &s.Obj); err == nil {
 		return nil
 	}
-	if err := goyaml.Unmarshal(data, &s.Str); err == nil {
+	if err := Unmarshal(data, &s.Str); err == nil {
 		return nil
 	}
 	return fmt.Errorf("unknown YAML object: %s", string(data))

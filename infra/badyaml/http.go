@@ -1,8 +1,8 @@
 package badyaml
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	urlpkg "net/url"
 	"strings"
@@ -21,7 +21,8 @@ func (m *HTTPMethod) UnmarshalYAML(data []byte) error {
 	switch method {
 	case "", http.MethodGet, http.MethodPost, http.MethodPut, http.MethodConnect,
 		http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPatch,
-		http.MethodDelete, "BREW", "PROPFIND", "WHEN": // RFC2324
+		http.MethodDelete,
+		"BREW", "PROPFIND", "WHEN": // RFC2324
 		*m = HTTPMethod(method)
 	default:
 		return fmt.Errorf("unknown http method: %s", method)
@@ -35,9 +36,7 @@ type HTTPHeader struct {
 
 func (h *HTTPHeader) UnmarshalYAML(data []byte) error {
 	m := make(map[string]any)
-	decoder := goyaml.NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(m)
-	if err != nil {
+	if err := Unmarshal(data, m); err != nil {
 		return err
 	}
 	h.Header = make(http.Header)
@@ -84,4 +83,14 @@ func (d *DomainName) UnmarshalYAML(data []byte) error {
 	}
 	*d = DomainName(s)
 	return nil
+}
+
+func Unmarshal(data []byte, v any, options ...goyaml.DecodeOption) error {
+	return goyaml.UnmarshalWithOptions(data, v, append(options,
+		goyaml.DisallowUnknownField())...)
+}
+
+func NewDecoder(r io.Reader, options ...goyaml.DecodeOption) *goyaml.Decoder {
+	return goyaml.NewDecoder(r, append(options,
+		goyaml.DisallowUnknownField())...)
 }

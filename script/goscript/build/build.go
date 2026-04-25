@@ -208,7 +208,7 @@ func Run() {
 
 		if target.GOARMVersion > 0 && target.GOARCH == "arm" {
 			binNameJoin = append(binNameJoin, fmt.Sprintf("v%d", target.GOARMVersion))
-			env = append(env, fmt.Sprintf("GOARM=v%d", target.GOARMVersion))
+			env = append(env, fmt.Sprintf("GOARM=%d", target.GOARMVersion))
 		}
 
 		args := []string{"build", "-C", Main, "-trimpath"}
@@ -225,7 +225,7 @@ func Run() {
 			args = append(args, "-ldflags="+strings.Join(target.LDFlags, " "))
 		}
 
-		binName := strings.Join([]string{binaryName, goos, goarch}, "-")
+		binName := strings.Join(binNameJoin, "-")
 		if goos == "windows" {
 			binName += ".exe"
 		}
