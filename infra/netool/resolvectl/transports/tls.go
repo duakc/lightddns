@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const TransportTypeTLS = "tls"
+
 type tlsTransportConn struct {
 	conn    *tls.Conn
 	queryID uint16
@@ -40,7 +42,7 @@ func NewTLS(ctx context.Context, dialer dialerx.Dialer, server string, tlsConfig
 		dialer:      dialer,
 		server:      server,
 		tlsConfig:   tlsConfig,
-		tlsSessions: generic.New[*tlsTransportConn](),
+		tlsSessions: generic.NewList[*tlsTransportConn](),
 	}, nil
 }
 

@@ -11,8 +11,7 @@ import (
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/internal"
-	"github.com/duakc/lightddns/infra/netool/transports"
-
+	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
 	"go.uber.org/zap"
 )
 

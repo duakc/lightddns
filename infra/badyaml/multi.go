@@ -31,10 +31,10 @@ type StringOrObject[T any] struct {
 }
 
 func (s *StringOrObject[T]) UnmarshalYAML(data []byte) error {
-	if err := goyaml.Unmarshal(data, &s.Str); err == nil {
+	if err := goyaml.UnmarshalWithOptions(data, &s.Obj, goyaml.DisallowUnknownField()); err == nil {
 		return nil
 	}
-	if err := goyaml.Unmarshal(data, &s.Obj); err == nil {
+	if err := goyaml.Unmarshal(data, &s.Str); err == nil {
 		return nil
 	}
 	return fmt.Errorf("unknown YAML object: %s", string(data))

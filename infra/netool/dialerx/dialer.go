@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/mt"
 )
 
 var (
@@ -184,6 +185,14 @@ func (ds DialStrategy) String() string {
 	default:
 		return fmt.Sprintf("DialStrategy_%d", ds)
 	}
+}
+
+func (ds *DialStrategy) UnmarshalYAML(b []byte) error {
+	unqoted := mt.UnquoteString(string(b))
+	if ss, ok := DialStrategyFromString(unqoted); ok {
+		*ds = ss
+	}
+	return fmt.Errorf("unknown dialer strategy: `%s`", unqoted)
 }
 
 func DialStrategyFromString(s string) (DialStrategy, bool) {

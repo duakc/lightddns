@@ -12,21 +12,17 @@ import (
 type ConnectOption struct {
 	FwManirk uint `yaml:"fwmark"`
 
-	DialStrategy string `yaml:"dial-strategy"`
-	BindAddress4 string `yaml:"bind-address4"`
-	BindAddress6 string `yaml:"bind-address6"`
+	DNS          DNSOption `yaml:"dns"`
+	BindAddress4 string    `yaml:"bind-address4"`
+	BindAddress6 string    `yaml:"bind-address6"`
 
+	DialStrategy  dialerx.DialStrategy   `yaml:"dial-strategy"`
 	BindInterface badyaml.StringOrNumber `yaml:"bind-interface"`
-	// DNS noop now
-	DNS string `yaml:"dns"`
 }
 
 func (co ConnectOption) Options() ([]dialerx.DialerOption, error) {
 	var options []dialerx.DialerOption
-
-	if dialStrategy, ok := dialerx.DialStrategyFromString(co.DialStrategy); ok {
-		options = append(options, dialerx.WithDialStrategy(dialStrategy))
-	}
+	options = append(options, dialerx.WithDialStrategy(co.DialStrategy))
 	if co.BindAddress4 != "" || co.BindAddress6 != "" {
 		var (
 			address4 netip.Addr

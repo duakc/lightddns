@@ -8,6 +8,8 @@ import (
 	mDns "github.com/miekg/dns"
 )
 
+const TransportTypeSystem = "system"
+
 type SystemTransport struct{}
 
 func (t *SystemTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error) {

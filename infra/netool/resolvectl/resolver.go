@@ -11,7 +11,7 @@ import (
 	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/lookctx"
-	"github.com/duakc/lightddns/infra/netool/transports"
+	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
@@ -58,11 +58,7 @@ type defaultResolveClient struct {
 
 func NewResolver(ctx context.Context) ResolveClient {
 	seed := maphash.MakeSeed()
-	logger := lookctx.LookupPtr[zap.Logger](ctx)
-	if logger == nil {
-		logger = resolverLogger
-	}
-
+	logger := lookctx.LookupPtrDefault[zap.Logger](ctx, resolverLogger)
 	return &defaultResolveClient{
 		logger: logger.Named("resolver"),
 		cache: mt.Must(freelru.NewSharded[mDns.Question, dnsCacheMessage](defaultCacheSize,

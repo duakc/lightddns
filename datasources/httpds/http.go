@@ -17,8 +17,11 @@ import (
 	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/lookctx"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
+	"github.com/duakc/mt"
 
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
@@ -38,6 +41,20 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	if option.Method == "" {
 		option.Method = http.MethodGet
 	}
+	isDomainName := true
+	if !netool.IsDomainName(option.Url.URL.Host) {
+		ipAddress := option.Url.URL.Host
+		addr, err := netip.ParseAddr(ipAddress)
+		if err != nil {
+			return nil, fmt.Errorf("unknown address: %w: %w", err, dialerx.ErrNoAddressToDialer)
+		}
+		isDomainName = false
+		if netool.IsIPv4(addr) {
+			option.DialStrategy = dialerx.DialOnlyIPv4
+		} else {
+			option.DialStrategy = dialerx.DialOnlyIPv6
+		}
+	}
 	dialerOptions, err := option.ConnectOption.Options()
 	if err != nil {
 		return nil, fmt.Errorf("dialer: %w", err)
@@ -46,32 +63,21 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	if err != nil {
 		return nil, fmt.Errorf("http: %w", err)
 	}
+
 	var (
 		logger = datasourcepkg.NewLogger(lookctx.LookupPtr[zap.Logger](ctx), option.AbstractDatasourceOption)
 		v4, v6 *requestContext
 	)
 
-	dialStrategy, _ := dialerx.DialStrategyFromString(option.DialStrategy)
-	if dialStrategy != dialerx.DialOnlyIPv4 {
-		// enable ipv6
-		dialer := dialerx.NewDialerWithOption(append(dialerOptions,
-			dialerx.WithDialStrategy(dialerx.DialOnlyIPv6))...)
-		httpClient := httpxx.NewClient(append(httpOptions,
-			httpxx.ClientOptionWithDialer(dialer))...)
-		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
-			option.Headers.Header, httpClient,
-			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V6),
-			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V6))
-		if err != nil {
-			return nil, err
-		}
+	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
+	if isDomainName {
+		connectDialer = resolvectl.NewDialer(ctx, connectDialer, mt.Must(option.DNS.NewTransport(ctx, connectDialer)))
 	}
-	if dialStrategy != dialerx.DialOnlyIPv6 {
+
+	if option.DialStrategy != dialerx.DialOnlyIPv6 {
 		// enable ipv4
-		dialer := dialerx.NewDialerWithOption(append(dialerOptions,
-			dialerx.WithDialStrategy(dialerx.DialOnlyIPv4))...)
 		httpClient := httpxx.NewClient(append(httpOptions,
-			httpxx.ClientOptionWithDialer(dialer))...)
+			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
 		v4, err = newRequestContext(string(option.Method), option.Url.Raw,
 			option.Headers.Header, httpClient,
 			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V4),
@@ -80,13 +86,24 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			return nil, err
 		}
 	}
+	if option.DialStrategy != dialerx.DialOnlyIPv4 {
+		// enable ipv6
+		httpClient := httpxx.NewClient(append(httpOptions,
+			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
+		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
+			option.Headers.Header, httpClient,
+			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V6),
+			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V6))
+		if err != nil {
+			return nil, err
+		}
+	}
 	httpds := &Httpds{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		logger:              logger,
-		v4:                  v4,
-		v6:                  v6,
 	}
-	logger.Debug("created", zap.Bool("ipv4", v4 != nil), zap.Bool("ipv6", v6 != nil))
+	httpds.v4 = v4
+	httpds.v6 = v6
 	return httpds, nil
 }
 
@@ -183,8 +200,7 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 		for val, ok := iter.Next(); ok; val, ok = iter.Next() {
 			switch x := val.(type) {
 			case error:
-				var haltErr *gojq.HaltError
-				if errors.As(x, &haltErr) && haltErr.Value() == nil {
+				if haltErr, ok := errors.AsType[*gojq.HaltError](x); ok && haltErr.Value() == nil {
 					break
 				}
 				return nil, fmt.Errorf("jq execution error: %w", x)

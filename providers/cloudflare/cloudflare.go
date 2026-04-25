@@ -14,9 +14,11 @@ import (
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
 	providerpkg "github.com/duakc/lightddns/providers"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
+	"github.com/duakc/mt"
 
 	"go.uber.org/zap"
 )
@@ -41,10 +43,13 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 	if err != nil {
 		return nil, err
 	}
+
+	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	clientOptions = append(clientOptions,
 		httpxx.ClientOptionWithToken(option.Token),
 		httpxx.ClientOptionWithDialer(
-			dialerx.NewDialerWithOption(dialerOptions...)))
+			resolvectl.NewDialer(ctx, connectDialer,
+				mt.Must(option.DNS.NewTransport(ctx, connectDialer)))))
 
 	cf := &Cloudflare{
 		logger: providerpkg.NewLogger(
