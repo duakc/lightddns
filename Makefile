@@ -3,7 +3,7 @@ all: clean generate test build-all
 
 .PHONY: test
 test: lint
-	@go test ./...
+	@go test -v ./...
 
 .PHONY: generate
 generate:
@@ -23,7 +23,7 @@ lint: fmt
 
 .PHONY: clean
 clean:
-	rm -r ./bin/build/
+	rm -rf ./bin/build/
 
 .PHONY: build-all
 build-all:

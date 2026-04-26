@@ -234,7 +234,7 @@ func Run() {
 		if verbose {
 			fmt.Printf("$ %s %s\n",
 				strings.Join(env, " "),
-				strings.Join(append([]string{"go"}, args...), " "))
+				strings.Join(append([]string{"go"}, mapQuota(args)...), " "))
 		}
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Env = append(os.Environ(), env...)
@@ -242,8 +242,7 @@ func Run() {
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 		if err := cmd.Run(); err != nil {
-			fatalErrorf("build failed :%q : %#v", fmt.Sprintf("go %s",
-				strings.Join(args, " ")), target)
+			fatalErrorf("%s", err.Error())
 		}
 	}
 }
@@ -251,4 +250,17 @@ func Run() {
 func fatalErrorf(format string, vv ...any) {
 	_, _ = fmt.Fprintf(os.Stderr, ">>>>Fatal: "+format+"\n", vv...)
 	os.Exit(1)
+}
+
+func mapQuota(s []string) []string {
+	v := make([]string, len(s))
+	for i := 0; i < len(s); i++ {
+		ss := s[i]
+		if strings.IndexByte(ss, ' ') >= 0 {
+			v[i] = fmt.Sprintf("%q", ss)
+		} else {
+			v[i] = ss
+		}
+	}
+	return v
 }
