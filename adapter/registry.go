@@ -3,6 +3,8 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/duakc/mt"
@@ -27,6 +29,7 @@ func Register[T managedType, O any](R Registry[T], typ string, constructor Gener
 type Registry[T managedType] interface {
 	Create(ctx context.Context, typ string, option any) (T, error)
 	CreateOption(typ string) (any, error)
+	Types() []string
 
 	registry(typ string, option optionConstructor, object objectConstructor[T])
 }
@@ -86,6 +89,13 @@ func (R *defaultRegistry[T]) CreateOption(typ string) (any, error) {
 	}
 	managerLogger.Trace("new option created", zap.String("type", typ))
 	return create(), nil
+}
+
+func (R *defaultRegistry[T]) Types() []string {
+	R.access.Lock()
+	defer R.access.Unlock()
+
+	return slices.Collect(maps.Keys(R.typeToOption))
 }
 
 func (R *defaultRegistry[T]) registry(typ string, option optionConstructor, object objectConstructor[T]) {

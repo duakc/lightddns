@@ -1,0 +1,89 @@
+package version
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+
+	"github.com/duakc/lightddns/adapter"
+	constpkg "github.com/duakc/lightddns/constant"
+
+	"github.com/duakc/mt"
+	"github.com/duakc/mt/debug"
+
+	goyaml "github.com/goccy/go-yaml"
+	"github.com/spf13/cobra"
+)
+
+var outputMethod string
+
+var Command = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Run:   entry,
+}
+
+func init() {
+	Command.Flags().StringVarP(&outputMethod, "format", "f", "", "Set the output format, one of [json, yaml ,plain(default)]")
+}
+
+type Info struct {
+	Name       string
+	Version    string
+	Branch     string
+	Debug      bool
+	Datasource []string
+	Provider   []string
+}
+
+func entry(cmd *cobra.Command, args []string) {
+	I := NewInfo()
+	switch strings.ToLower(outputMethod) {
+	case "json":
+		I.JSON()
+	case "yaml", "yml":
+		I.YAML()
+	default:
+		I.Plain()
+	}
+}
+
+func NewInfo() Info {
+	datasourceTypes := adapter.DatasourceRegister.Types()
+	providerTypes := adapter.ProviderRegister.Types()
+
+	sort.Strings(datasourceTypes)
+	sort.Strings(providerTypes)
+	return Info{
+		Name:    constpkg.Project,
+		Version: constpkg.Version,
+		Branch:  constpkg.Branch,
+
+		Debug:      debug.Enabled,
+		Datasource: datasourceTypes,
+		Provider:   providerTypes,
+	}
+}
+
+func (I Info) YAML() {
+	data := mt.Must(goyaml.Marshal(&I))
+	_, _ = os.Stderr.Write(data)
+}
+
+func (I Info) JSON() {
+	data := mt.Must(json.Marshal(&I))
+	_, _ = os.Stderr.Write(data)
+}
+
+func (I Info) Plain() {
+	const temp = `%s: Version: %s ,Branch: %s ,Debug: %t
+Supported Datasource: %s
+Supported Provider: %s
+`
+	_, _ = fmt.Fprintf(os.Stderr, temp, I.Name,
+		I.Version, I.Branch, I.Debug,
+		strings.Join(I.Datasource, ","),
+		strings.Join(I.Provider, ","))
+}

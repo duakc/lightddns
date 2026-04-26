@@ -10,7 +10,7 @@ import (
 	"github.com/duakc/mt"
 )
 
-var managerLogger = zaplog.NewPackage("adapter/manager")
+var managerLogger = zaplog.NewPackage("adapter", "manager")
 
 type managedType interface {
 	Type() string

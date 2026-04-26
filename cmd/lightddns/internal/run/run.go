@@ -1,4 +1,4 @@
-package main
+package run
 
 import (
 	"bytes"
@@ -6,14 +6,15 @@ import (
 	"html/template"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/lightddns"
+	"github.com/duakc/mt"
 	"github.com/duakc/mt/mtmap"
 
 	goyaml "github.com/goccy/go-yaml"
@@ -22,66 +23,64 @@ import (
 	"go.uber.org/zap"
 )
 
-type commandArgRunType struct {
-	options.Options
+type Arguments struct {
+	Options options.Options
 
 	Config string
-
-	Once bool
-}
-
-type configTemplateContext struct {
-	Env map[string]string
+	Once   bool
 }
 
 var (
-	runCommand = &cobra.Command{
-		Use: "run",
-		Run: commandEntryRun,
+	Command = &cobra.Command{
+		Use:   "run",
+		Short: "Run " + constpkg.Project,
+		Run:   entry,
 	}
 
-	cmdOption commandArgRunType
+	arg Arguments
 )
 
 func init() {
-	runCommand.Flags().StringVarP(&cmdOption.Config, "config", "c", "", "Set config file path")
-	runCommand.Flags().BoolVar(&cmdOption.Once, "once", false, "Trigger once and quit")
+	Command.Flags().StringVarP(&arg.Config, "config", "c", "", "Set config file path")
+	Command.Flags().BoolVar(&arg.Once, "once", false, "Trigger once and quit")
 	// TODO: add a fast way to configure options rather than config file
-
-	rootCommand.AddCommand(runCommand)
 }
 
-func commandEntryRun(cmd *cobra.Command, args []string) {
-	if cmdOption.Config == "" {
+func entry(cmd *cobra.Command, args []string) {
+	if arg.Config == "" {
 		_ = cmd.Help()
 		return
 	}
-	if err := openConfigBind(cmdOption.Config, &cmdOption.Options); err != nil {
-		zaplog.Fatal("read config file failed", zap.String("file", cmdOption.Config), zap.Error(err))
+	if err := openConfigBind(arg.Config, &arg.Options); err != nil {
+		zaplog.Fatal("read config file failed", zap.String("file", arg.Config), zap.Error(err))
 		return
 	}
-
-	if err := runMain(); err != nil {
+	ctx := lookctx.NewRegistry(context.Background(), lookctx.NewDefaultRegistry())
+	ddns, err := lightddns.New(ctx, arg.Options)
+	if err != nil {
+		zaplog.Fatal("initial instance failed", zap.Error(err))
+	}
+	if err := runInstance(ctx, ddns); err != nil {
 		zaplog.Fatal("start failed", zap.Error(err))
 	}
 }
 
-func runMain() error {
-	ctx := lookctx.NewRegistry(context.Background(), lookctx.NewDefaultRegistry())
-	ctx, stop := signal.NotifyContext(ctx,
-		os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGQUIT)
-	defer stop()
+func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) error {
+	var cancel context.CancelFunc
+	ctx, cancel = signal.NotifyContext(ctx, os.Interrupt, os.Kill,
+		syscall.SIGINT, syscall.SIGHUP, syscall.SIGABRT)
+	defer cancel()
 
-	ddns, err := lightddns.New(ctx, cmdOption.Options)
-	if err != nil {
-		return err
-	}
 	ddns.Once(ctx)
-	if cmdOption.Once {
+	if arg.Once {
 		return nil
 	}
 
 	return ddns.Start(ctx)
+}
+
+type configTemplateContext struct {
+	Env map[string]string
 }
 
 func openConfigBind(file string, opt *options.Options) error {
@@ -104,8 +103,10 @@ func fullEnv() map[string]string {
 	result := make(map[string]string)
 
 	for _, v := range os.Environ() {
-		vv := strings.SplitN(v, "=", 2)
-		result[vv[0]] = vv[1]
+		key, value, ok := mt.KeyValue(v)
+		if ok {
+			result[key] = value
+		}
 	}
 	if _, err := os.Stat(".env"); err == nil {
 		envFile, err := os.ReadFile(".env")

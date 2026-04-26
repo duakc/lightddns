@@ -21,22 +21,17 @@ import (
 var errDomainNotEnabled = errors.New("not enabled")
 
 type Domain struct {
-	logger *zap.Logger
-
-	provider   adapter.Provider
-	datasource adapter.Datasource
-
+	logger         *zap.Logger
+	provider       adapter.Provider
+	datasource     adapter.Datasource
 	domainName     string
 	updateInterval time.Duration
-
-	ttl  uint32
-	ipv4 bool
-	ipv6 bool
+	ttl            uint32
+	ipv4           bool
+	ipv6           bool
 }
 
 func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
-	updateInterval := constpkg.DefaultUpdateInterval
-
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, errDomainNotEnabled
 	}
@@ -47,84 +42,72 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		return nil, fmt.Errorf("missing provider")
 	}
 	if !opt.IPv4 && !opt.IPv6 {
-		// enable dual stack default
 		opt.IPv4 = true
 		opt.IPv6 = true
 	}
-	if time.Duration(opt.Interval) != 0 {
+
+	updateInterval := constpkg.DefaultUpdateInterval
+	if opt.Interval > 0 {
 		updateInterval = time.Duration(opt.Interval)
 	}
 
-	logger := lookctx.LookupPtr[zap.Logger](ctx)
+	logger := lookctx.LookupPtr[zap.Logger](ctx).Named(string(opt.Domain))
 	dataSourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
 	providerManager := lookctx.Lookup[adapter.ProviderManager](ctx)
 
-	var (
-		provider   adapter.Provider
-		datasource adapter.Datasource
-		found      bool
-	)
-
-	if provider, found = providerManager.Lookup(opt.Provider); !found {
+	provider, found := providerManager.Lookup(opt.Provider)
+	if !found {
 		return nil, &providerpkg.ProviderNotFoundError{Name: opt.Provider}
 	}
-	if datasource, found = dataSourceManager.Lookup(opt.DataSource); !found {
+	datasource, found := dataSourceManager.Lookup(opt.DataSource)
+	if !found {
 		return nil, &datasourcepkg.DatasourceNotFoundError{Name: opt.DataSource}
 	}
 
 	return &Domain{
-		logger:         logger.Named(string(opt.Domain)),
+		logger:         logger,
 		provider:       provider,
 		datasource:     datasource,
+		domainName:     string(opt.Domain),
 		updateInterval: updateInterval,
-
-		domainName: string(opt.Domain),
-		ttl:        opt.TTL,
-		ipv4:       opt.IPv4,
-		ipv6:       opt.IPv6,
+		ttl:            opt.TTL,
+		ipv4:           opt.IPv4,
+		ipv6:           opt.IPv6,
 	}, nil
 }
 
-func (o *Domain) UpdateOnce(ctx context.Context) error {
-	// TODO: here needs some optimization
-	logger := o.logger
-	var cancel context.CancelFunc
-	ctx, cancel = mt.Timeout(ctx, o.updateInterval)
+func (d *Domain) UpdateOnce(ctx context.Context) error {
+	ctx, cancel := mt.Timeout(ctx, d.updateInterval)
 	defer cancel()
 
 	netips, err := adapter.MergeDatasources(ctx,
-		[]adapter.Datasource{o.datasource}, o.ipv4, o.ipv6, true)
+		[]adapter.Datasource{d.datasource}, d.ipv4, d.ipv6, true)
 	if err != nil {
 		return err
 	}
-	logger.Debug("found ip",
-		zap.String("domain", o.domainName), zap.Stringers("ip", netips))
+	d.logger.Debug("found ip",
+		zap.String("domain", d.domainName),
+		zap.Stringers("ip", netips))
 
-	if err := o.provider.Update(ctx, o.domainName, o.ttl, netips); err != nil {
-		return fmt.Errorf("update domain(%s) failed: %w",
-			o.domainName, err)
+	if err := d.provider.Update(ctx, d.domainName, d.ttl, netips); err != nil {
+		return fmt.Errorf("update domain(%s) failed: %w", d.domainName, err)
 	}
 	return nil
 }
 
-func (o *Domain) UpdateLoop(ctx context.Context) {
-	// TODO: here needs some optimization
-	logger := o.logger
-	ticker := time.NewTicker(o.updateInterval)
+func (d *Domain) UpdateLoop(ctx context.Context) {
+	ticker := time.NewTicker(d.updateInterval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
-			deadlineCtx, cancel := context.WithTimeout(ctx, o.updateInterval)
-			err := o.UpdateOnce(deadlineCtx)
-			if err != nil {
-				logger.Error("update failed", zap.Error(err))
+			if err := d.UpdateOnce(ctx); err != nil {
+				d.logger.Error("update failed", zap.Error(err))
 			}
-			cancel()
 		case <-ctx.Done():
-			logger.Warn("quited", zap.Error(ctx.Err()))
+			d.logger.Warn("quited", zap.Error(ctx.Err()))
 			return
 		}
-		ticker.Reset(o.updateInterval)
 	}
 }

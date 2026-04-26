@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
+	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/spf13/cobra"
@@ -9,6 +11,12 @@ import (
 
 var rootCommand = &cobra.Command{
 	Use: "lightddns",
+}
+
+func init() {
+	rootCommand.AddCommand(
+		run.Command,
+		version.Command)
 }
 
 func main() {

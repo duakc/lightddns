@@ -14,4 +14,5 @@ type DomainOption struct {
 
 	Domain   badyaml.DomainName `yaml:"domain"`
 	Interval badyaml.Duration   `yaml:"interval"`
+	Timeout  badyaml.Duration   `yaml:"timeout"`
 }

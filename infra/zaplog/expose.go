@@ -2,6 +2,7 @@ package zaplog
 
 import (
 	"os"
+	"strings"
 
 	"github.com/duakc/mt/debug"
 
@@ -10,11 +11,16 @@ import (
 )
 
 var (
-	defaultLevel  = zap.NewAtomicLevelAt(zapcore.TraceLevel)
+	defaultLevel  = zap.NewAtomicLevelAt(zap.TraceLevel)
 	defaultLogger = createDefault(defaultLevel)
 )
 
 func createDefault(lvl zapcore.LevelEnabler) *zap.Logger {
+	if debug.IsTestEnv() || !debug.Enabled {
+		// omit log message on test
+		defaultLevel.SetLevel(zap.PanicLevel)
+	}
+
 	var options []zap.Option
 	if debug.Enabled {
 		options = append(options, zap.Development())
@@ -29,8 +35,8 @@ func DefaultLevel(lvl zapcore.Level) {
 	defaultLevel.SetLevel(lvl)
 }
 
-func NewPackage(pkg string) *zap.Logger {
-	return defaultLogger.With(zap.String("package", pkg))
+func NewPackage(pkg ...string) *zap.Logger {
+	return defaultLogger.With(zap.String("package", strings.Join(pkg, ".")))
 }
 
 func Trace(msg string, fields ...zap.Field) {

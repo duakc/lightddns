@@ -29,7 +29,6 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create logger: %w", err)
 	}
-	zaplog.DefaultLevel(logger.Level())
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
 	dataSourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
@@ -69,7 +68,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("create domain[%d]: %w", i, err)
+			return nil, fmt.Errorf("create domain `%s`: %w", domain.domainName, err)
 		}
 		domains = append(domains, domain)
 	}
@@ -85,26 +84,21 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 }
 
 func (ddns *LightDDNS) Once(ctx context.Context) {
-	logger := ddns.logger
-
 	for i := 0; i < len(ddns.domains); i++ {
 		domain := ddns.domains[i]
 		err := domain.UpdateOnce(ctx)
 		if err != nil {
-			logger.Error("update failed", zap.Error(err))
+			ddns.logger.Error("update failed", zap.Error(err))
 			return
 		}
 	}
 }
 
 func (ddns *LightDDNS) Start(ctx context.Context) error {
-	logger := ddns.logger
-
 	for i := 0; i < len(ddns.domains); i++ {
 		domain := ddns.domains[i]
 		go domain.UpdateLoop(ctx)
 	}
-	logger.Info("started")
 	<-ctx.Done()
 	if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
@@ -126,6 +120,7 @@ func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 			return nil, err
 		}
 	}
+	zaplog.DefaultLevel(level)
 
 	var outputFD *os.File
 	switch strings.ToLower(opt.Output) {
@@ -139,6 +134,7 @@ func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 			return nil, err
 		}
 	}
+
 	logger := zaplog.NewDefault(outputFD, level, nil)
 	return logger, nil
 }

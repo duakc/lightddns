@@ -1,3 +1,10 @@
 package constant
 
-const Version = "unknown"
+const unknown = "(unknown)"
+
+var (
+	Version = unknown
+	Branch  = unknown
+)
+
+const Project = "lightddns"

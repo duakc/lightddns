@@ -25,7 +25,7 @@ import (
 
 const defaultCacheSize = 1024
 
-var resolverLogger = zaplog.NewPackage("netool/resolvectl")
+var resolverLogger = zaplog.NewPackage("netool", "resolvectl")
 
 type RcodeError struct {
 	Code     int

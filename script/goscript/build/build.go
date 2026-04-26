@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 )
@@ -35,6 +36,7 @@ type BuildTarget struct {
 
 var (
 	version string
+	branch  string
 
 	binaryName string
 
@@ -43,6 +45,8 @@ var (
 	verbose    bool
 
 	buildAll bool
+
+	extraTags string
 )
 
 var allTarget []BuildTarget
@@ -161,8 +165,10 @@ func Run() {
 	const Main = "../../"
 
 	flag.StringVar(&version, "version", "0.0.1", "version")
-	flag.StringVar(&workingDir, "wd", "cmd/lightddns/", "working directory")
+	flag.StringVar(&branch, "branch", "main", "branch")
+	flag.StringVar(&workingDir, "workdir", "./cmd/lightddns/", "working directory")
 	flag.StringVar(&outputDir, "output", "bin/build", "output directory")
+	flag.StringVar(&extraTags, "tags", "", "extra tags")
 	flag.StringVar(&binaryName, "binary", "lightddns", "binary name")
 	flag.BoolVar(&verbose, "verbose", false, "verbose output")
 	flag.BoolVar(&buildAll, "all", false, "build all")
@@ -177,15 +183,24 @@ func Run() {
 	defer cancel()
 
 	for _, target := range allTarget {
-		// defaults
-		target.LDFlags = append(target.LDFlags, "-w", "-s",
-			fmt.Sprintf("-X github.com/duakc/lightddns/constant.Version=%s", version))
-		//
 
 		goos := target.GOOS
 		goarch := target.GOARCH
 		if !buildAll && !(runtime.GOARCH == goarch && runtime.GOOS == goos) {
 			continue
+		}
+
+		// defaults
+		target.LDFlags = append(target.LDFlags,
+			fmt.Sprintf(`-X "github.com/duakc/lightddns/constant.Version=%s"`, version),
+			fmt.Sprintf(`-X "github.com/duakc/lightddns/constant.Branch=%s"`, branch))
+		// flags
+		if extraTags != "" {
+			ext := strings.Split(extraTags, ",")
+			if slices.Contains(ext, "debug") {
+				target.Debug = true
+			}
+			target.TAGS = append(target.TAGS, ext...)
 		}
 
 		binNameJoin := []string{binaryName, goos, goarch}
@@ -211,18 +226,22 @@ func Run() {
 			env = append(env, fmt.Sprintf("GOARM=%d", target.GOARMVersion))
 		}
 
-		args := []string{"build", "-C", Main, "-trimpath"}
+		args := []string{"build", "-C", Main}
 
 		if target.Debug {
+			binNameJoin = append(binNameJoin, "debug")
 			target.TAGS = append(target.TAGS, "debug")
+		} else {
+			target.LDFlags = append(target.LDFlags, "-w", "-s")
+			args = append(args, "-trimpath")
 		}
 
 		if len(target.TAGS) > 0 {
-			args = append(args, "-tags="+strings.Join(target.TAGS, ","))
+			args = append(args, "-tags", strings.Join(target.TAGS, ","))
 		}
 
 		if len(target.LDFlags) > 0 {
-			args = append(args, "-ldflags="+strings.Join(target.LDFlags, " "))
+			args = append(args, "-ldflags", strings.Join(target.LDFlags, " "))
 		}
 
 		binName := strings.Join(binNameJoin, "-")
@@ -230,7 +249,7 @@ func Run() {
 			binName += ".exe"
 		}
 		args = append(args,
-			"-o", filepath.Join(outputDir, binName), ".")
+			"-o", filepath.Join(outputDir, binName), workingDir)
 		if verbose {
 			fmt.Printf("$ %s %s\n",
 				strings.Join(env, " "),
@@ -257,7 +276,7 @@ func mapQuota(s []string) []string {
 	for i := 0; i < len(s); i++ {
 		ss := s[i]
 		if strings.IndexByte(ss, ' ') >= 0 {
-			v[i] = fmt.Sprintf("%q", ss)
+			v[i] = fmt.Sprintf("'%s'", ss)
 		} else {
 			v[i] = ss
 		}
