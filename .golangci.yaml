@@ -5,6 +5,9 @@ run:
   tests: false
   tags:
     - debug
+issues:
+  exclude-dirs:
+    - "script/goscript"
 linters:
   default: none
   enable:
@@ -21,12 +24,19 @@ linters:
     - nolintlint
     - tagalign
     - tagliatelle
+    - depguard
   settings:
     tagliatelle:
       case:
         rules:
           json: snake
           yaml: kebab
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: "gopkg.in/yaml.v3$"
+              desc: "use github.com/goccy/go-yaml"
     staticcheck:
       checks:
         - all
