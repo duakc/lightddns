@@ -37,6 +37,8 @@ linters:
           deny:
             - pkg: "gopkg.in/yaml.v3$"
               desc: "use github.com/goccy/go-yaml"
+            - pkg: "github.com/duakc/lightddns/script/goscript/*"
+              desc: "main project can not import script module"
     staticcheck:
       checks:
         - all

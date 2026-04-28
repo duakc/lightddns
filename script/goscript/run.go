@@ -3,7 +3,8 @@ package main
 import (
 	"os"
 
-	"goscript/build"
+	"github.com/duakc/lightddns/script/goscript/build"
+	"github.com/duakc/lightddns/script/goscript/schema"
 )
 
 func main() {
@@ -14,5 +15,7 @@ func main() {
 	switch t {
 	case "build":
 		build.Run()
+	case "schema":
+		schema.Run()
 	}
 }
