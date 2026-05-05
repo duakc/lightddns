@@ -10,9 +10,7 @@ import (
 	"github.com/duakc/mt"
 )
 
-var (
-	ErrMissingMetaValue = errors.New("missing meta value")
-)
+var ErrMissingMetaValue = errors.New("missing meta value")
 
 type BaseDocument struct {
 	Name string
@@ -20,7 +18,8 @@ type BaseDocument struct {
 }
 
 func (o *BaseDocument) FromComment(comment *goast.CommentGroup,
-	child func(name string, tokenizer *Tokenizer) error) error {
+	child func(name string, tokenizer *Tokenizer) error,
+) error {
 	if comment == nil {
 		return nil
 	}
@@ -28,7 +27,8 @@ func (o *BaseDocument) FromComment(comment *goast.CommentGroup,
 }
 
 func (o *BaseDocument) FromToken(token *Tokenizer,
-	child func(name string, token *Tokenizer) error) error {
+	child func(name string, token *Tokenizer) error,
+) error {
 	lang := maps.Clone(LangMap)
 	for token.NextMeta() {
 		name := token.MetaName()

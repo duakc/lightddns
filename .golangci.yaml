@@ -5,9 +5,6 @@ run:
   tests: false
   tags:
     - debug
-issues:
-  exclude-dirs:
-    - "script/goscript"
 linters:
   default: none
   enable:
@@ -61,6 +58,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - script/goscript
 formatters:
   enable:
     - gci

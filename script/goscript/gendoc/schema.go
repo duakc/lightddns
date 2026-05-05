@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/duakc/lightddns/infra/zaplog"
+
 	gopackage "golang.org/x/tools/go/packages"
 )
 
