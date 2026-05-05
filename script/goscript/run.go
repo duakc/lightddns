@@ -9,11 +9,21 @@ import (
 	"github.com/duakc/lightddns/script/goscript/gendoc"
 )
 
+const debugScript = "gendoc"
+
 func main() {
-	t := os.Args[1]
-	if len(os.Args) > 2 {
-		os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
+	if len(os.Args) < 2 && debugScript == "" {
+		// nop
+		return
 	}
+	t := debugScript
+	if debugScript == "" {
+		t = os.Args[1]
+		if len(os.Args) > 2 {
+			os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
+		}
+	}
+
 	ctx, cancel := gos.InterruptSignalContext(context.Background())
 	defer cancel()
 	switch t {

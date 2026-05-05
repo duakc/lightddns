@@ -3,6 +3,7 @@ package gendoc
 import (
 	"bytes"
 	"io"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -26,6 +27,10 @@ type Tokenizer struct {
 	// dirty >= r
 	// err == nil => dirty == -1
 	dirty int
+}
+
+func NewTokenizerString(s string) *Tokenizer {
+	return NewTokenizer(strings.NewReader(s))
 }
 
 func NewTokenizer(r io.Reader) *Tokenizer {
@@ -53,8 +58,13 @@ func (t *Tokenizer) NextMeta() bool {
 
 func (t *Tokenizer) MetaName() string {
 	if !t.readUntil(0, unicode.IsSpace) {
+		frag := t.Fragment()
+		if id := bytes.IndexRune(t.Fragment(), metaPrefixRune); id >= 0 {
+			return string(bytes.TrimSpace(frag[id:]))
+		}
 		return ""
 	}
+
 	return string(t.Fragment())
 }
 

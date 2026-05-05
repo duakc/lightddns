@@ -9,6 +9,7 @@ import (
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 )
 
+// ConnectOption @Shared
 type ConnectOption struct {
 	FwManirk uint `yaml:"fwmark"`
 

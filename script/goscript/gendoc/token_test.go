@@ -13,14 +13,15 @@ const testdata1 = `@V 1 @A @B
 @DOC this 
 is a doc name
 
-@nextmeta`
+@nextmeta
+@eof `
 
 func TestTokenizer(t *testing.T) {
 	token := NewTokenizer(strings.NewReader(testdata1))
-	for !token.NextMeta() {
+	for token.NextMeta() {
 		name := token.MetaName()
 		switch name {
-		case "@A", "@B", "@VersionRequired", "@nextmeta":
+		case "@A", "@B", "@VersionRequired", "@nextmeta", "@eof":
 		case "@V":
 			token.NextMeta()
 			assert.Equal(t, "1", token.FragmentText())

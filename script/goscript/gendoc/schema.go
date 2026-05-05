@@ -1,66 +1,15 @@
 package gendoc
 
 import (
-	"bufio"
 	"context"
 	goast "go/ast"
 	gotoken "go/token"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
 
 	"github.com/duakc/lightddns/infra/zaplog"
 	gopackage "golang.org/x/tools/go/packages"
 )
-
-type BaseDoc struct {
-	Name string
-	Lang map[LangCode]string
-}
-
-type OptionFieldDoc struct {
-	BaseDoc
-
-	Required bool
-	Values   []string
-
-	YAML string
-}
-
-func (o *OptionFieldDoc) FromComment(comment *goast.CommentGroup) {
-	scanner := bufio.NewScanner(strings.NewReader(comment.Text()))
-	for scanner.Scan() {
-
-	}
-}
-
-type OptionDoc struct {
-	BaseDoc
-
-	Fields []OptionFieldDoc
-}
-
-func NewOptionDoc(typeSpec *goast.TypeSpec, structType *goast.StructType) (*OptionDoc, error) {
-
-	doc := &OptionDoc{}
-	doc.Name = typeSpec.Name.Name
-
-	for i := 0; i < len(structType.Fields.List); i++ {
-		field := structType.Fields.List[i]
-		if field.Doc == nil {
-			// skip
-			continue
-		}
-		fieldDoc := &OptionFieldDoc{}
-		if field.Tag != nil {
-			structTag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
-			fieldDoc.YAML = structTag.Get("yaml")
-		}
-		fieldDoc.FromComment(field.Doc)
-	}
-	return nil, nil
-}
 
 const WorkDirectory = "../../"
 
@@ -70,9 +19,9 @@ var (
 	OptionDirectory = filepath.Join(WorkDirectory, "./options")
 
 	GoPackageConfig = &gopackage.Config{
-		Mode:       gopackage.LoadSyntax,
+		Mode:       gopackage.NeedName | gopackage.NeedFiles | gopackage.NeedSyntax,
 		Dir:        OptionDirectory,
-		BuildFlags: []string{"debug"},
+		BuildFlags: []string{"-tags=debug"},
 		Context:    context.Background(),
 		Logf:       Logger.Infof,
 		Env:        os.Environ(),
@@ -83,7 +32,7 @@ var (
 func Run(ctx context.Context) {
 	packageLoaded, err := gopackage.Load(goPackageConfigReplaceContext(ctx))
 	if err != nil {
-		Logger.Error("Load Package: %s", err.Error())
+		Logger.Fatalf("Load Package: %s", err.Error())
 	}
 	for i := 0; i < len(packageLoaded); i++ {
 		pkg := packageLoaded[i]
@@ -111,7 +60,7 @@ func handleFiles(astFile *goast.File) {
 			if !ok {
 				continue
 			}
-			NewOptionDoc(typeSpec, structType)
+			NewStruct(typeSpec, structType)
 		}
 	}
 }
