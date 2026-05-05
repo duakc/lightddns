@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
-	"syscall"
 )
 
 type BuildTarget struct {
@@ -161,7 +159,7 @@ func init() {
 	}...)
 }
 
-func Run() {
+func Run(ctx context.Context) {
 	const Main = "../../"
 
 	flag.StringVar(&version, "version", "0.0.1", "version")
@@ -178,9 +176,6 @@ func Run() {
 	if err := os.MkdirAll(filepath.Join(Main, outputDir), 0o755); err != nil {
 		fatalErrorf("mkdir: %s", err.Error())
 	}
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill,
-		syscall.SIGINT, syscall.SIGABRT, syscall.SIGHUP)
-	defer cancel()
 
 	for _, target := range allTarget {
 
@@ -255,6 +250,7 @@ func Run() {
 				strings.Join(env, " "),
 				strings.Join(append([]string{"go"}, mapQuota(args)...), " "))
 		}
+
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Env = append(os.Environ(), env...)
 		cmd.Stdout = os.Stdout

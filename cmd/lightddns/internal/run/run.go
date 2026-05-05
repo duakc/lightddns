@@ -5,10 +5,9 @@ import (
 	"context"
 	"html/template"
 	"os"
-	"os/signal"
-	"syscall"
 
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -66,9 +65,7 @@ func entry(cmd *cobra.Command, args []string) {
 }
 
 func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) error {
-	var cancel context.CancelFunc
-	ctx, cancel = signal.NotifyContext(ctx, os.Interrupt, os.Kill,
-		syscall.SIGINT, syscall.SIGHUP, syscall.SIGABRT)
+	ctx, cancel := gos.InterruptSignalContext(ctx)
 	defer cancel()
 
 	ddns.Once(ctx)

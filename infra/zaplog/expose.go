@@ -36,7 +36,11 @@ func DefaultLevel(lvl zapcore.Level) {
 }
 
 func NewPackage(pkg ...string) *zap.Logger {
-	return defaultLogger.With(zap.String("package", strings.Join(pkg, ".")))
+	return defaultLogger.With(zap.String("package", strings.Join(pkg, "/")))
+}
+
+func Sugar() *zap.SugaredLogger {
+	return defaultLogger.Sugar()
 }
 
 func Trace(msg string, fields ...zap.Field) {
