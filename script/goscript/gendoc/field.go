@@ -4,7 +4,6 @@ import (
 	"fmt"
 	goast "go/ast"
 	"reflect"
-	"slices"
 	"strings"
 )
 
@@ -17,6 +16,7 @@ type FieldDocument struct {
 
 	Required bool
 	Values   []string
+	Platform []string
 }
 
 func NewField(ast *goast.Field) (*FieldDocument, error) {
@@ -28,7 +28,7 @@ func NewField(ast *goast.Field) (*FieldDocument, error) {
 		structTag := reflect.StructTag(strings.Trim(ast.Tag.Value, "`"))
 		o.YAML = structTag.Get("yaml")
 	}
-	err := o.FromComment(ast.Doc, o.FromTokenName)
+	err := o.FromComment(ast.Doc, o)
 	if err != nil {
 		return nil, fmt.Errorf("field: %s: %w", o.Name, err)
 	}
@@ -42,13 +42,16 @@ func (o *FieldDocument) FromTokenName(name string, t *Tokenizer) error {
 		o.Required = true
 	case "@Values":
 		t.NextMeta()
-		values := strings.Split(t.FragmentText(), ",")
-		if len(values) == 0 {
+		o.Values = docArray(t.FragmentText())
+		if len(o.Values) == 0 {
 			return fmt.Errorf("%s: %w", name, ErrMissingMetaValue)
 		}
-		o.Values = slices.DeleteFunc(values, func(s string) bool {
-			return len(s) == 0
-		})
+	case "@Platform":
+		t.NextMeta()
+		o.Platform = docArray(t.FragmentText())
+		if len(o.Platform) == 0 {
+			return fmt.Errorf("%s: %w", name, ErrMissingMetaValue)
+		}
 	default:
 		return fmt.Errorf("unknown meta: %s", name)
 	}

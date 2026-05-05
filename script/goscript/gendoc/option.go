@@ -5,6 +5,7 @@ import (
 	"fmt"
 	goast "go/ast"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/duakc/mt"
@@ -12,22 +13,27 @@ import (
 
 var ErrMissingMetaValue = errors.New("missing meta value")
 
+type TokenNameHandler interface {
+	FromTokenName(name string, token *Tokenizer) error
+}
+
 type BaseDocument struct {
 	Name string
 	Lang map[LangCode]string
 }
 
 func (o *BaseDocument) FromComment(comment *goast.CommentGroup,
-	child func(name string, tokenizer *Tokenizer) error,
+	tokenHandler TokenNameHandler,
 ) error {
 	if comment == nil {
 		return nil
 	}
-	return o.FromToken(NewTokenizerString(comment.Text()), child)
+	o.Lang = make(map[LangCode]string)
+	return o.FromToken(NewTokenizerString(comment.Text()), tokenHandler)
 }
 
 func (o *BaseDocument) FromToken(token *Tokenizer,
-	child func(name string, token *Tokenizer) error,
+	tokenHandler TokenNameHandler,
 ) error {
 	lang := maps.Clone(LangMap)
 	for token.NextMeta() {
@@ -49,11 +55,12 @@ func (o *BaseDocument) FromToken(token *Tokenizer,
 			}
 			o.Lang[code] = langText
 			delete(lang, string(code))
-			continue
+		default:
+			if err := tokenHandler.FromTokenName(name, token); err != nil {
+				return err
+			}
 		}
-		if err := child(name, token); err != nil {
-			return err
-		}
+
 	}
 	return nil
 }
@@ -62,4 +69,11 @@ func identNames(ids []*goast.Ident) string {
 	return strings.Join(mt.Map(ids, func(s *goast.Ident) string {
 		return s.Name
 	}), ", ")
+}
+
+func docArray(s string) []string {
+	vv := strings.Split(s, ",")
+	return slices.DeleteFunc(vv, func(s string) bool {
+		return len(s) == 0
+	})
 }

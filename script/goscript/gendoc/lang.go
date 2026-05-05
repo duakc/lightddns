@@ -2,19 +2,6 @@ package gendoc
 
 type LangCode string
 
-var RegisteredOption = []struct {
-	Name       string
-	MappedName map[LangCode]string
-}{
-	{
-		Name: "LogOption",
-		MappedName: map[LangCode]string{
-			LangZhCn: "日志选项",
-			LangEnUS: "Log Option",
-		},
-	},
-}
-
 const (
 	LangDefault = LangEnUS
 

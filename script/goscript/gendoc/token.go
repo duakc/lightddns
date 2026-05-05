@@ -47,7 +47,6 @@ func (t *Tokenizer) Err() error {
 
 func (t *Tokenizer) Reset() {
 	t.buf = nil
-	t.buf = make([]byte, t.nextSize())
 	t.r, t.b = 0, 0
 	t.dirty = -1
 }
@@ -114,13 +113,15 @@ func (t *Tokenizer) fill() bool {
 		t.r -= offset
 		t.e -= offset
 	}
-	if t.r >= t.e {
+
+	if t.ioErr == nil && t.e == len(t.buf) {
 		// no more free space in buf, but need more free space, how:
 		// resize
 		buf := make([]byte, t.nextSize())
 		copy(buf[:t.e], t.buf[:t.e])
 		t.buf = buf
 	}
+
 	if t.ioErr == nil {
 		nn, err := t.reader.Read(t.buf[t.e:])
 		t.e = t.e + nn

@@ -26,12 +26,12 @@ func (o *StructDocument) FromTokenName(name string, token *Tokenizer) error {
 	return nil
 }
 
-func NewStruct(typeSpec *goast.TypeSpec, structType *goast.StructType) (*StructDocument, error) {
+func NewStruct(gendecl *goast.GenDecl, typeSpec *goast.TypeSpec, structType *goast.StructType) (*StructDocument, error) {
 	o := &StructDocument{}
 	o.AstTypeSpec = typeSpec
 	o.Ast = structType
 	o.Name = typeSpec.Name.Name
-	err := o.FromComment(typeSpec.Doc, o.FromTokenName)
+	err := o.FromComment(gendecl.Doc, o)
 	if err != nil {
 		return nil, err
 	}
