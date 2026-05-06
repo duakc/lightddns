@@ -1,4 +1,4 @@
-package gendoc
+package genschema
 
 import (
 	"reflect"
@@ -7,7 +7,7 @@ import (
 	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/options"
-	"github.com/duakc/lightddns/script/goscript/gendoc/jsonschema"
+	"github.com/duakc/lightddns/script/goscript/pkg/jsonschema"
 
 	"github.com/duakc/mt"
 )
@@ -33,6 +33,7 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.StringOrNumber]()] = stringOr(singleType(JSONTypeNumber))
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.StringOrObject[options.DualStack[string]]]()] = stringOr(mt.Must(jsonschema.For[options.DualStack[string]](nil)))
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()] = enumSchema(JSONTypeString, "trace", "debug", "info", "warn", "error", "dpanic", "panic", "fatal")
 
 		optionsTypeMappingTable[reflect.TypeFor[dialerx.DialStrategy]()] = enumSchema(JSONTypeString, mt.Map(
 			[]dialerx.DialStrategy{dialerx.DialOnlyIPv4, dialerx.DialOnlyIPv6, dialerx.DialPreferIPv4, dialerx.DialPreferIPv6},
@@ -45,7 +46,7 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 	return optionsTypeMappingTable
 }
 
-func GenSchema(structs []*StructDocument) ([]byte, error) {
+func GenSchema() ([]byte, error) {
 	rootSchema := new(jsonschema.Schema)
 	var (
 		logTag    = lookupTagIn[options.Options, options.LogOption]()

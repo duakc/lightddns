@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/duakc/mt"
+
+	"go.uber.org/zap/zapcore"
 )
 
 type Duration time.Duration
@@ -53,4 +55,16 @@ func (E *EnvironmentVariable) Lookup(key string) string {
 		return vv
 	}
 	return ""
+}
+
+type LogLevel zapcore.Level
+
+func (L *LogLevel) UnmarshalYAML(data []byte) error {
+	levelString := mt.UnquoteString(string(data))
+	level, err := zapcore.ParseLevel(levelString)
+	if err != nil {
+		return err
+	}
+	*L = LogLevel(level)
+	return nil
 }

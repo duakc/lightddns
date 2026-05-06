@@ -1,9 +1,9 @@
-package gendoc
+package genschema
 
 import (
 	"net/http"
 
-	"github.com/duakc/lightddns/script/goscript/gendoc/jsonschema"
+	"github.com/duakc/lightddns/script/goscript/pkg/jsonschema"
 )
 
 const (

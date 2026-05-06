@@ -111,15 +111,9 @@ func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 		return zaplog.NOP, nil
 	}
 	var (
-		level = zapcore.InfoLevel
+		level = zapcore.Level(opt.Level)
 		err   error
 	)
-	if len(opt.Level) != 0 {
-		level, err = zapcore.ParseLevel(opt.Level)
-		if err != nil {
-			return nil, err
-		}
-	}
 	zaplog.DefaultLevel(level)
 
 	var outputFD *os.File

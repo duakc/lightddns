@@ -160,7 +160,7 @@ func init() {
 }
 
 func Run(ctx context.Context) {
-	const Main = "../../"
+	const Main = "."
 
 	flag.StringVar(&version, "version", "0.0.1", "version")
 	flag.StringVar(&branch, "branch", "main", "branch")

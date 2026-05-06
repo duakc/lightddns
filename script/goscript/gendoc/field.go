@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/duakc/lightddns/script/goscript/gendoc/jsonschema"
+	"github.com/duakc/lightddns/script/goscript/pkg/jsonschema"
 )
 
 type FieldDocument struct {

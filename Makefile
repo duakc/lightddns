@@ -1,12 +1,12 @@
 NAME="lightddns"
 MAIN_WORKDIR=$(shell cd cmd/$(NAME) && pwd)
-SCRIPT_WORKDIR=$(shell cd script/goscrip && pwd)
+SCRIPT_WORKDIR=$(shell cd script/goscript && pwd)
 
 GIT_VERSION=$(shell git rev-parse --short HEAD)
 GIT_BRANCH=$(shell git branch --show-current)
-BUILD_OUTPUT="./bin/build"
+BUILD_OUTPUT="./build"
 
-GO_SCRIPT=go run -C $(SCRIPT_WORKDIR) .
+GO_SCRIPT=go run $(SCRIPT_WORKDIR)/run.go
 
 GO_BUILD=$(GO_SCRIPT) build -verbose \
 			-version $(GIT_VERSION) -branch $(GIT_BRANCH)\
@@ -24,10 +24,7 @@ test: lint
 .PHONY: generate
 generate:
 	@go generate ./...
-
-.PHONY: generate-doc
-generate-doc:
-	@$(GO_SCRIPT) schema
+	@$(GO_SCRIPT) genschema
 
 .PHONY: toolchain
 toolchain:
@@ -40,6 +37,10 @@ fmt:
 .PHONY: lint
 lint: fmt
 	@golangci-lint run
+
+.PHONY: lint-fix
+lint-fix:
+	@golangci-lint run --fix
 
 .PHONY: clean
 clean:
@@ -57,5 +58,5 @@ build-dev:
 
 .PHONY: build
 build:
-	@$(GO_BUILD)
+	$(GO_BUILD)
 

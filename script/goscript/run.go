@@ -7,21 +7,17 @@ import (
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/script/goscript/build"
 	"github.com/duakc/lightddns/script/goscript/gendoc"
+	"github.com/duakc/lightddns/script/goscript/genschema"
 )
 
-const debugScript = "gendoc"
-
 func main() {
-	if len(os.Args) < 2 && debugScript == "" {
+	if len(os.Args) < 2 {
 		// nop
 		return
 	}
-	t := debugScript
-	if debugScript == "" {
-		t = os.Args[1]
-		if len(os.Args) > 2 {
-			os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
-		}
+	t := os.Args[1]
+	if len(os.Args) > 2 {
+		os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
 	}
 
 	ctx, cancel := gos.InterruptSignalContext(context.Background())
@@ -31,5 +27,7 @@ func main() {
 		build.Run(ctx)
 	case "gendoc":
 		gendoc.Run(ctx)
+	case "genschema":
+		genschema.Run(ctx)
 	}
 }

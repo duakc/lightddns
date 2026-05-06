@@ -65,12 +65,6 @@ func Run(ctx context.Context) {
 			structs = append(structs, handleFiles(pkg.Syntax[i])...)
 		}
 	}
-	var schema []byte
-	schema, err = GenSchema(structs)
-	if err != nil {
-		Logger.Fatal(err)
-	}
-	os.WriteFile("JSONSchema.json", schema, 0o666)
 }
 
 func handleFiles(astFile *goast.File) []*StructDocument {
