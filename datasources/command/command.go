@@ -36,6 +36,7 @@ func init() {
 
 func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.Datasource, error) {
 	logger := datasourcepkg.NewLogger(lookctx.LookupPtr[zap.Logger](ctx), option.AbstractDatasourceOption)
+
 	command := sh.New()
 	if option.Shell != "" {
 		shell, isShell := sh.ShellFromString(option.Shell)
@@ -55,8 +56,8 @@ func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.D
 		logger: logger,
 		cmd:    command,
 
-		cmdIPv4:  option.CmdV4,
-		cmdIPv6:  option.CmdV6,
+		cmdIPv4:  option.Cmd.IPv4,
+		cmdIPv6:  option.Cmd.IPv6,
 		exitCode: option.ExitCode,
 	}, nil
 }

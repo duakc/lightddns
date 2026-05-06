@@ -5,9 +5,9 @@ import (
 )
 
 type HTTPOption struct {
-	UseSystemProxy bool   `yaml:"use-system-proxy"`
-	HTTPProxy      string `yaml:"http-proxy"`
-	HTTPSProxy     string `yaml:"https-proxy"`
+	UseSystemProxy bool   `json:"useSystemProxy,omitempty" yaml:"useSystemProxy,omitempty"`
+	HTTPProxy      string `json:"httpProxy,omitempty"      yaml:"httpProxy,omitempty"`
+	HTTPSProxy     string `json:"httpsProxy,omitempty"     yaml:"httpsProxy,omitempty"`
 }
 
 func (ho HTTPOption) Options() ([]httpxx.HTTPClientOption, error) {

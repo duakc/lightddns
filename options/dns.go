@@ -16,9 +16,9 @@ import (
 )
 
 type DNSOption struct {
-	Type   string `yaml:"type"`
-	Server string `yaml:"server"`
-	Port   uint16 `yaml:"port"`
+	Type   string `json:"type"           yaml:"type"`
+	Server string `json:"server"         yaml:"server"`
+	Port   uint16 `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
 func (n *DNSOption) UnmarshalYAML(data []byte) error {

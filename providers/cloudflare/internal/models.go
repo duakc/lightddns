@@ -19,15 +19,19 @@ func (e *BaseError) Error() string {
 type MessageError struct {
 	BaseError
 
+	//nolint:tagliatelle
 	DocumentationUrl string `json:"documentation_url"`
 	// other doesn't needed fields are ignored
 }
 
 type ResultInfo struct {
-	Count      int `json:"count"`
-	Page       int `json:"page"`
-	PerPage    int `json:"per_page"`
+	Count int `json:"count"`
+	Page  int `json:"page"`
+	//nolint:tagliatelle
+	PerPage int `json:"per_page"`
+	//nolint:tagliatelle
 	TotalCount int `json:"total_count"`
+	//nolint:tagliatelle
 	TotalPages int `json:"total_pages"`
 }
 
@@ -57,7 +61,8 @@ type ResponseWithResult[T any] struct {
 type ResponseWithPage[T any] struct {
 	Response `json:",inline"`
 
-	Result     []T        `json:"result"`
+	Result []T `json:"result"`
+	//nolint:tagliatelle
 	ResultInfo ResultInfo `json:"result_info"`
 }
 
@@ -77,11 +82,12 @@ type DNSRecord struct {
 }
 
 type UpdateDNSRecordRequest struct {
-	Name           string `json:"name"`
-	Ttl            uint32 `json:"ttl"`
-	Type           string `json:"type"`
-	Comment        string `json:"comment"`
-	Content        string `json:"content"`
-	PrivateRouting bool   `json:"private_routing"`
-	Proxied        bool   `json:"proxied"`
+	Name    string `json:"name"`
+	Ttl     uint32 `json:"ttl"`
+	Type    string `json:"type"`
+	Comment string `json:"comment"`
+	Content string `json:"content"`
+	//nolint:tagliatelle
+	PrivateRouting bool `json:"private_routing"`
+	Proxied        bool `json:"proxied"`
 }

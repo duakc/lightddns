@@ -31,11 +31,11 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	}
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
-	dataSourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
+	datasourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
 
 	lookctx.StorePtr[zap.Logger](ctx, logger)
 	lookctx.Store[adapter.ProviderManager](ctx, providerManager)
-	lookctx.Store[adapter.DatasourceManager](ctx, dataSourceManager)
+	lookctx.Store[adapter.DatasourceManager](ctx, datasourceManager)
 
 	logger = logger.Named("main")
 	resortedDatasources, err := resortDatasources(opt.DataSources)
@@ -45,7 +45,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 
 	for i := 0; i < len(resortedDatasources); i++ {
 		datasourceOption := resortedDatasources[i]
-		if err := dataSourceManager.Create(ctx, datasourceOption.Type, datasourceOption.Option); err != nil {
+		if err := datasourceManager.Create(ctx, datasourceOption.Type, datasourceOption.Option); err != nil {
 			return nil, fmt.Errorf("create datasource `%s,type=%s` failed: %w",
 				datasourceOption.Name, datasourceOption.Type, err)
 		}
@@ -77,7 +77,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		logger:            logger,
 		domains:           domains,
 		providerManager:   providerManager,
-		datasourceManager: dataSourceManager,
+		datasourceManager: datasourceManager,
 	}
 
 	return ddns, nil

@@ -8,9 +8,9 @@ import (
 )
 
 type DatasourceOption struct {
-	AbstractDatasourceOption `yaml:",inline"`
+	AbstractDatasourceOption
 
-	Option any `yaml:"-"`
+	Option any `json:"-" yaml:"-"`
 }
 
 type _DatasourceOption DatasourceOption
@@ -28,6 +28,10 @@ func (O *DatasourceOption) UnmarshalYAML(bs []byte) error {
 }
 
 type AbstractDatasourceOption struct {
-	Type string `yaml:"type"`
-	Name string `yaml:"name"`
+	Type string `json:"type" yaml:"type"`
+	Name string `json:"name" yaml:"name"`
+}
+
+func (AbstractDatasourceOption) UsedType() string {
+	return "abstract_datasource"
 }

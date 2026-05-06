@@ -26,8 +26,8 @@ linters:
     tagliatelle:
       case:
         rules:
-          json: snake
-          yaml: kebab
+          json: camel
+          yaml: camel
     depguard:
       rules:
         main:

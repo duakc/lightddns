@@ -74,6 +74,8 @@ func (s *Sum) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (s *Sum) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, error) {
+	// TODO: here needs some optimization
+
 	logger := s.logger
 	ips, err := adapter.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
 	if err != nil && s.fastFail {

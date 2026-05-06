@@ -18,6 +18,7 @@ type StructDocument struct {
 
 func (o *StructDocument) FromTokenName(name string, token *Tokenizer) error {
 	switch name {
+	case "":
 	case "@Shared":
 		o.Shared = true
 	default:

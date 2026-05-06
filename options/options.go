@@ -1,8 +1,12 @@
 package options
 
 type Options struct {
-	Log         LogOption          `yaml:"log"`
-	DataSources []DatasourceOption `yaml:"datasource"`
-	Providers   []ProviderOption   `yaml:"provider"`
-	Domains     []DomainOption     `yaml:"domain"`
+	Log         LogOption          `json:"log,omitempty" yaml:"log,omitempty"`
+	DataSources []DatasourceOption `json:"datasources"   yaml:"datasources"`
+	Providers   []ProviderOption   `json:"providers"     yaml:"providers"`
+	Domains     []DomainOption     `json:"domains"       yaml:"domains"`
+}
+
+type VariantOption interface {
+	UsedType() string
 }

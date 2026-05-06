@@ -8,9 +8,9 @@ import (
 )
 
 type ProviderOption struct {
-	AbstractProviderOption `yaml:",inline"`
+	AbstractProviderOption
 
-	Option any `yaml:"-"`
+	Option any `json:"-" yaml:"-"`
 }
 
 type _ProviderOption ProviderOption
@@ -28,6 +28,10 @@ func (O *ProviderOption) UnmarshalYAML(bs []byte) error {
 }
 
 type AbstractProviderOption struct {
-	Type string `yaml:"type"`
-	Name string `yaml:"name"`
+	Type string `json:"type" yaml:"type"`
+	Name string `json:"name" yaml:"name"`
+}
+
+func (AbstractProviderOption) UsedType() string {
+	return "abstract_provider"
 }

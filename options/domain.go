@@ -5,14 +5,16 @@ import (
 )
 
 type DomainOption struct {
-	Enabled    bool   `yaml:"enabled"`
-	TTL        uint32 `yaml:"ttl"`
-	IPv4       bool   `yaml:"ipv4"`
-	IPv6       bool   `yaml:"ipv6"`
-	Provider   string `yaml:"provider"`
-	DataSource string `yaml:"datasource"`
+	Domain badyaml.DomainName `json:"domain" yaml:"domain"`
 
-	Domain   badyaml.DomainName `yaml:"domain"`
-	Interval badyaml.Duration   `yaml:"interval"`
-	Timeout  badyaml.Duration   `yaml:"timeout"`
+	Enabled    bool   `json:"enabled"    yaml:"enabled"`
+	Provider   string `json:"provider"   yaml:"provider"`
+	DataSource string `json:"datasource" yaml:"datasource"`
+
+	TTL  uint32 `json:"ttl,omitempty"  yaml:"ttl,omitempty"`
+	IPv4 bool   `json:"ipv4,omitempty" yaml:"ipv4,omitempty"`
+	IPv6 bool   `json:"ipv6,omitempty" yaml:"ipv6,omitempty"`
+
+	Interval badyaml.Duration `json:"interval,omitempty" yaml:"interval,omitempty"`
+	Timeout  badyaml.Duration `json:"timeout,omitempty"  yaml:"timeout,omitempty"`
 }

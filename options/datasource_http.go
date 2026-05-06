@@ -1,21 +1,29 @@
 package options
 
-import "github.com/duakc/lightddns/infra/badyaml"
+import (
+	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/badyaml"
+)
 
-type matchV4OrV6 struct {
-	V4 string `yaml:"v4"`
-	V6 string `yaml:"v6"`
+type DualStack[T any] struct {
+	IPv4 T `json:"ipv4" yaml:"ipv4"`
+	IPv6 T `json:"ipv6" yaml:"ipv6"`
 }
 
 type HTTPDatasourceOption struct {
-	AbstractDatasourceOption `yaml:",inline"`
-	ConnectOption            `yaml:",inline"`
-	HTTPOption               `yaml:",inline"`
+	AbstractDatasourceOption
+	ConnectOption
+	HTTPOption
 
-	MatchJson  badyaml.StringOrObject[matchV4OrV6] `yaml:"match-json"`
-	MatchRegex badyaml.StringOrObject[matchV4OrV6] `yaml:"match-regex4"`
+	Url badyaml.URL `json:"url" yaml:"url"`
 
-	Url     badyaml.URL        `yaml:"url"`
-	Method  badyaml.HTTPMethod `yaml:"method"`
-	Headers badyaml.HTTPHeader `yaml:"headers"`
+	MatchJson  badyaml.StringOrObject[DualStack[string]] `json:"matchJson,omitempty"  yaml:"matchJson,omitempty"`
+	MatchRegex badyaml.StringOrObject[DualStack[string]] `json:"matchRegex,omitempty" yaml:"matchRegex,omitempty"`
+
+	Method  badyaml.HTTPMethod `json:"method,omitempty"  yaml:"method,omitempty"`
+	Headers badyaml.HTTPHeader `json:"headers,omitempty" yaml:"headers,omitempty"`
+}
+
+func (HTTPDatasourceOption) UsedType() string {
+	return constpkg.DatasourceTypeHTTP
 }

@@ -81,8 +81,8 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
 		v4, err = newRequestContext(string(option.Method), option.Url.Raw,
 			option.Headers.Header, httpClient,
-			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V4),
-			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V4))
+			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.IPv4),
+			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.IPv4))
 		if err != nil {
 			return nil, err
 		}
@@ -93,8 +93,8 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
 		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
 			option.Headers.Header, httpClient,
-			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.V6),
-			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.V6))
+			cmp.Or(option.MatchJson.Str, option.MatchJson.Obj.IPv6),
+			cmp.Or(option.MatchRegex.Str, option.MatchRegex.Obj.IPv6))
 		if err != nil {
 			return nil, err
 		}

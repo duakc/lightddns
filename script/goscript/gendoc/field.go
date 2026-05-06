@@ -5,6 +5,8 @@ import (
 	goast "go/ast"
 	"reflect"
 	"strings"
+
+	"github.com/duakc/lightddns/script/goscript/gendoc/jsonschema"
 )
 
 type FieldDocument struct {
@@ -12,11 +14,10 @@ type FieldDocument struct {
 
 	Ast *goast.Field
 
-	YAML string
-
-	Required bool
+	YAML     *jsonschema.FieldTagInfo
 	Values   []string
 	Platform []string
+	Shared   bool
 }
 
 func NewField(ast *goast.Field) (*FieldDocument, error) {
@@ -26,7 +27,10 @@ func NewField(ast *goast.Field) (*FieldDocument, error) {
 	o.Lang = make(map[LangCode]string)
 	if ast.Tag != nil {
 		structTag := reflect.StructTag(strings.Trim(ast.Tag.Value, "`"))
-		o.YAML = structTag.Get("yaml")
+		yamlInfo := structTag.Get("yaml")
+		info := &jsonschema.FieldTagInfo{Name: o.Name}
+		info.NewTag(yamlInfo)
+		o.YAML = info
 	}
 	err := o.FromComment(ast.Doc, o)
 	if err != nil {
@@ -35,11 +39,18 @@ func NewField(ast *goast.Field) (*FieldDocument, error) {
 	return o, nil
 }
 
+func (o *FieldDocument) Required() bool {
+	if o.YAML == nil || o.YAML.Omit || o.Shared {
+		return false
+	}
+	return !o.YAML.Settings["omitempty"] && !o.YAML.Settings["omitzero"]
+}
+
 func (o *FieldDocument) FromTokenName(name string, t *Tokenizer) error {
 	switch name {
 	case "":
-	case "@Required":
-		o.Required = true
+	case "@Shared":
+		o.Shared = true
 	case "@Values":
 		t.NextMeta()
 		o.Values = docArray(t.FragmentText())

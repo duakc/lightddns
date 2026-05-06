@@ -1,7 +1,13 @@
 package options
 
-type DatasourceGroupSumOption struct {
-	AbstractDatasourceGroupOption `yaml:",inline"`
+import constpkg "github.com/duakc/lightddns/constant"
 
-	IgnoreDownstreamError bool `yaml:"ignore-downstream-error"`
+type DatasourceGroupSumOption struct {
+	AbstractDatasourceGroupOption
+
+	IgnoreDownstreamError bool `json:"ignoreDownstreamError,omitempty" yaml:"ignoreDownstreamError,omitempty"`
+}
+
+func (DatasourceGroupSumOption) UsedType() string {
+	return constpkg.DatasourceGroupTypeSum
 }

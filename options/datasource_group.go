@@ -5,11 +5,15 @@ type DatasourceIsGroup interface {
 }
 
 type AbstractDatasourceGroupOption struct {
-	AbstractDatasourceOption `yaml:",inline"`
+	AbstractDatasourceOption
 
-	Datasources []string `yaml:"datasources"`
+	Datasources []string `json:"datasources" yaml:"datasources"`
 }
 
 func (x AbstractDatasourceGroupOption) Group() []string {
 	return x.Datasources
+}
+
+func (AbstractDatasourceGroupOption) UsedType() string {
+	return "abstract_datasource_group"
 }

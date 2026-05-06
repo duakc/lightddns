@@ -1,10 +1,16 @@
 package options
 
-type CloudflareProviderOption struct {
-	AbstractProviderOption `yaml:",inline"`
-	ConnectOption          `yaml:",inline"`
-	HTTPOption             `yaml:",inline"`
+import constpkg "github.com/duakc/lightddns/constant"
 
-	Token string `yaml:"token"`
-	Proxy bool   `yaml:"proxy"`
+type CloudflareProviderOption struct {
+	AbstractProviderOption
+	ConnectOption
+	HTTPOption
+
+	Token string `json:"token"           yaml:"token"`
+	Proxy bool   `json:"proxy,omitempty" yaml:"proxy,omitempty"`
+}
+
+func (CloudflareProviderOption) UsedType() string {
+	return constpkg.ProviderTypeCloudflare
 }

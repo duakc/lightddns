@@ -52,14 +52,14 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	}
 
 	logger := lookctx.LookupPtr[zap.Logger](ctx).Named(string(opt.Domain))
-	dataSourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
+	datasourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
 	providerManager := lookctx.Lookup[adapter.ProviderManager](ctx)
 
 	provider, found := providerManager.Lookup(opt.Provider)
 	if !found {
 		return nil, &providerpkg.ProviderNotFoundError{Name: opt.Provider}
 	}
-	datasource, found := dataSourceManager.Lookup(opt.DataSource)
+	datasource, found := datasourceManager.Lookup(opt.DataSource)
 	if !found {
 		return nil, &datasourcepkg.DatasourceNotFoundError{Name: opt.DataSource}
 	}

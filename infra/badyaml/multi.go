@@ -28,6 +28,10 @@ type StringOrObject[T any] struct {
 	Obj T
 }
 
+func (s *StringOrObject[T]) IsString() bool {
+	return len(s.Str) > 0
+}
+
 func (s *StringOrObject[T]) UnmarshalYAML(data []byte) error {
 	if err := Unmarshal(data, &s.Obj); err == nil {
 		return nil

@@ -1,0 +1,1 @@
+Source: https://github.com/google/jsonschema-go/tree/main/jsonschema

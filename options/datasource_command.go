@@ -1,16 +1,21 @@
 package options
 
-import "github.com/duakc/lightddns/infra/badyaml"
+import (
+	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/badyaml"
+)
 
 type CommandDatasourceOption struct {
-	AbstractDatasourceOption `yaml:",inline"`
+	AbstractDatasourceOption
 
-	// CmdV4 and CmdV6 is a shell command: support pipe, redirector and so on
-	// It use the current system shell to execute the command
-	CmdV4    string `yaml:"cmd-v4"`
-	CmdV6    string `yaml:"cmd-v6"`
-	Shell    string `yaml:"shell"`
-	ExitCode int    `yaml:"exit-code"`
+	Cmd DualStack[string] `json:"cmd" yaml:"cmd"`
 
-	Env badyaml.EnvironmentVariable `yaml:"env"`
+	Shell    string `json:"shell,omitempty"    yaml:"shell,omitempty"`
+	ExitCode int    `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
+
+	Env badyaml.EnvironmentVariable `json:"env,omitempty" yaml:"env,omitempty"`
+}
+
+func (CommandDatasourceOption) UsedType() string {
+	return constpkg.DatasourceTypeCommand
 }

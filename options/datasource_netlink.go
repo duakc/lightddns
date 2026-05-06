@@ -1,9 +1,15 @@
 package options
 
-type NetlinkDatasourceOption struct {
-	AbstractDatasourceOption `yaml:",inline"`
+import constpkg "github.com/duakc/lightddns/constant"
 
-	Interface    string `yaml:"interface"`
-	Index        int    `yaml:"index"`
-	AllowPrivate bool   `yaml:"allow-private"`
+type NetlinkDatasourceOption struct {
+	AbstractDatasourceOption
+
+	Name         string `json:"name,omitempty"         yaml:"name,omitempty"`
+	Index        int    `json:"index,omitempty"        yaml:"index,omitempty"`
+	AllowPrivate bool   `json:"allowPrivate,omitempty" yaml:"allowPrivate,omitempty"`
+}
+
+func (NetlinkDatasourceOption) UsedType() string {
+	return constpkg.DatasourceTypeNetlink
 }
