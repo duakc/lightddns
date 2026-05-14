@@ -2,8 +2,10 @@ package genschema
 
 import (
 	"reflect"
+	"slices"
 	"sync"
 
+	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/options"
@@ -68,27 +70,38 @@ func GenSchema() ([]byte, error) {
 }
 
 func providerSchema() *jsonschema.Schema {
-	rootSchema := &jsonschema.Schema{Type: JSONTypeArray, Items: &jsonschema.Schema{}}
-	schemaAddVariant[options.CloudflareProviderOption](rootSchema)
-	return rootSchema
+	return schemaFromRegistry(adapter.ProviderRegister)
 }
 
 func datasourceSchema() *jsonschema.Schema {
-	rootSchema := &jsonschema.Schema{Type: JSONTypeArray, Items: &jsonschema.Schema{}}
-	schemaAddVariant[options.CommandDatasourceOption](rootSchema)
-	schemaAddVariant[options.NetlinkDatasourceOption](rootSchema)
-	schemaAddVariant[options.HTTPDatasourceOption](rootSchema)
-	schemaAddVariant[options.DatasourceGroupSumOption](rootSchema)
-	schemaAddVariant[options.DatasourceGroupFailoverOption](rootSchema)
-	return rootSchema
+	return schemaFromRegistry(adapter.DatasourceRegister)
 }
 
-func schemaAddVariant[T options.VariantOption](rootSchema *jsonschema.Schema) {
+type schemaRegistry interface {
+	Types() []string
+	CreateOption(typ string) (any, error)
+}
+
+func schemaFromRegistry(reg schemaRegistry) *jsonschema.Schema {
 	const typeTag = "type"
 
-	variantOptionSchema := mustFor[T]()
-	variantOptionSchema.Properties[typeTag].Const = new(any(mt.Zero[T]().UsedType()))
-	rootSchema.Items.AnyOf = append(rootSchema.Items.AnyOf, variantOptionSchema)
+	types := reg.Types()
+	slices.Sort(types)
+
+	rootSchema := &jsonschema.Schema{Type: JSONTypeArray, Items: &jsonschema.Schema{}}
+	for _, typ := range types {
+		opt, err := reg.CreateOption(typ)
+		if err != nil {
+			continue
+		}
+		optType := reflect.TypeOf(opt).Elem()
+		variantSchema := mt.Must(jsonschema.ForType(optType, &jsonschema.ForOptions{
+			TypeSchemas: optionsTypeMapping(),
+		}))
+		variantSchema.Properties[typeTag].Const = new(any(typ))
+		rootSchema.Items.AnyOf = append(rootSchema.Items.AnyOf, variantSchema)
+	}
+	return rootSchema
 }
 
 func mustFor[T any]() *jsonschema.Schema {

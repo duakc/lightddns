@@ -36,8 +36,8 @@ func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.D
 			option.AbstractDatasourceOption,
 		),
 		interfaceFinder: control.NewDefaultInterfaceFinder(),
-		interfaceName:   option.Name,
-		interfaceIndex:  option.Index,
+		interfaceName:   option.IfName,
+		interfaceIndex:  option.IfIndex,
 		allowPrivate:    option.AllowPrivate,
 	}, nil
 }

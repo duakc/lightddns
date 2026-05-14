@@ -5,8 +5,8 @@ import constpkg "github.com/duakc/lightddns/constant"
 type NetlinkDatasourceOption struct {
 	AbstractDatasourceOption
 
-	Name         string `json:"name,omitempty"         yaml:"name,omitempty"`
-	Index        int    `json:"index,omitempty"        yaml:"index,omitempty"`
+	IfName       string `json:"ifName,omitempty"       yaml:"ifName,omitempty"`
+	IfIndex      int    `json:"ifIndex,omitempty"      yaml:"ifIndex,omitempty"`
 	AllowPrivate bool   `json:"allowPrivate,omitempty" yaml:"allowPrivate,omitempty"`
 }
 
