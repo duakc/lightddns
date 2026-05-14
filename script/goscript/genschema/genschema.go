@@ -5,8 +5,9 @@ import (
 	"flag"
 	"os"
 
-	_ "github.com/duakc/lightddns"
+	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
+	_ "github.com/duakc/lightddns/providers"
 
 	"go.uber.org/zap"
 )

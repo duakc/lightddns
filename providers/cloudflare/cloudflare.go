@@ -16,7 +16,6 @@ import (
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
-	providerpkg "github.com/duakc/lightddns/providers"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
 	"github.com/duakc/mt"
@@ -34,7 +33,7 @@ func init() {
 
 func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.Provider, error) {
 	if option.Token == "" {
-		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, providerpkg.ErrRequireToken)
+		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, adapter.ErrRequireToken)
 	}
 	dialerOptions, err := option.ConnectOption.Options()
 	if err != nil {
@@ -53,9 +52,8 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 				mt.Must(option.DNS.NewTransport(ctx, connectDialer)))))
 
 	cf := &Cloudflare{
-		logger: providerpkg.NewLogger(
+		logger: option.AbstractProviderOption.CreateLogger(
 			lookctx.LookupPtr[zap.Logger](ctx),
-			option.AbstractProviderOption,
 		),
 		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),
 		zones:  new(generic.SyncMap[string, string]),

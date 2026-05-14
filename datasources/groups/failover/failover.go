@@ -8,7 +8,6 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
@@ -30,11 +29,10 @@ func init() {
 
 func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (adapter.Datasource, error) {
 	if len(option.Datasources) == 0 {
-		return nil, &datasourcepkg.EmptyGroupError{Type: DatasourceType, Name: option.Name}
+		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
-	logger := datasourcepkg.NewLogger(
-		lookctx.LookupPtr[zap.Logger](ctx),
-		option.AbstractDatasourceOption)
+	logger := option.AbstractDatasourceOption.CreateLogger(
+		lookctx.LookupPtr[zap.Logger](ctx))
 
 	var datasources []adapter.Datasource
 	manager := lookctx.Lookup[adapter.DatasourceManager](ctx)
@@ -43,7 +41,7 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 		if baseDatasource, found := manager.Lookup(name); found {
 			datasources = append(datasources, baseDatasource)
 		} else {
-			return nil, &datasourcepkg.DatasourceNotFoundError{Name: name}
+			return nil, &adapter.ManagedNotFoundError{Name: name}
 		}
 	}
 

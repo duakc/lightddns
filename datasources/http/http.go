@@ -14,7 +14,6 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
@@ -66,7 +65,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	}
 
 	var (
-		logger = datasourcepkg.NewLogger(lookctx.LookupPtr[zap.Logger](ctx), option.AbstractDatasourceOption)
+		logger = option.AbstractDatasourceOption.CreateLogger(lookctx.LookupPtr[zap.Logger](ctx))
 		v4, v6 *requestContext
 	)
 

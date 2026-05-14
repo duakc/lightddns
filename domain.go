@@ -8,10 +8,8 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/options"
-	providerpkg "github.com/duakc/lightddns/providers"
 
 	"github.com/duakc/mt"
 
@@ -57,11 +55,11 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 
 	provider, found := providerManager.Lookup(opt.Provider)
 	if !found {
-		return nil, &providerpkg.ProviderNotFoundError{Name: opt.Provider}
+		return nil, &adapter.ManagedNotFoundError{Name: opt.Provider}
 	}
 	datasource, found := datasourceManager.Lookup(opt.DataSource)
 	if !found {
-		return nil, &datasourcepkg.DatasourceNotFoundError{Name: opt.DataSource}
+		return nil, &adapter.ManagedNotFoundError{Name: opt.DataSource}
 	}
 
 	return &Domain{

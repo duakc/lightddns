@@ -6,7 +6,6 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/options"
 
@@ -25,12 +24,11 @@ func init() {
 
 func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.Datasource, error) {
 	if len(option.Datasources) == 0 {
-		return nil, &datasourcepkg.EmptyGroupError{Type: DatasourceType, Name: option.Name}
+		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	logger := datasourcepkg.NewLogger(
-		lookctx.LookupPtr[zap.Logger](ctx),
-		option.AbstractDatasourceOption)
+	logger := option.AbstractDatasourceOption.CreateLogger(
+		lookctx.LookupPtr[zap.Logger](ctx))
 
 	datasourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
 	var datasources []adapter.Datasource
@@ -40,7 +38,7 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 		if datasource, found := datasourceManager.Lookup(name); found {
 			datasources = append(datasources, datasource)
 		} else {
-			return nil, &datasourcepkg.DatasourceNotFoundError{Name: name}
+			return nil, &adapter.ManagedNotFoundError{Name: name}
 		}
 	}
 

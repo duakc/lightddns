@@ -8,7 +8,6 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	datasourcepkg "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool/control"
 	"github.com/duakc/lightddns/options"
@@ -31,9 +30,8 @@ func init() {
 func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.Datasource, error) {
 	return &Netlink{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		logger: datasourcepkg.NewLogger(
+		logger: option.AbstractDatasourceOption.CreateLogger(
 			lookctx.LookupPtr[zap.Logger](ctx),
-			option.AbstractDatasourceOption,
 		),
 		interfaceFinder: control.NewDefaultInterfaceFinder(),
 		interfaceName:   option.IfName,

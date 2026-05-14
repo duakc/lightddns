@@ -1,6 +1,10 @@
 package main
 
 import (
+	// registry
+	_ "github.com/duakc/lightddns/datasources"
+	_ "github.com/duakc/lightddns/providers"
+
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
 	"github.com/duakc/lightddns/infra/zaplog"
