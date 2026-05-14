@@ -3,9 +3,6 @@ package options
 import "github.com/duakc/lightddns/infra/badyaml"
 
 type LogOption struct {
-	// @Values trace,debug,info,warn,error,dpanic,panic,fatal
-	// @LANG.EN_US Set the log level.
-	// @LANG.ZH_CN 设置日志等级
 	Level badyaml.LogLevel `json:"level,omitempty" yaml:"level,omitempty"`
 
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`

@@ -24,7 +24,6 @@ func NewField(ast *goast.Field) (*FieldDocument, error) {
 	o := &FieldDocument{}
 	o.Ast = ast
 	o.Name = identNames(ast.Names)
-	o.Lang = make(map[LangCode]string)
 	if ast.Tag != nil {
 		structTag := reflect.StructTag(strings.Trim(ast.Tag.Value, "`"))
 		yamlInfo := structTag.Get("yaml")

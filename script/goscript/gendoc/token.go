@@ -49,6 +49,7 @@ func (t *Tokenizer) Reset() {
 	t.buf = nil
 	t.r, t.b = 0, 0
 	t.dirty = -1
+	t.ioErr = nil
 }
 
 func (t *Tokenizer) NextMeta() bool {

@@ -2,9 +2,7 @@ package gendoc
 
 import (
 	"errors"
-	"fmt"
 	goast "go/ast"
-	"maps"
 	"slices"
 	"strings"
 
@@ -18,8 +16,9 @@ type TokenNameHandler interface {
 }
 
 type BaseDocument struct {
-	Name string
-	Lang map[LangCode]string
+	Name    string
+	Lang    map[LangCode]string
+	hasLANG bool
 }
 
 func (o *BaseDocument) FromComment(comment *goast.CommentGroup,
@@ -29,32 +28,37 @@ func (o *BaseDocument) FromComment(comment *goast.CommentGroup,
 		return nil
 	}
 	o.Lang = make(map[LangCode]string)
-	return o.FromToken(NewTokenizerString(comment.Text()), tokenHandler)
+	err := o.FromToken(NewTokenizerString(comment.Text()), tokenHandler)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *BaseDocument) FromToken(token *Tokenizer,
 	tokenHandler TokenNameHandler,
 ) error {
-	lang := maps.Clone(LangMap)
 	for token.NextMeta() {
 		name := token.MetaName()
-		switch {
-		case strings.HasPrefix(name, "@LANG"):
-			code := LangDefault
-			if idx := strings.Index(name[len("@LANG"):], "."); idx >= 0 {
-				code = LangCode(name[len("@LANG")+1+idx:])
-			}
-			if _, ok := lang[string(code)]; !ok {
-				return fmt.Errorf("unregistered language or duplicated language declare")
-			}
+		switch name {
+		case "@LANG":
 
-			token.NextMeta()
-			langText := token.FragmentText()
-			if langText == "" {
-				return fmt.Errorf("%s: %w", name, ErrMissingMetaValue)
-			}
-			o.Lang[code] = langText
-			delete(lang, string(code))
+		//case strings.HasPrefix(name, "@LANG"):
+		//	code := LangDefault
+		//	if idx := strings.Index(name[len("@LANG"):], "."); idx >= 0 {
+		//		code = LangCode(name[len("@LANG")+1+idx:])
+		//	}
+		//	if _, ok := lang[string(code)]; !ok {
+		//		return fmt.Errorf("unregistered language or duplicated language declare")
+		//	}
+		//
+		//	token.NextMeta()
+		//	langText := token.FragmentText()
+		//	if langText == "" {
+		//		return fmt.Errorf("%s: %w", name, ErrMissingMetaValue)
+		//	}
+		//	o.Lang[code] = langText
+		//	delete(lang, string(code))
 		default:
 			if err := tokenHandler.FromTokenName(name, token); err != nil {
 				return err

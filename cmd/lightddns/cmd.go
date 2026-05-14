@@ -1,13 +1,12 @@
 package main
 
 import (
-	// registry
-	_ "github.com/duakc/lightddns/datasources"
-	_ "github.com/duakc/lightddns/providers"
-
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
+	// registry
+	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
+	_ "github.com/duakc/lightddns/providers"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

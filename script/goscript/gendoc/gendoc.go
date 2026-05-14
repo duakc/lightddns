@@ -12,6 +12,8 @@ import (
 	gopackage "golang.org/x/tools/go/packages"
 )
 
+const I18nFileName = "i18n.yaml"
+
 const WorkDirectory = "../../"
 
 var RegisteredOption = map[string]struct{}{
@@ -53,7 +55,10 @@ var (
 	}
 )
 
+// Run
+// Deprecated: generate a doc is meaning less
 func Run(ctx context.Context) {
+
 	packageLoaded, err := gopackage.Load(goPackageConfigReplaceContext(ctx))
 	if err != nil {
 		Logger.Fatalf("Load Package: %s", err.Error())
@@ -61,8 +66,14 @@ func Run(ctx context.Context) {
 	structs := make([]*StructDocument, 0, len(RegisteredOption))
 	for i := 0; i < len(packageLoaded); i++ {
 		pkg := packageLoaded[i]
-		for i := 0; i < len(pkg.Syntax); i++ {
-			structs = append(structs, handleFiles(pkg.Syntax[i])...)
+		if len(pkg.Errors) > 0 {
+			for _, e := range pkg.Errors {
+				Logger.Errorf("package %s: %s", pkg.PkgPath, e)
+			}
+			continue
+		}
+		for j := 0; j < len(pkg.Syntax); j++ {
+			structs = append(structs, handleFiles(pkg.Syntax[j])...)
 		}
 	}
 }
