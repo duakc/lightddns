@@ -58,7 +58,6 @@ var (
 // Run
 // Deprecated: generate a doc is meaning less
 func Run(ctx context.Context) {
-
 	packageLoaded, err := gopackage.Load(goPackageConfigReplaceContext(ctx))
 	if err != nil {
 		Logger.Fatalf("Load Package: %s", err.Error())

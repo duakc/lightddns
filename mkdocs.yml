@@ -12,14 +12,14 @@ edit_uri: ""
 nav:
   - Home: index.md
   - Configuration:
-      - Options: configuration/Options.md
-      - Log: configuration/Log.md
-      - Domain: configuration/Domain.md
+      - Options: configuration/options.md
+      - Log: configuration/log.md
+      - Domain: configuration/domain.md
       - Datasources:
-          - HTTP: configuration/datasource/HTTP.md
+          - HTTP: configuration/datasource/http.md
       - Shared:
-          - ConnectOption: configuration/shared/Connect.md
-          - HTTPOption: configuration/shared/HTTP.md
+          - ConnectOption: configuration/shared/connect.md
+          - HTTPOption: configuration/shared/http.md
 theme:
   name: material
   features:

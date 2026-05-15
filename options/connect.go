@@ -12,9 +12,9 @@ import (
 type ConnectOption struct {
 	Fwmark uint `json:"fwmark,omitempty" yaml:"fwmark,omitempty"`
 
-	DNS DNSOption `json:"dns,omitempty" yaml:"dns,omitempty"`
-	BindAddress4 string `json:"bindAddress4,omitempty" yaml:"bindAddress4,omitempty"`
-	BindAddress6 string `json:"bindAddress6,omitempty" yaml:"bindAddress6,omitempty"`
+	DNS          DNSOption `json:"dns,omitempty"          yaml:"dns,omitempty"`
+	BindAddress4 string    `json:"bindAddress4,omitempty" yaml:"bindAddress4,omitempty"`
+	BindAddress6 string    `json:"bindAddress6,omitempty" yaml:"bindAddress6,omitempty"`
 
 	DialStrategy dialerx.DialStrategy `json:"dialStrategy,omitempty" yaml:"dialStrategy,omitempty"`
 

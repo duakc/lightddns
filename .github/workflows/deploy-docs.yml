@@ -2,8 +2,13 @@ name: Deploy Docs
 on:
   push:
     branches:
+      - stable
       - testing
       - test/docs
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "requirements.txt"
 jobs:
   deploy:
     name: Deploy MkDocs to ci/docs

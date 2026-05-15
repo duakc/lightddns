@@ -17,7 +17,7 @@ type HTTPDatasourceOption struct {
 
 	Url badyaml.URL `json:"url" yaml:"url"`
 
-	JSON  badyaml.StringOrObject[DualStack[string]] `json:"json,omitempty" yaml:"json,omitempty"`
+	JSON  badyaml.StringOrObject[DualStack[string]] `json:"json,omitempty"  yaml:"json,omitempty"`
 	Regex badyaml.StringOrObject[DualStack[string]] `json:"regex,omitempty" yaml:"regex,omitempty"`
 
 	Method  badyaml.HTTPMethod `json:"method,omitempty"  yaml:"method,omitempty"`
