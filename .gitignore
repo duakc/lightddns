@@ -19,7 +19,8 @@ go.work.sum
 
 # env file
 .env
-.envrc
+.venv/
+.direnv/
 
 # Editor/IDE
 .idea/
@@ -38,3 +39,4 @@ config.d/
 build/
 bin/
 .DS_Store/
+.cache/

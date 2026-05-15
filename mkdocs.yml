@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+
+site_name: Lightddns
+site_url: https://lightddns.duaky.com
+site_author: duakc
+repo_url: https://github.com/duakc/lightddns
+repo_name: duakc/lightddns
+copyright: Copyright &copy; 2022 duakc
+site_description: Lightweight DDNS(Dynamic DNS) Prog.
+remote_branch: docs
+edit_uri: ""
+nav:
+  - Home: index.md
+  - Configuration:
+      - Datasources:
+          - HTTP: configuration/datasource/http.md
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.sections
+    - navigation.path
+    - navigation.top
+    - navigation.prune
+    - search.suggest
+    - search.highlight
+  font:
+    text: Roboto
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      toggle:
+        icon: material/weather-night
+        name: Switch to system preference
+plugins:
+  - privacy
+  - search:
+      lang: en
+  - i18n:
+      reconfigure_material: true
+      reconfigure_search: true
+      fallback_to_default: true
+      docs_structure: folder
+      languages:
+        - locale: en
+          name: English
+          build: true
+          default: true
+        - locale: zh
+          name: 简体中文
+          build: true
+          default: false
+          nav_translations:
+            Home: Home
+            Configuration: 配置
+            Datasources: 数据源
+extra:
+  version:
+    provider: mike
+extra_css:
+  - stylesheets/extra.css
