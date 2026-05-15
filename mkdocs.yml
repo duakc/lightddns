@@ -12,13 +12,22 @@ edit_uri: ""
 nav:
   - Home: index.md
   - Configuration:
+      - Options: configuration/Options.md
+      - Log: configuration/Log.md
+      - Domain: configuration/Domain.md
       - Datasources:
-          - HTTP: configuration/datasource/http.md
+          - HTTP: configuration/datasource/HTTP.md
+      - Shared:
+          - ConnectOption: configuration/shared/Connect.md
+          - HTTPOption: configuration/shared/HTTP.md
 theme:
   name: material
   features:
-    - navigation.instant
-    - navigation.instant.progress
+#   mkdocs_static_i18n:
+#   mkdocs-material language switcher contextual link is not compatible with
+#   theme.features = navigation.instant
+#    - navigation.instant
+#    - navigation.instant.progress
     - navigation.tabs
     - navigation.sections
     - navigation.path
@@ -66,10 +75,17 @@ plugins:
           default: false
           nav_translations:
             Home: Home
+            Manual: 手册
             Configuration: 配置
+            Options: 配置文件
+            Log: 日志
+            Domain: 域名
             Datasources: 数据源
-extra:
-  version:
-    provider: mike
+            Providers: 服务提供方
+            Shared: 共享配置
 extra_css:
   - stylesheets/extra.css
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
