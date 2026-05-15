@@ -114,11 +114,11 @@ headers:
 
 ## 连接配置
 
-参见 [ConnectOption](../shared/Connect.md)。
+参见 [ConnectOption](../shared/connect.md)。
 
 ## HTTP 客户端配置
 
-参见 [HTTPOption](../shared/HTTP.md)。
+参见 [HTTPOption](../shared/http.md)。
 
 ---
 

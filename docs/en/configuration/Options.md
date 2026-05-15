@@ -25,7 +25,7 @@ log:
 
 A list of datasources. Each datasource discovers the current public IP address of the host.
 
-See [HTTP Datasource](datasource/HTTP.md).
+See [HTTP Datasource](datasource/http.md).
 
 ## `providers`
 
@@ -35,8 +35,8 @@ A list of Service Providers. Each provider pushes IP updates to the correspondin
 
 A list of domain records. Each entry binds a domain, provider, and datasource together for automatic DDNS updates.
 
-See [Domain](Domain.md).
+See [Domain](domain.md).
 
 ## `log`
 
-Global logging configuration. See [Log](Log.md).
+Global logging configuration. See [Log](log.md).

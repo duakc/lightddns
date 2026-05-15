@@ -10,11 +10,11 @@ datasources:
     # ... HTTP 数据源配置
 providers:
   - type: cloudflare
-    name: cf-primary
+    name: prov-cf
     # ... Cloudflare Provider 配置
 domains:
   - domain: example.com
-    provider: cf-primary
+    provider: prov-cf
     datasource: data-http
 
 log:
@@ -25,7 +25,7 @@ log:
 
 数据源列表。每个数据源负责获取当前主机的公网 IP 地址。
 
-参见 [HTTP 数据源](datasource/HTTP.md)。
+参见 [HTTP 数据源](datasource/http.md)。
 
 ## `providers`
 
@@ -35,8 +35,8 @@ log:
 
 域名记录列表。每个条目将域名、数据源和服务提供者绑定在一起，实现自动 DDNS 更新。
 
-参见 [域名](Domain.md)。
+参见 [域名](domain.md)。
 
 ## `log`
 
-全局日志配置。参见 [日志](Log.md)。
+全局日志配置。参见 [日志](log.md)。

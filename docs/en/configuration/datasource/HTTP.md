@@ -114,11 +114,11 @@ headers:
 
 ## Connection Options
 
-See [ConnectOption](../shared/Connect.md).
+See [ConnectOption](../shared/connect.md).
 
 ## HTTP Client Options
 
-See [HTTPOption](../shared/HTTP.md).
+See [HTTPOption](../shared/http.md).
 
 ---
 
