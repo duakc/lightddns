@@ -9,12 +9,12 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - "requirements.txt"
+      - "wrangler.toml"
+      - ".cloudflare/worker/**"
 jobs:
   deploy:
-    name: Deploy MkDocs to ci/docs
+    name: Deploy MkDocs to Cloudflare Workers
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,10 +24,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
-      - name: Deploy
-        run: make deploy-docs
+      - name: Build docs
+        run: make build-docs
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: "."

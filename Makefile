@@ -60,9 +60,17 @@ build-dev:
 build:
 	$(GO_BUILD)
 
-.PHONY: deploy-docs
-deploy-docs:
+.PHONY: build-docs
+build-docs:
 	@pip install -r requirements.txt
-	@mkdocs gh-deploy --force
+	@mkdocs build
+
+.PHONY: deploy-docs
+deploy-docs: build-docs
+	@npx wrangler deploy
+
+.PHONY: deploy-docs-pages
+deploy-docs-pages: build-docs
+	@npx wrangler pages deploy site/ --project-name lightddns-docs --commit-dirty=true
 
 
