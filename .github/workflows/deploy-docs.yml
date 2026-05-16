@@ -4,13 +4,13 @@ on:
     branches:
       - stable
       - testing
-      - test/docs
     paths:
       - "docs/**"
       - "mkdocs.yml"
       - "requirements.txt"
       - "wrangler.toml"
       - ".cloudflare/worker/**"
+      - ".github/workflows/deploy-docs.yml"
 jobs:
   deploy:
     name: Deploy MkDocs to Cloudflare Workers

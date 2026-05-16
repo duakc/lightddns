@@ -1,0 +1,8 @@
+name = "lightddns-docs"
+main = ".cloudflare/worker/index.ts"
+compatibility_date = "2026-05-16"
+workers_dev = false
+
+[assets]
+directory = "site"
+binding = "ASSETS"

@@ -5,7 +5,7 @@ import constpkg "github.com/duakc/lightddns/constant"
 type DatasourceGroupSumOption struct {
 	AbstractDatasourceGroupOption
 
-	IgnoreDownstreamError bool `json:"ignoreDownstreamError,omitempty" yaml:"ignoreDownstreamError,omitempty"`
+	FastFail bool `json:"fastFail,omitempty" yaml:"fastFail,omitempty"`
 }
 
 func (DatasourceGroupSumOption) UsedType() string {

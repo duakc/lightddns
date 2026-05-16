@@ -46,7 +46,7 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		logger:              logger,
 		datasources:         datasources,
-		fastFail:            !option.IgnoreDownstreamError,
+		fastFail:            option.FastFail,
 	}
 	return sum, nil
 }
@@ -80,9 +80,9 @@ func (s *Sum) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, error)
 		return nil, err
 	}
 	if err != nil {
-		logger.Warn("an error occurred with DatasourceGroupSumOption.IgnoreDownstreamError enabled",
+		logger.Warn("an error occurred with DatasourceGroupSumOption.Fastfail enabled",
 			zap.Error(err), zap.Int("len(ips)", len(ips)))
-		// even if the DatasourceGroupSumOption.IgnoreDownstreamError is enabled ,
+		// even if the DatasourceGroupSumOption.Fastfail is enabled ,
 		// but with empty ip list returned may case this domain unaccessible.
 		// so we must return an error here if len(ips) == 0.
 		if len(ips) != 0 {

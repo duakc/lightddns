@@ -65,12 +65,3 @@ build-docs:
 	@pip install -r requirements.txt
 	@mkdocs build
 
-.PHONY: deploy-docs
-deploy-docs: build-docs
-	@npx wrangler deploy
-
-.PHONY: deploy-docs-pages
-deploy-docs-pages: build-docs
-	@npx wrangler pages deploy site/ --project-name lightddns-docs --commit-dirty=true
-
-
