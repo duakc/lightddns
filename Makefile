@@ -60,3 +60,9 @@ build-dev:
 build:
 	$(GO_BUILD)
 
+.PHONY: deploy-docs
+deploy-docs:
+	@pip install -r requirements.txt
+	@mkdocs gh-deploy --force
+
+
