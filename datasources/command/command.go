@@ -14,12 +14,12 @@ import (
 	"github.com/duakc/lightddns/infra/filehelper"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
-	"github.com/duakc/mt/xtypes"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/sh"
+	"github.com/duakc/mt/xtypes"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

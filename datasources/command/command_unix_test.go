@@ -10,6 +10,7 @@ import (
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/sh"
+	"github.com/duakc/mt/xtypes"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -50,7 +51,9 @@ func TestRunCommand(t *testing.T) {
 		if cmd == nil {
 			cmd = sh.New().Deattach()
 		}
-		ip, err := runCommand(timeout, zaplog.NOP, cmd, cc.cmd, cc.exitCode)
+		ip, err := runCommand(timeout, zaplog.NOP, cmd, xtypes.Joined[string]{
+			Array: nil, Join: cc.cmd,
+		}, cc.exitCode, false)
 		cancel()
 
 		if cc.err == nil {

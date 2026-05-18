@@ -15,9 +15,9 @@ type CommandDatasourceOption struct {
 
 	Env badyaml.EnvironmentVariable `json:"env,omitempty" yaml:"env,omitempty"`
 
-	Stdin  string `json:"stdin,omitempty"    yaml:"stdin,omitempty"`
-	Stdout string `json:"stdout,omitempty"   yaml:"stdout,omitempty"`
-	Stderr string `json:"stderr,omitempty"   yaml:"stderr,omitempty"`
+	Stdin  string `json:"stdin,omitempty"  yaml:"stdin,omitempty"`
+	Stdout string `json:"stdout,omitempty" yaml:"stdout,omitempty"`
+	Stderr string `json:"stderr,omitempty" yaml:"stderr,omitempty"`
 }
 
 func (CommandDatasourceOption) UsedType() string {
