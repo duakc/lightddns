@@ -25,11 +25,21 @@ log:
 
 A list of datasources. Each datasource discovers the current public IP address of the host.
 
-See [HTTP Datasource](datasource/http.md).
+| Type | Description |
+|---|---|
+| [`http`](datasource/http.md) | Discover public IP via HTTP request. Supports JSON (jq) and regex extraction. |
+| [`netlink`](datasource/netlink.md) | Read IP addresses from local network interfaces. |
+| [`command`](datasource/command.md) | Run shell commands to discover IP addresses. |
+| [`sum`](datasource/sum.md) | Merge IPs from multiple child datasources. |
+| [`failover`](datasource/failover.md) | Query child datasources in priority order, failing over on error. |
 
 ## `providers`
 
 A list of Service Providers. Each provider pushes IP updates to the corresponding DNS service.
+
+| Type | Description |
+|---|---|
+| [`cloudflare`](provider/cloudflare.md) | Update DNS records via the Cloudflare API. Supports A/AAAA records and proxy mode. |
 
 ## `domains`
 

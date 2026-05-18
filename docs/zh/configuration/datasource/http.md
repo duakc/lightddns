@@ -1,8 +1,6 @@
-# HTTP 数据源
+# HTTP
 
-通过 HTTP(S) 请求获取本机公网 IP 地址。支持 JSON（jq）解析、正则提取，以及双栈网络（IPv4/IPv6）。
-
-## 配置示例
+通过 HTTP 请求获取本机公网 IP 地址。支持 JSON（jq）解析、正则提取，以及双栈网络（IPv4/IPv6）。
 
 ```yaml
 # required
@@ -10,6 +8,7 @@ type: http
 name: data-http
 url: https://api64.ipify.org?format=json
 
+# optional
 json:
   ipv4: ".ip"
   ipv6: ".ip"
@@ -20,11 +19,21 @@ method: GET
 headers:
   User-Agent: Lightddns/stable
 
-# ... ConnectOption 连接配置
-# ... HTTPOption HTTP 客户端配置
+# ... ConnectOption
+# ... HTTPOption
 ```
 
+??? note "行为说明"
+    HTTP 数据源根据 `dialStrategy` 分别创建 IPv4 和 IPv6 的请求上下文：
+
+    - 非 `ipv4_only` 模式创建 IPv6 上下文（`tcp6` 拨号）
+    - 非 `ipv6_only` 模式创建 IPv4 上下文（`tcp4` 拨号）
+
+    各自的 `json`/`regex` 表达式独立提取对应 IP，最终合并返回。
+
 ---
+
+[JQ表达式和Regex部分示例](../example/http.md)
 
 ## `url`
 
@@ -38,7 +47,7 @@ url: https://api.ip.sb/ip
 url: https://api64.ipify.org?format=json
 ```
 
-若 URL 主机部分是 IP 地址而非域名，`dialStrategy` 会自动覆盖为该 IP 对应的地址族（IPv4 → `ipv4_only`，IPv6 → `ipv6_only`）。
+若 URL 主机部分是 IP 地址而非域名，`dialStrategy` 会自动覆盖为该 IP 对应的版本（IPv4 → `ipv4_only`，IPv6 → `ipv6_only`）。
 
 ---
 
@@ -52,7 +61,7 @@ url: https://api64.ipify.org?format=json
 json: ".ip"
 ```
 
-**对象形式**（`DualStack<string>`）— 分别为 IPv4 和 IPv6 指定不同的 jq 表达式：
+**对象形式** — 单独为 IPv4 和 IPv6 指定不同的 jq 表达式：
 
 ```yaml
 json:
@@ -74,7 +83,7 @@ json:
 regex: "IP:\\s*(.+?)\\n"
 ```
 
-**对象形式**（`DualStack<string>`）— 分别为 IPv4 和 IPv6 指定不同的正则：
+**对象形式** — 单独为 IPv4 和 IPv6 指定不同的正则：
 
 ```yaml
 regex:
@@ -82,7 +91,7 @@ regex:
   ipv6: "IPv6:\\s*(.+?)\\n"
 ```
 
-正则使用 `FindAllSubmatch` 匹配，取**第一个捕获组**作为 IP 地址。
+取**匹配到的第一个**作为 IP 地址。
 
 !!! note "提取优先级"
     1. 若响应 `Content-Type` 为 `application/json` 且配置了 `json` → JSON（jq）提取
@@ -112,21 +121,10 @@ headers:
 
 ---
 
-## 连接配置
+## `ConnectOption`
 
 参见 [ConnectOption](../shared/connect.md)。
 
-## HTTP 客户端配置
+## `HTTPOption`
 
 参见 [HTTPOption](../shared/http.md)。
-
----
-
-## 双栈行为
-
-HTTP 数据源实现了 `DatasourceDualStack` 接口（同时提供 `IPv4()` 和 `IPv6()`），根据 `dialStrategy` 分别创建 IPv4 和 IPv6 的请求上下文：
-
-- 非 `ipv4_only` 模式 → 创建 IPv6 上下文（`tcp6` 拨号）
-- 非 `ipv6_only` 模式 → 创建 IPv4 上下文（`tcp4` 拨号）
-
-各自的 `json`/`regex` 表达式独立提取对应 IP，最终的 `IP()` 方法合并两者返回。

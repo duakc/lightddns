@@ -37,6 +37,8 @@ func (a AbstractManagedType) Name() string {
 type Manager[T managedType] interface {
 	Create(ctx context.Context, typ string, opt any) error
 	Lookup(name string) (T, bool)
+
+	All() []T
 }
 
 type DefaultManager[T managedType] struct {
@@ -85,4 +87,11 @@ func (M *DefaultManager[T]) Lookup(name string) (T, bool) {
 		return v, true
 	}
 	return mt.Zero[T](), false
+}
+
+func (M *DefaultManager[T]) All() []T {
+	M.access.RLock()
+	defer M.access.RUnlock()
+
+	return M.items
 }

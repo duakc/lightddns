@@ -9,9 +9,10 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/options"
+
 	"github.com/duakc/mt/debug"
+	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -45,12 +46,21 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		opt.IPv6 = true
 	}
 
+	logger := services.LookupPtr[zap.Logger](ctx).Named(string(opt.Domain))
+	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
+	providerManager := services.Lookup[adapter.ProviderManager](ctx)
+
 	updateInterval := cmp.Or(time.Duration(opt.Interval), constpkg.DefaultDomainUpdateInterval)
 	timeout := cmp.Or(time.Duration(opt.Timeout), constpkg.DefaultDomainTimeout)
 
-	logger := lookctx.LookupPtr[zap.Logger](ctx).Named(string(opt.Domain))
-	datasourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
-	providerManager := lookctx.Lookup[adapter.ProviderManager](ctx)
+	switch {
+	case timeout > updateInterval:
+		return nil, fmt.Errorf("timeout too long (%v > %v)", timeout, updateInterval)
+	case updateInterval < time.Second:
+		logger.Warn("update interval too short, consider to increase the update interval")
+	case timeout < time.Second:
+		logger.Warn("timeout too short, consider to increase the timeout")
+	}
 
 	provider, found := providerManager.Lookup(opt.Provider)
 	if !found {
@@ -84,8 +94,7 @@ func (o *Domain) UpdateOnce(ctx context.Context) error {
 		[]adapter.Datasource{o.datasource}, o.ipv4, o.ipv6, true)
 	if err != nil {
 		return err
-	}
-	if len(netips) == 0 {
+	} else if len(netips) == 0 {
 		if debug.Enabled {
 			return fmt.Errorf("no available IP address found")
 		}
@@ -93,6 +102,7 @@ func (o *Domain) UpdateOnce(ctx context.Context) error {
 		logger.Info("no available IP address found")
 		return nil
 	}
+
 	logger.Debug("found ip", zap.Stringers("ip", netips))
 
 	if err := o.provider.Update(ctx, o.domainName, o.ttl, netips); err != nil {
@@ -108,9 +118,11 @@ func (o *Domain) UpdateLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			if err := o.UpdateOnce(ctx); err != nil {
+			err := o.UpdateOnce(ctx)
+			if err != nil {
 				o.logger.Error("update failed", zap.Error(err))
 			}
+			ticker.Reset(o.updateInterval)
 		case <-ctx.Done():
 			o.logger.Warn("quited", zap.Error(ctx.Err()))
 			return

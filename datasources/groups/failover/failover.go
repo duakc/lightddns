@@ -8,11 +8,11 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -32,10 +32,10 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 	logger := option.AbstractDatasourceOption.CreateLogger(
-		lookctx.LookupPtr[zap.Logger](ctx))
+		services.LookupPtr[zap.Logger](ctx))
 
 	var datasources []adapter.Datasource
-	manager := lookctx.Lookup[adapter.DatasourceManager](ctx)
+	manager := services.Lookup[adapter.DatasourceManager](ctx)
 	for i := 0; i < len(option.Datasources); i++ {
 		name := option.Datasources[i]
 		if baseDatasource, found := manager.Lookup(name); found {

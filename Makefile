@@ -32,15 +32,16 @@ toolchain:
 
 .PHONY: fmt
 fmt:
-	@golangci-lint fmt
+	@golangci-lint fmt ./...
 
 .PHONY: lint
 lint: fmt
-	@golangci-lint run
+	@go vet ./...
+	@golangci-lint run ./...
 
 .PHONY: lint-fix
 lint-fix:
-	@golangci-lint run --fix
+	@golangci-lint run --fix ./...
 
 .PHONY: clean
 clean:

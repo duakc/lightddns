@@ -8,11 +8,11 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool/control"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -31,7 +31,7 @@ func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.D
 	return &Netlink{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		logger: option.AbstractDatasourceOption.CreateLogger(
-			lookctx.LookupPtr[zap.Logger](ctx),
+			services.LookupPtr[zap.Logger](ctx),
 		),
 		interfaceFinder: control.NewDefaultInterfaceFinder(),
 		interfaceName:   option.IfName,

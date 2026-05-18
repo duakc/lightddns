@@ -11,7 +11,7 @@ httpsProxy: ""
 
 ## `useSystemProxy`
 
-是否使用系统代理。若同时配置了 `httpProxy` 或 `httpsProxy`，此选项会被忽略。
+是否使用系统代理。若配置了 `httpProxy` 或 `httpsProxy`，此选项会被忽略。
 
 ## `httpProxy` / `httpsProxy`
 

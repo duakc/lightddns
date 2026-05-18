@@ -1,14 +1,15 @@
 # Domain
 
-Binds a domain name to a Service Provider and a datasource for automatic DNS updates.
+Binds a domain name to a Service Provider and a datasource.
 
 ```yaml
 # required
+enabled: true
 domain: example.com
-provider: cf-primary
+provider: prov-cf
 datasource: data-http
 
-enabled: true
+# optional
 ttl: 300
 ipv4: true
 ipv6: false
@@ -16,17 +17,17 @@ interval: 5m
 timeout: 30s
 ```
 
+## `enabled`
+
+Enables or disables this domain record.
+
 ## `domain`
 
-A fully-qualified domain name. Must be a valid domain name (RFC 1035, RFC 3696).
+A fully-qualified domain name. Must be a valid domain name per [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) and [RFC 3696](https://datatracker.ietf.org/doc/html/rfc3696).
 
 ```yaml
 domain: www.example.com
 ```
-
-## `enabled`
-
-Enables or disables this domain record. Disabled domains are skipped entirely.
 
 ## `provider`
 
@@ -35,12 +36,12 @@ References a Service Provider by its `name`. The provider handles the actual DNS
 ```yaml
 providers:
   - type: cloudflare
-    name: cf-primary
+    name: prov-cf
     # ...
 
 domains:
   - domain: example.com
-    provider: cf-primary  # references the provider above
+    provider: prov-cf
 ```
 
 ## `datasource`
@@ -55,34 +56,24 @@ datasources:
 
 domains:
   - domain: example.com
-    datasource: data-http  # references the datasource above
+    datasource: data-http
 ```
 
 ## `ttl`
 
-DNS record TTL in seconds. When unset, the Service Provider default is used.
+DNS record TTL in seconds. When unset, the provider default is used.
+
+!!! note
+    Setting TTL to 0 may result in a provider-specific default TTL.
 
 ```yaml
-ttl: 300  # 5 minutes
+ttl: 300
 ```
 
 ## `ipv4` / `ipv6`
 
-Control which IP address families to update for this domain. At least one must be enabled.
-
-```yaml
-# IPv4 only
-ipv4: true
-ipv6: false
-
-# IPv6 only
-ipv4: false
-ipv6: true
-
-# Dual-stack
-ipv4: true
-ipv6: true
-```
+Control which IP versions (IPv4 / IPv6) to update for this domain.
+When both are left unset, IPv4 and IPv6 are both enabled.
 
 ## `interval`
 

@@ -15,13 +15,13 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/httpxx"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/services"
 
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
@@ -65,7 +65,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	}
 
 	var (
-		logger = option.AbstractDatasourceOption.CreateLogger(lookctx.LookupPtr[zap.Logger](ctx))
+		logger = option.AbstractDatasourceOption.CreateLogger(services.LookupPtr[zap.Logger](ctx))
 		v4, v6 *requestContext
 	)
 

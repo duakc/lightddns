@@ -67,7 +67,7 @@ bindInterface: 1
 
 ## `dialStrategy`
 
-IP address family selection strategy.
+IP version (IPv4 / IPv6) selection strategy.
 
 - **`prefer_ipv6`** — Prefer IPv6, IPv4 enabled (default)
 - **`prefer_ipv4`** — Prefer IPv4, IPv6 enabled

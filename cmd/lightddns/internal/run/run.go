@@ -6,15 +6,16 @@ import (
 	"html/template"
 	"os"
 
+	"github.com/duakc/lightddns/cmd/lightddns/internal/gctx"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/gos"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/lightddns"
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/mtmap"
+	"github.com/duakc/mt/services"
 
 	goyaml "github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
@@ -54,7 +55,9 @@ func entry(cmd *cobra.Command, args []string) {
 		zaplog.Fatal("read config file failed", zap.String("file", arg.Config), zap.Error(err))
 		return
 	}
-	ctx := lookctx.NewRegistry(context.Background(), lookctx.NewDefaultRegistry())
+	ctx, cancel := gctx.Context()
+	defer cancel()
+
 	ddns, err := lightddns.New(ctx, arg.Options)
 	if err != nil {
 		zaplog.Fatal("initial instance failed", zap.Error(err))
@@ -73,7 +76,7 @@ func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) error {
 		return nil
 	}
 
-	return ddns.Start(ctx)
+	return ddns.Start(ctx, services.StageStart)
 }
 
 type configTemplateContext struct {

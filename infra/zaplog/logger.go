@@ -14,8 +14,6 @@ const (
 	EnvEnableStackTrace = "ZAP_STACK_TRACE"
 )
 
-type LoggerKey struct{}
-
 var NOP = zap.NewNop()
 
 func NewDefault(output io.Writer, level zapcore.LevelEnabler, options []zap.Option) *zap.Logger {

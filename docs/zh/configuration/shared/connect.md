@@ -67,7 +67,7 @@ bindInterface: 1
 
 ## `dialStrategy`
 
-IP 地址族选择策略。
+IP 版本（IPv4 / IPv6）选择策略。
 
 - **`prefer_ipv6`** — 优先使用 IPv6，同时启用 IPv4（默认）
 - **`prefer_ipv4`** — 优先使用 IPv4，同时启用 IPv6

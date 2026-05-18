@@ -5,18 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/netip"
-	"os"
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/lookctx"
+	"github.com/duakc/lightddns/infra/filehelper"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
+	"github.com/duakc/mt/xtypes"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
+	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/sh"
 
 	"go.uber.org/zap"
@@ -34,31 +36,63 @@ func init() {
 }
 
 func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.Datasource, error) {
-	logger := option.AbstractDatasourceOption.CreateLogger(lookctx.LookupPtr[zap.Logger](ctx))
-
+	logger := option.AbstractDatasourceOption.CreateLogger(services.LookupPtr[zap.Logger](ctx))
 	command := sh.New()
-	if option.Shell != "" {
+	command.Envs(option.Env.Values)
+
+	cc := &Command{
+		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
+
+		logger: logger,
+
+		cmdIPv4:  xtypes.NewJoinedString(option.Cmd.IPv4.Value, " "),
+		cmdIPv6:  xtypes.NewJoinedString(option.Cmd.IPv6.Value, " "),
+		exitCode: option.ExitCode,
+	}
+
+	if option.Shell == "none" {
+		cc.noShell = true
+	} else if option.Shell != "" {
 		shell, isShell := sh.ShellFromString(option.Shell)
 		if !isShell {
 			return nil, fmt.Errorf("unknown shell: %s", option.Shell)
 		}
-		command = sh.NewShell(shell)
+		command.Shell = shell
 	}
 
-	command.Deattach()
-	command.Stdin = os.Stdin
-	command.Envs(option.Env.Values)
+	if option.Stdin != "" {
+		stdin, err := filehelper.Open(option.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("open stdin: %w", err)
+		}
+		cc.closers = append(cc.closers, stdin)
+		command.Stdin = stdin
+	}
 
-	return &Command{
-		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
+	if option.Stdout != "" {
+		stdout, err := filehelper.Create(option.Stdout)
+		if err != nil {
+			return nil, fmt.Errorf("open stdout: %w", err)
+		}
+		cc.closers = append(cc.closers, stdout)
+		command.Stdout = stdout
+		if option.Stderr == "" {
+			// redirect stderr to the same stdout
+			command.Stderr = stdout
+		}
+	}
 
-		logger: logger,
-		cmd:    command,
+	if option.Stderr != "" {
+		stderr, err := filehelper.Create(option.Stderr)
+		if err != nil {
+			return nil, fmt.Errorf("open stderr: %w", err)
+		}
+		cc.closers = append(cc.closers, stderr)
+		command.Stderr = stderr
+	}
 
-		cmdIPv4:  option.Cmd.IPv4,
-		cmdIPv6:  option.Cmd.IPv6,
-		exitCode: option.ExitCode,
-	}, nil
+	cc.cmd = command
+	return cc, nil
 }
 
 type Command struct {
@@ -66,10 +100,14 @@ type Command struct {
 
 	logger *zap.Logger
 
-	cmd      *sh.Cmd
-	cmdIPv4  string
-	cmdIPv6  string
+	cmd     *sh.Cmd
+	cmdIPv4 xtypes.Joined[string]
+	cmdIPv6 xtypes.Joined[string]
+
 	exitCode int
+
+	closers []io.Closer
+	noShell bool
 }
 
 func (c *Command) IP(ctx context.Context) ([]netip.Addr, error) {
@@ -77,7 +115,7 @@ func (c *Command) IP(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {
-	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv4, c.exitCode)
+	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv4, c.exitCode, c.noShell)
 	if err != nil {
 		return nil, err
 	}
@@ -85,34 +123,47 @@ func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (c *Command) IPv6(ctx context.Context) ([]netip.Addr, error) {
-	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv6, c.exitCode)
+	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv6, c.exitCode, c.noShell)
 	if err != nil {
 		return nil, err
 	}
 	return netool.FilterAddress(ip, false, true), nil
 }
 
+func (c *Command) Close() error {
+	var err error
+	for _, closer := range c.closers {
+		err = errors.Join(err, closer.Close())
+	}
+	return err
+}
+
 func runCommand(ctx context.Context, logger *zap.Logger,
-	cmd *sh.Cmd, command string, exitCode int,
+	cmd *sh.Cmd, command xtypes.Joined[string], exitCode int, noShell bool,
 ) ([]netip.Addr, error) {
 	const maxOutputBufferSize = 1 << 16
 
-	if command == "" {
+	if command.Join == "" {
 		return []netip.Addr{}, nil
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	logger = logger.WithLazy(zap.String("command", command))
+	logger = logger.WithLazy(zap.String("command", command.Join))
 	buf := freebuf.New(maxOutputBufferSize)
 	defer buf.FreeMe()
 
 	runCmd := *cmd
-	runCmd.Stdout = buf
-	runCmd.Stderr = buf
+	runCmd.Stdout = io.MultiWriter(buf, runCmd.Stdout)
+	runCmd.Stderr = io.MultiWriter(buf, runCmd.Stderr)
 
 	logger.Debug("run", zap.String("shell", cmd.Shell.String()))
-	err := runCmd.RunContext(ctx, command)
+	var err error
+	if noShell {
+		err = runCmd.ExecCommand(ctx, command.Array[0], command.Array[1:]...).Run()
+	} else {
+		err = runCmd.RunContext(ctx, command.Join)
+	}
 	if err != nil {
 		shellErr, ok := errors.AsType[*sh.ShellError](err)
 		if !ok {

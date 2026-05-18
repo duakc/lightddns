@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/infra/generic"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+
+	"github.com/duakc/mt/services"
 
 	mDns "github.com/miekg/dns"
 	"go.uber.org/zap"
@@ -37,7 +38,7 @@ type TLSTransport struct {
 }
 
 func NewTLS(ctx context.Context, dialer dialerx.Dialer, server string, tlsConfig *tls.Config) (*TLSTransport, error) {
-	logger := lookctx.LookupPtr[zap.Logger](ctx)
+	logger := services.LookupPtr[zap.Logger](ctx)
 	return &TLSTransport{
 		logger:      logger.With(zap.String("dns_transport_type", "tls")),
 		dialer:      dialer,

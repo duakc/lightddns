@@ -5,6 +5,10 @@ github.com/duakc/mt v0.0.0-20260426105758-218061cc8f82 h1:XNEWi0Y3RiHsWNxiLzPMFG
 github.com/duakc/mt v0.0.0-20260426105758-218061cc8f82/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/mt v0.0.0-20260518071304-19bf4e4b1c7a h1:2psTywh8ce4YfgFHgrSe0TUSN+7Qz6hOCSaN+2oUXHY=
 github.com/duakc/mt v0.0.0-20260518071304-19bf4e4b1c7a/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260518120713-2cd10dca5ac8 h1:o+6MQlZPDmN/y9uDaYuyXy0sfyT0K1BQDWXl+9LO4I8=
+github.com/duakc/mt v0.0.0-20260518120713-2cd10dca5ac8/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260518131614-787dbe2be380 h1:NK5ZVWcuGi15BvaHobc+0zl8B/wnuY7JyXPjsC4Pfzw=
+github.com/duakc/mt v0.0.0-20260518131614-787dbe2be380/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/zap v0.0.0-20260409023011-7d65ec09a648 h1:nXKDz+iP5jLdtvvIuMThNdGLKVT0mb2llfDFTvO1cYM=
 github.com/duakc/zap v0.0.0-20260409023011-7d65ec09a648/go.mod h1:rDLpOi171uODNm/mxFcuYWxDsqWSAVkFdX4XojSKg/Q=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=

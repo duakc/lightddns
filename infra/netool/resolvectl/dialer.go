@@ -8,10 +8,11 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/internal"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+
+	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -58,7 +59,7 @@ func (r *ResolveDialer) DialContext(ctx context.Context, network string, address
 	} else if network == "udp6" || network == "tcp6" || network == "ip6" {
 		strategy = ResolveIPv6
 	}
-	resolver := lookctx.LookupDefault[ResolveClient](ctx, DefaultResolveClient)
+	resolver := services.LookupDefault[ResolveClient](ctx, DefaultResolveClient)
 	var addresses []netip.Addr
 	addresses, err = resolver.Lookup(ctx, r.transport, host, strategy)
 	if err != nil {
@@ -76,6 +77,6 @@ func (r *ResolveDialer) DialContext(ctx context.Context, network string, address
 }
 
 func NewDialer(ctx context.Context, dialer dialerx.Dialer, transport transports.Transport) *ResolveDialer {
-	logger := lookctx.LookupPtrDefault[zap.Logger](ctx, resolverLogger)
+	logger := services.LookupPtrDefault[zap.Logger](ctx, resolverLogger)
 	return &ResolveDialer{logger: logger, dialer: dialer, transport: transport}
 }

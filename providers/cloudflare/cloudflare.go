@@ -11,7 +11,6 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/httpxx"
-	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
@@ -19,6 +18,7 @@ import (
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -53,7 +53,7 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 
 	cf := &Cloudflare{
 		logger: option.AbstractProviderOption.CreateLogger(
-			lookctx.LookupPtr[zap.Logger](ctx),
+			services.LookupPtr[zap.Logger](ctx),
 		),
 		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),
 		zones:  new(generic.SyncMap[string, string]),
@@ -127,10 +127,10 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (string, e
 				zap.String("zone_name", zone.Name))
 			if zone.Name == domain {
 				zoneID = zone.ID
+				c.zones.Store(domain, zone.ID)
 			}
 
 			c.zones.Store(zone.Name, zone.ID)
-			c.zones.Store(domain, zone.ID)
 		}
 	}
 	if zoneID != "" {

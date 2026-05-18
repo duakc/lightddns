@@ -1,14 +1,15 @@
 # 域名
 
-将域名绑定到服务提供者和数据源，实现 DNS 记录的自动更新。
+将域名绑定到服务提供者和数据源。
 
 ```yaml
 # required
+enabled: true
 domain: example.com
-provider: cf-primary
+provider: prov-cf
 datasource: data-http
 
-enabled: true
+# optional
 ttl: 300
 ipv4: true
 ipv6: false
@@ -16,17 +17,17 @@ interval: 5m
 timeout: 30s
 ```
 
+## `enabled`
+
+是否启用该域名记录。
+
 ## `domain`
 
-完全限定域名。必须是符合 RFC 1035 和 RFC 3696 标准的有效域名。
+完全限定域名。必须是符合 [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) 和 [RFC 3696](https://datatracker.ietf.org/doc/html/rfc3696) 标准的有效域名。
 
 ```yaml
 domain: www.example.com
 ```
-
-## `enabled`
-
-是否启用该域名记录。禁用的域名会被完全跳过。
 
 ## `provider`
 
@@ -35,12 +36,12 @@ domain: www.example.com
 ```yaml
 providers:
   - type: cloudflare
-    name: cf-primary
+    name: prov-cf
     # ...
 
 domains:
   - domain: example.com
-    provider: cf-primary  # 引用上面定义的服务提供者
+    provider: prov-cf
 ```
 
 ## `datasource`
@@ -55,34 +56,25 @@ datasources:
 
 domains:
   - domain: example.com
-    datasource: data-http  # 引用上面定义的数据源
+    datasource: data-http 
 ```
 
 ## `ttl`
 
-DNS 记录的 TTL，单位秒。不设置时使用服务提供者默认值。
+DNS 记录的 TTL，单位秒。 不设置时使用 provider 默认值。
+
+!!! note
+    如果设置为0，根据不同的 provider 可能会有不同的默认TTL。
 
 ```yaml
-ttl: 300  # 5 分钟
+ttl: 300
 ```
 
 ## `ipv4` / `ipv6`
 
-控制该域名的 IP 地址族。至少需要启用一个。
+控制该域名的启用的网站栈。
+留空代表 `IPv4` 和 `IPv6` 同时启用。
 
-```yaml
-# 仅 IPv4
-ipv4: true
-ipv6: false
-
-# 仅 IPv6
-ipv4: false
-ipv6: true
-
-# 双栈
-ipv4: true
-ipv6: true
-```
 
 ## `interval`
 

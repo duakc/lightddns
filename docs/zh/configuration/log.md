@@ -3,16 +3,18 @@
 全局日志配置。
 
 ```yaml
-log:
-  level: info
-
-  disabled: false
-  output: ""
+level: info
+disabled: false
+output: ""
 ```
 
 ## `level`
 
-日志级别。使用 [zap](https://github.com/uber-go/zap) 日志级别：`debug | info | warn | error | dpanic | panic | fatal`。
+日志级别：
+
+可用值: `trace | debug | info | warn | error | dpanic | panic | fatal`。
+
+留空使用 `info`
 
 ## `disabled`
 

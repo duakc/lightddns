@@ -5,6 +5,7 @@ import (
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
 	// registry
 	_ "github.com/duakc/lightddns/datasources"
+	"github.com/duakc/lightddns/infra/filehelper"
 	"github.com/duakc/lightddns/infra/zaplog"
 	_ "github.com/duakc/lightddns/providers"
 
@@ -13,13 +14,22 @@ import (
 )
 
 var rootCommand = &cobra.Command{
-	Use: "lightddns",
+	Use:              "lightddns",
+	PersistentPreRun: preRun,
 }
 
+var workingDirectory string
+
 func init() {
+	rootCommand.Flags().StringVarP(&workingDirectory, "workdir", "D", ".", "working directory")
+
 	rootCommand.AddCommand(
 		run.Command,
 		version.Command)
+}
+
+func preRun(cmd *cobra.Command, args []string) {
+	filehelper.WorkingDir(workingDirectory)
 }
 
 func main() {

@@ -1,8 +1,6 @@
-# HTTP Datasource
+# HTTP
 
-Retrieves the public IP address via HTTP(S). Supports JSON (jq) extraction, regex extraction, and dual-stack networking (IPv4/IPv6).
-
-## Example
+Retrieves the public IP address via HTTP. Supports JSON (jq) extraction, regex extraction, and dual-stack networking (IPv4/IPv6).
 
 ```yaml
 # required
@@ -10,6 +8,7 @@ type: http
 name: data-http
 url: https://api64.ipify.org?format=json
 
+# optional
 json:
   ipv4: ".ip"
   ipv6: ".ip"
@@ -24,7 +23,17 @@ headers:
 # ... HTTPOption
 ```
 
+??? note "Behavior"
+    The HTTP datasource creates separate IPv4 and IPv6 request contexts based on `dialStrategy`:
+
+    - Non-`ipv4_only` mode creates an IPv6 context (`tcp6` dialer)
+    - Non-`ipv6_only` mode creates an IPv4 context (`tcp4` dialer)
+
+    Each context uses its own `json`/`regex` expression for IP extraction. The final result merges IPv4 and IPv6.
+
 ---
+
+[JQ and Regex Examples](../example/http.md)
 
 ## `url`
 
@@ -38,7 +47,7 @@ url: https://api.ip.sb/ip
 url: https://api64.ipify.org?format=json
 ```
 
-If the URL host is an IP address rather than a domain name, `dialStrategy` is automatically overridden to match the IP's address family (IPv4 → `ipv4_only`, IPv6 → `ipv6_only`).
+If the URL host is an IP address rather than a domain name, `dialStrategy` is automatically overridden to match the IP's version (IPv4 to `ipv4_only`, IPv6 to `ipv6_only`).
 
 ---
 
@@ -52,7 +61,7 @@ Extracts IP addresses from JSON responses using [jq](https://github.com/itchyny/
 json: ".ip"
 ```
 
-**Object form** (`DualStack<string>`) — separate jq expressions per address family:
+**Object form** — separate jq expressions for IPv4 and IPv6:
 
 ```yaml
 json:
@@ -74,7 +83,7 @@ Extracts IP addresses from non-JSON responses using a regular expression. At lea
 regex: "IP:\\s*(.+?)\\n"
 ```
 
-**Object form** (`DualStack<string>`) — separate regex per address family:
+**Object form** — separate regex for IPv4 and IPv6:
 
 ```yaml
 regex:
@@ -82,12 +91,12 @@ regex:
   ipv6: "IPv6:\\s*(.+?)\\n"
 ```
 
-Uses `FindAllSubmatch`; captures the **first group** as the IP address.
+Takes the **first match** as the IP address.
 
 !!! note "Extraction priority"
-    1. If `Content-Type` is `application/json` and `json` is set → JSON (jq) extraction
-    2. If `regex` is set → regex extraction
-    3. Otherwise → treat response body as plain-text IP
+    1. If `Content-Type` is `application/json` and `json` is set — JSON (jq) extraction
+    2. If `regex` is set — regex extraction
+    3. Otherwise — treat response body as plain-text IP
 
 ---
 
@@ -112,21 +121,10 @@ headers:
 
 ---
 
-## Connection Options
+## `ConnectOption`
 
 See [ConnectOption](../shared/connect.md).
 
-## HTTP Client Options
+## `HTTPOption`
 
 See [HTTPOption](../shared/http.md).
-
----
-
-## Dual-Stack Behavior
-
-The HTTP datasource implements the `DatasourceDualStack` interface (exposing both `IPv4()` and `IPv6()`). It creates separate IPv4 and IPv6 request contexts based on `dialStrategy`:
-
-- Non-`ipv4_only` mode → creates IPv6 context (`tcp6` dialer)
-- Non-`ipv6_only` mode → creates IPv4 context (`tcp4` dialer)
-
-Each context uses its own `json`/`regex` expression for IP extraction. The `IP()` method merges both results.
