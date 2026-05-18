@@ -16,16 +16,16 @@ type ProviderOption struct {
 
 type _ProviderOption ProviderOption
 
-func (O *ProviderOption) UnmarshalYAML(bs []byte) error {
-	err := badyaml.Unmarshal(bs, (*_ProviderOption)(O))
+func (po *ProviderOption) UnmarshalYAML(bs []byte) error {
+	err := badyaml.Unmarshal(bs, (*_ProviderOption)(po))
 	if err != nil {
 		return err
 	}
-	O.Option, err = adapter.ProviderRegister.CreateOption(O.Type)
+	po.Option, err = adapter.ProviderRegister.CreateOption(po.Type)
 	if err != nil {
 		return err
 	}
-	return goyaml.Unmarshal(bs, O.Option)
+	return goyaml.Unmarshal(bs, po.Option)
 }
 
 type AbstractProviderOption struct {

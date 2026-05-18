@@ -15,7 +15,7 @@ type HTTPDatasourceOption struct {
 	ConnectOption
 	HTTPOption
 
-	Url badyaml.URL `json:"url" yaml:"url"`
+	URL badyaml.URL `json:"url" yaml:"url"`
 
 	JSON  badyaml.StringOrObject[DualStack[string]] `json:"json,omitempty"  yaml:"json,omitempty"`
 	Regex badyaml.StringOrObject[DualStack[string]] `json:"regex,omitempty" yaml:"regex,omitempty"`

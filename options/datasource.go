@@ -16,16 +16,16 @@ type DatasourceOption struct {
 
 type _DatasourceOption DatasourceOption
 
-func (O *DatasourceOption) UnmarshalYAML(bs []byte) error {
-	err := badyaml.Unmarshal(bs, (*_DatasourceOption)(O))
+func (do *DatasourceOption) UnmarshalYAML(bs []byte) error {
+	err := badyaml.Unmarshal(bs, (*_DatasourceOption)(do))
 	if err != nil {
 		return err
 	}
-	O.Option, err = adapter.DatasourceRegister.CreateOption(O.Type)
+	do.Option, err = adapter.DatasourceRegister.CreateOption(do.Type)
 	if err != nil {
 		return err
 	}
-	return goyaml.Unmarshal(bs, O.Option)
+	return goyaml.Unmarshal(bs, do.Option)
 }
 
 type AbstractDatasourceOption struct {

@@ -5,7 +5,7 @@ site_url: https://lightddns.duaky.com
 site_author: duakc
 repo_url: https://github.com/duakc/lightddns
 repo_name: duakc/lightddns
-copyright: Copyright &copy; 2022 duakc
+copyright: Copyright &copy; 2026 duakc
 site_description: Lightweight DDNS(Dynamic DNS) Prog.
 remote_branch: ci/docs
 edit_uri: ""

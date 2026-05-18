@@ -38,7 +38,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	lookctx.Store[adapter.DatasourceManager](ctx, datasourceManager)
 
 	logger = logger.Named("main")
-	resortedDatasources, err := resortDatasources(opt.DataSources)
+	resortedDatasources, err := resortDatasources(opt.Datasources)
 	if err != nil {
 		return nil, fmt.Errorf("resort: %w", err)
 	}
@@ -151,7 +151,7 @@ func resortDatasources(ds []options.DatasourceOption) ([]options.DatasourceOptio
 
 	deps := make(map[string][]string, len(ds))
 	for _, d := range ds {
-		if g, ok := d.Option.(options.DatasourceIsGroup); ok {
+		if g, ok := d.Option.(options.DatasourceGrouper); ok {
 			deps[d.Name] = g.Group()
 		}
 	}

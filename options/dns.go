@@ -31,17 +31,17 @@ func (n *DNSOption) UnmarshalYAML(data []byte) error {
 	if !strings.Contains(unquoted, "://") {
 		unquoted = "udp://" + unquoted
 	}
-	dnsUrl, err := urlpkg.Parse(unquoted)
+	dnsURL, err := urlpkg.Parse(unquoted)
 	if err != nil {
 		return fmt.Errorf("resolve DNSOption: %w", err)
 	}
-	switch dnsUrl.Scheme {
+	switch dnsURL.Scheme {
 	case transports.TransportTypeTLS:
 		n.Type = transports.TransportTypeTLS
-		n.Server = dnsUrl.Host
-		if dnsUrl.Port() == "" {
+		n.Server = dnsURL.Host
+		if dnsURL.Port() == "" {
 			n.Port = 853
-		} else if numPort, err := strconv.ParseUint(dnsUrl.Port(), 10, 16); err != nil {
+		} else if numPort, err := strconv.ParseUint(dnsURL.Port(), 10, 16); err != nil {
 			return fmt.Errorf("bad port: %w", err)
 		} else {
 			n.Port = uint16(numPort)

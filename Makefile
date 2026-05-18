@@ -44,7 +44,7 @@ lint-fix:
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_OUTPUT)
+	rm -rf $(BUILD_OUTPUT) site/ .cache/
 	go mod tidy
 	cd script/goscript && go mod tidy
 

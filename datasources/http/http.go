@@ -42,8 +42,8 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		option.Method = http.MethodGet
 	}
 	isDomainName := true
-	if !netool.IsDomainName(option.Url.URL.Host) {
-		ipAddress := option.Url.URL.Host
+	if !netool.IsDomainName(option.URL.URL.Host) {
+		ipAddress := option.URL.URL.Host
 		addr, err := netip.ParseAddr(ipAddress)
 		if err != nil {
 			return nil, fmt.Errorf("unknown address: %w: %w", err, dialerx.ErrNoAddressToDialer)
@@ -78,7 +78,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		// enable ipv4
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
-		v4, err = newRequestContext(string(option.Method), option.Url.Raw,
+		v4, err = newRequestContext(string(option.Method), option.URL.Raw,
 			option.Headers.Header, httpClient,
 			cmp.Or(option.JSON.Str, option.JSON.Obj.IPv4),
 			cmp.Or(option.Regex.Str, option.Regex.Obj.IPv4))
@@ -90,7 +90,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		// enable ipv6
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
-		v6, err = newRequestContext(string(option.Method), option.Url.Raw,
+		v6, err = newRequestContext(string(option.Method), option.URL.Raw,
 			option.Headers.Header, httpClient,
 			cmp.Or(option.JSON.Str, option.JSON.Obj.IPv6),
 			cmp.Or(option.Regex.Str, option.Regex.Obj.IPv6))

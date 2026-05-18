@@ -1,6 +1,6 @@
 package options
 
-type DatasourceIsGroup interface {
+type DatasourceGrouper interface {
 	Group() []string
 }
 

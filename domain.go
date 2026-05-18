@@ -33,7 +33,7 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, errDomainNotEnabled
 	}
-	if len(opt.DataSource) == 0 {
+	if len(opt.Datasource) == 0 {
 		return nil, fmt.Errorf("missing datasource")
 	}
 	if len(opt.Provider) == 0 {
@@ -57,9 +57,9 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	if !found {
 		return nil, &adapter.ManagedNotFoundError{Name: opt.Provider}
 	}
-	datasource, found := datasourceManager.Lookup(opt.DataSource)
+	datasource, found := datasourceManager.Lookup(opt.Datasource)
 	if !found {
-		return nil, &adapter.ManagedNotFoundError{Name: opt.DataSource}
+		return nil, &adapter.ManagedNotFoundError{Name: opt.Datasource}
 	}
 
 	return &Domain{
@@ -74,37 +74,37 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	}, nil
 }
 
-func (d *Domain) UpdateOnce(ctx context.Context) error {
-	ctx, cancel := mt.Timeout(ctx, d.updateInterval)
+func (o *Domain) UpdateOnce(ctx context.Context) error {
+	ctx, cancel := mt.Timeout(ctx, o.updateInterval)
 	defer cancel()
 
 	netips, err := adapter.MergeDatasources(ctx,
-		[]adapter.Datasource{d.datasource}, d.ipv4, d.ipv6, true)
+		[]adapter.Datasource{o.datasource}, o.ipv4, o.ipv6, true)
 	if err != nil {
 		return err
 	}
-	d.logger.Debug("found ip",
-		zap.String("domain", d.domainName),
+	o.logger.Debug("found ip",
+		zap.String("domain", o.domainName),
 		zap.Stringers("ip", netips))
 
-	if err := d.provider.Update(ctx, d.domainName, d.ttl, netips); err != nil {
-		return fmt.Errorf("update domain(%s) failed: %w", d.domainName, err)
+	if err := o.provider.Update(ctx, o.domainName, o.ttl, netips); err != nil {
+		return fmt.Errorf("update domain(%s) failed: %w", o.domainName, err)
 	}
 	return nil
 }
 
-func (d *Domain) UpdateLoop(ctx context.Context) {
-	ticker := time.NewTicker(d.updateInterval)
+func (o *Domain) UpdateLoop(ctx context.Context) {
+	ticker := time.NewTicker(o.updateInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if err := d.UpdateOnce(ctx); err != nil {
-				d.logger.Error("update failed", zap.Error(err))
+			if err := o.UpdateOnce(ctx); err != nil {
+				o.logger.Error("update failed", zap.Error(err))
 			}
 		case <-ctx.Done():
-			d.logger.Warn("quited", zap.Error(ctx.Err()))
+			o.logger.Warn("quited", zap.Error(ctx.Err()))
 			return
 		}
 	}

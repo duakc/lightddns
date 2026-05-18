@@ -2,6 +2,7 @@ package sum
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter"
@@ -72,22 +73,12 @@ func (s *Sum) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (s *Sum) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, error) {
-	// TODO: here needs some optimization
-
-	logger := s.logger
 	ips, err := adapter.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
-	if err != nil && s.fastFail {
+	switch {
+	case err != nil:
 		return nil, err
+	case len(ips) == 0:
+		return nil, fmt.Errorf("no IP addresses found")
 	}
-	if err != nil {
-		logger.Warn("an error occurred with DatasourceGroupSumOption.Fastfail enabled",
-			zap.Error(err), zap.Int("len(ips)", len(ips)))
-		// even if the DatasourceGroupSumOption.Fastfail is enabled ,
-		// but with empty ip list returned may case this domain unaccessible.
-		// so we must return an error here if len(ips) == 0.
-		if len(ips) != 0 {
-			err = nil
-		}
-	}
-	return ips, err
+	return ips, nil
 }

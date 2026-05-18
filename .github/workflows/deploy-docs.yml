@@ -29,6 +29,14 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-
+
       - name: Build docs
         run: make build-docs
 

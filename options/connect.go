@@ -58,7 +58,7 @@ func (co ConnectOption) Options() ([]dialerx.DialerOption, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ConnectOption.BindInterface(name): %w", err)
 		}
-		options = append(options, dialerx.WithBindInterfaceName(co.BindInterface.Str))
+		options = append(options, dialerx.WithBindInterfaceName(name))
 	}
 
 	if co.Fwmark != 0 {
