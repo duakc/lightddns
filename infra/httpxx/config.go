@@ -51,7 +51,6 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 	if rc.Body != nil && slices.Contains([]string{
 		http.MethodPost, http.MethodPut, http.MethodPatch,
 	}, rc.Method) {
-
 		switch x := rc.Body.(type) {
 		case json.Marshaler:
 			if contentType == "" {

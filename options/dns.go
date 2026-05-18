@@ -21,11 +21,11 @@ type DNSOption struct {
 	Port   uint16 `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
-func (n *DNSOption) UnmarshalYAML(data []byte) error {
+func (do *DNSOption) UnmarshalYAML(data []byte) error {
 	unquoted := mt.UnquoteString(string(data))
 	lowerUnquoted := strings.ToLower(unquoted)
 	if lowerUnquoted == "system" || lowerUnquoted == "" {
-		n.Type = transports.TransportTypeSystem
+		do.Type = transports.TransportTypeSystem
 		return nil
 	}
 	if !strings.Contains(unquoted, "://") {
@@ -37,14 +37,14 @@ func (n *DNSOption) UnmarshalYAML(data []byte) error {
 	}
 	switch dnsURL.Scheme {
 	case transports.TransportTypeTLS:
-		n.Type = transports.TransportTypeTLS
-		n.Server = dnsURL.Host
+		do.Type = transports.TransportTypeTLS
+		do.Server = dnsURL.Host
 		if dnsURL.Port() == "" {
-			n.Port = 853
+			do.Port = 853
 		} else if numPort, err := strconv.ParseUint(dnsURL.Port(), 10, 16); err != nil {
 			return fmt.Errorf("bad port: %w", err)
 		} else {
-			n.Port = uint16(numPort)
+			do.Port = uint16(numPort)
 		}
 	default:
 		return fmt.Errorf("unknown dns: `%s`", unquoted)
@@ -52,14 +52,14 @@ func (n *DNSOption) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-func (n *DNSOption) NewTransport(ctx context.Context, dialer dialerx.Dialer) (transports.Transport, error) {
-	switch n.Type {
+func (do *DNSOption) NewTransport(ctx context.Context, dialer dialerx.Dialer) (transports.Transport, error) {
+	switch do.Type {
 	case transports.TransportTypeSystem:
 		return &transports.SystemTransport{}, nil
 	case transports.TransportTypeTLS:
 		return transports.NewTLS(ctx, dialer,
-			net.JoinHostPort(n.Server, strconv.FormatUint(uint64(n.Port), 10)), &tls.Config{})
+			net.JoinHostPort(do.Server, strconv.FormatUint(uint64(do.Port), 10)), &tls.Config{})
 	default:
-		return nil, fmt.Errorf("unknown dns type: %s", n.Type)
+		return nil, fmt.Errorf("unknown dns type: %s", do.Type)
 	}
 }

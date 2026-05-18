@@ -1,6 +1,7 @@
 package lightddns
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -10,8 +11,7 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/lookctx"
 	"github.com/duakc/lightddns/options"
-
-	"github.com/duakc/mt"
+	"github.com/duakc/mt/debug"
 
 	"go.uber.org/zap"
 )
@@ -24,6 +24,7 @@ type Domain struct {
 	datasource     adapter.Datasource
 	domainName     string
 	updateInterval time.Duration
+	timeout        time.Duration
 	ttl            uint32
 	ipv4           bool
 	ipv6           bool
@@ -44,10 +45,8 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		opt.IPv6 = true
 	}
 
-	updateInterval := constpkg.DefaultUpdateInterval
-	if opt.Interval > 0 {
-		updateInterval = time.Duration(opt.Interval)
-	}
+	updateInterval := cmp.Or(time.Duration(opt.Interval), constpkg.DefaultDomainUpdateInterval)
+	timeout := cmp.Or(time.Duration(opt.Timeout), constpkg.DefaultDomainTimeout)
 
 	logger := lookctx.LookupPtr[zap.Logger](ctx).Named(string(opt.Domain))
 	datasourceManager := lookctx.Lookup[adapter.DatasourceManager](ctx)
@@ -68,6 +67,7 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		datasource:     datasource,
 		domainName:     string(opt.Domain),
 		updateInterval: updateInterval,
+		timeout:        timeout,
 		ttl:            opt.TTL,
 		ipv4:           opt.IPv4,
 		ipv6:           opt.IPv6,
@@ -75,7 +75,9 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 }
 
 func (o *Domain) UpdateOnce(ctx context.Context) error {
-	ctx, cancel := mt.Timeout(ctx, o.updateInterval)
+	logger := o.logger
+
+	ctx, cancel := context.WithTimeout(ctx, o.timeout)
 	defer cancel()
 
 	netips, err := adapter.MergeDatasources(ctx,
@@ -83,9 +85,15 @@ func (o *Domain) UpdateOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	o.logger.Debug("found ip",
-		zap.String("domain", o.domainName),
-		zap.Stringers("ip", netips))
+	if len(netips) == 0 {
+		if debug.Enabled {
+			return fmt.Errorf("no available IP address found")
+		}
+
+		logger.Info("no available IP address found")
+		return nil
+	}
+	logger.Debug("found ip", zap.Stringers("ip", netips))
 
 	if err := o.provider.Update(ctx, o.domainName, o.ttl, netips); err != nil {
 		return fmt.Errorf("update domain(%s) failed: %w", o.domainName, err)

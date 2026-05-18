@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	constpkg "github.com/duakc/lightddns/constant"
-
 	"github.com/duakc/mt"
 )
 
@@ -30,9 +28,6 @@ func JSONRequest[O any](ctx context.Context, do HTTPRequester, req ReqConfig, in
 		}
 		req.Body = JM
 	}
-	var cancel context.CancelFunc
-	ctx, cancel = mt.Timeout(ctx, constpkg.DefaultHTTPTimeout)
-	defer cancel()
 
 	request, err := req.ToRequestContext(ctx)
 	if err != nil {

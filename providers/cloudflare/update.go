@@ -24,7 +24,7 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr
 	diffRecords, err := c.diff(ctx, domain, addr)
 	if diff, er := isDiff(diffRecords, err); !diff || er != nil {
 		if len(diffRecords) == 0 && er == nil {
-			logger.Debug("no difference since last updated, skip")
+			logger.Info("no difference since last updated, skip")
 			return nil
 		}
 		return fmt.Errorf("diff: %w", err)
