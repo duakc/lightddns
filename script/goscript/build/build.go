@@ -209,6 +209,7 @@ func Run(ctx context.Context) {
 			binNameJoin = append(binNameJoin, fmt.Sprintf("v%d", target.GOAMD64Version))
 			env = append(env, fmt.Sprintf("GOAMD64=v%d", target.GOAMD64Version))
 		}
+
 		if target.SoftFloat && target.GOARCH == "mips" {
 			binNameJoin = append(binNameJoin, "softfloat")
 			env = append(env, "GOMIPS=softfloat")
@@ -238,13 +239,15 @@ func Run(ctx context.Context) {
 		if len(target.LDFlags) > 0 {
 			args = append(args, "-ldflags", strings.Join(target.LDFlags, " "))
 		}
-
-		binName := strings.Join(binNameJoin, "-")
+		buildOutputBinaryName := binaryName
+		if buildAll {
+			buildOutputBinaryName = strings.Join(binNameJoin, "-")
+		}
 		if goos == "windows" {
-			binName += ".exe"
+			buildOutputBinaryName += ".exe"
 		}
 		args = append(args,
-			"-o", filepath.Join(outputDir, binName), workingDir)
+			"-o", filepath.Join(outputDir, buildOutputBinaryName), workingDir)
 		if verbose {
 			fmt.Printf("$ %s %s\n",
 				strings.Join(env, " "),

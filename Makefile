@@ -13,9 +13,15 @@ GO_BUILD=$(GO_SCRIPT) build -verbose \
 			-workdir $(MAIN_WORKDIR) -binary $(NAME)\
 			-output $(BUILD_OUTPUT)
 
+ifeq ($(origin DOCKER_CLI), undefined)
+    DOCKER_CLI := $(shell command -v nerdctl || command -v docker)
+endif
+
+.DEFAULT_GOAL=build
 
 .PHONY: all
-all: clean generate test build
+all: toolchain clean generate test \
+	generate-schema build-all
 
 .PHONY: test
 test: lint
@@ -23,8 +29,11 @@ test: lint
 
 .PHONY: generate
 generate:
-	@go generate ./...
-	@$(GO_SCRIPT) genschema
+	go generate ./...
+
+.PHONY: generate-schema
+generate-schema:
+	$(GO_SCRIPT) genschema
 
 .PHONY: toolchain
 toolchain:
@@ -47,22 +56,34 @@ lint-fix:
 clean:
 	rm -rf $(BUILD_OUTPUT) site/ .cache/
 	go mod tidy
-	cd script/goscript && go mod tidy
 
 .PHONY: build-all
-build-all:
+build-all: build
 	@$(GO_BUILD) -all
 
 .PHONY: build-dev
-build-dev:
+build-dev: _check-build
 	@$(GO_BUILD) -tags debug
 
 .PHONY: build
-build:
+build: _check-build
 	$(GO_BUILD)
 
 .PHONY: build-docs
 build-docs:
-	@pip install -r requirements.txt
-	@mkdocs build
+	@pip install -r requirements.txt && mkdocs build
 
+.PHONY: build-docker
+build-docker: _check-docker
+	$(DOCKER_CLI) build -t $(NAME):latest -f Dockerfile .
+
+.PHONY: _check-docker
+_check-docker:
+	@if [ -z "$(DOCKER_CLI)" ]; then \
+		echo "Please set DOCKER_CLI manually or install nerdctl/docker."; \
+		exit 1; \
+	fi
+
+.PHONY: _check-build
+_check-build: toolchain lint generate
+	@mkdir -p build

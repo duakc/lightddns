@@ -78,7 +78,7 @@ func (I Info) JSON() {
 }
 
 func (I Info) Plain() {
-	const temp = `%s: Version: %s ,Branch: %s ,Debug: %t
+	const temp = `%s: Version: %s, Branch: %s, Debug: %t
 Supported Datasource: %s
 Supported Provider: %s
 `

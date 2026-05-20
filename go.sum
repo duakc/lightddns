@@ -1,12 +1,6 @@
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/duakc/mt v0.0.0-20260426105758-218061cc8f82 h1:XNEWi0Y3RiHsWNxiLzPMFGa/1DEL9ZviZP6sgbEfLuY=
-github.com/duakc/mt v0.0.0-20260426105758-218061cc8f82/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260518071304-19bf4e4b1c7a h1:2psTywh8ce4YfgFHgrSe0TUSN+7Qz6hOCSaN+2oUXHY=
-github.com/duakc/mt v0.0.0-20260518071304-19bf4e4b1c7a/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260518120713-2cd10dca5ac8 h1:o+6MQlZPDmN/y9uDaYuyXy0sfyT0K1BQDWXl+9LO4I8=
-github.com/duakc/mt v0.0.0-20260518120713-2cd10dca5ac8/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/mt v0.0.0-20260518131614-787dbe2be380 h1:NK5ZVWcuGi15BvaHobc+0zl8B/wnuY7JyXPjsC4Pfzw=
 github.com/duakc/mt v0.0.0-20260518131614-787dbe2be380/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/zap v0.0.0-20260409023011-7d65ec09a648 h1:nXKDz+iP5jLdtvvIuMThNdGLKVT0mb2llfDFTvO1cYM=
