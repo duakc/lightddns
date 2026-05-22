@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
 )
 
@@ -16,3 +17,11 @@ type (
 )
 
 var ProviderRegister = NewRegister[Provider]()
+
+type ProviderNotFoundError struct {
+	*ManagedNotFoundError
+}
+
+func (e *ProviderNotFoundError) Error() string {
+	return fmt.Sprintf("provider: %s", e.ManagedNotFoundError.Error())
+}

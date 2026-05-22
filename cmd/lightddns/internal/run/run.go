@@ -6,7 +6,7 @@ import (
 	"html/template"
 	"os"
 
-	"github.com/duakc/lightddns/cmd/lightddns/internal/gctx"
+	"github.com/duakc/lightddns/cmd/lightddns/internal/globalcontext"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -53,30 +53,31 @@ func entry(cmd *cobra.Command, args []string) {
 	}
 	if err := openConfigBind(arg.Config, &arg.Options); err != nil {
 		zaplog.Fatal("read config file failed", zap.String("file", arg.Config), zap.Error(err))
-		return
 	}
-	ctx, cancel := gctx.Context()
-	defer cancel()
+	ctx := globalcontext.Load()
 
 	ddns, err := lightddns.New(ctx, arg.Options)
 	if err != nil {
 		zaplog.Fatal("initial instance failed", zap.Error(err))
 	}
-	if err := runInstance(ctx, ddns); err != nil {
-		zaplog.Fatal("start failed", zap.Error(err))
-	}
+
+	runInstance(ctx, ddns)
 }
 
-func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) error {
+func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) {
 	ctx, cancel := gos.InterruptSignalContext(ctx)
 	defer cancel()
 
-	ddns.Once(ctx)
-	if arg.Once {
-		return nil
+	err := services.StartService(ctx, ddns)
+	if err != nil {
+		zaplog.Fatal("start service failed", zap.Error(err))
 	}
-
-	return ddns.Start(ctx, services.StageStart)
+	// wait
+	<-ctx.Done()
+	err = services.CloseService(ddns)
+	if err != nil {
+		zaplog.Warn("close failed", zap.Error(err))
+	}
 }
 
 type configTemplateContext struct {

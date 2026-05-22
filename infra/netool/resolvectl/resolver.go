@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/common/generic"
 	"github.com/duakc/mt/debug"
 	"github.com/duakc/mt/services"
 

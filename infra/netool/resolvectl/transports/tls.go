@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 
+	"github.com/duakc/mt/common/generic"
 	"github.com/duakc/mt/services"
 
 	mDns "github.com/miekg/dns"

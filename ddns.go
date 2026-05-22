@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/infra/filehelper"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/filehelper"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -28,7 +28,7 @@ type LightDDNS struct {
 }
 
 func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
-	logger, err := newLoggerWithOptions(opt.Log)
+	logger, err := newLoggerWithOptions(ctx, opt.Log)
 	if err != nil {
 		return nil, fmt.Errorf("create logger: %w", err)
 	}
@@ -82,11 +82,13 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		domainOption.Provider = cmp.Or(domainOption.Provider, defaultProviderName)
 		domainOption.Datasource = cmp.Or(domainOption.Datasource, defaultDatasourceName)
 		domain, err := NewDomain(ctx, domainOption)
-		if err != nil && errors.Is(err, errDomainNotEnabled) {
+		if domain == nil && err == nil {
+			// not enabled
+			logger.Info("domain not enabled", zap.String("domain", string(domainOption.Domain)))
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("create domain `%s`: %w", domain.domainName, err)
+			return nil, fmt.Errorf("create domain `%s`: %w", domainOption.Domain, err)
 		}
 		domains = append(domains, domain)
 	}
@@ -101,55 +103,20 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	return ld, nil
 }
 
-func (ld *LightDDNS) Once(ctx context.Context) {
-	logger := ld.logger
+func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
+	var err error
 	for i := 0; i < len(ld.domains); i++ {
 		domain := ld.domains[i]
-		err := domain.UpdateOnce(ctx)
-		if err != nil {
-			logger.Error("update failed", zap.Error(err))
-			return
-		}
-	}
-}
-
-func (ld *LightDDNS) Start(ctx context.Context, stage services.StartStage) error {
-	if err := ld.batchStart(ctx, stage); err != nil {
-		return err
-	}
-
-	if stage == services.StageStart {
-		for i := 0; i < len(ld.domains); i++ {
-			go ld.domains[i].UpdateLoop(ctx)
-		}
-
-		<-ctx.Done()
-		if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (ld *LightDDNS) Close() error {
-	var err error
-	for _, item := range ld.providerManager.All() {
-		err = errors.Join(err, services.Close(item))
-	}
-	for _, item := range ld.datasourceManager.All() {
-		err = errors.Join(err, services.Close(item))
+		err = errors.Join(err, domain.Start(ctx, stage))
 	}
 	return err
 }
 
-func (ld *LightDDNS) batchStart(ctx context.Context, stage services.StartStage) error {
+func (ld *LightDDNS) Close() error {
 	var err error
-	for _, item := range ld.providerManager.All() {
-		err = errors.Join(err, services.Start(ctx, stage, item))
-	}
-	for _, item := range ld.datasourceManager.All() {
-		err = errors.Join(err, services.Start(ctx, stage, item))
+	for i := 0; i < len(ld.domains); i++ {
+		domain := ld.domains[i]
+		err = errors.Join(err, domain.Close())
 	}
 	return err
 }
@@ -227,13 +194,14 @@ func resortDatasources(ds []options.DatasourceOption) ([]options.DatasourceOptio
 	return result, nil
 }
 
-func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
+func newLoggerWithOptions(ctx context.Context, opt options.LogOption) (*zap.Logger, error) {
 	if opt.Disabled {
 		return zaplog.NOP, nil
 	}
 	var (
-		level = zapcore.Level(opt.Level)
-		err   error
+		fileHelper = services.Lookup[filehelper.Helper](ctx)
+		level      = zapcore.Level(opt.Level)
+		err        error
 	)
 	zaplog.DefaultLevel(level)
 
@@ -244,7 +212,7 @@ func newLoggerWithOptions(opt options.LogOption) (*zap.Logger, error) {
 	case "stderr":
 		outputFD = os.Stderr
 	default:
-		outputFD, err = filehelper.Create(opt.Output)
+		outputFD, err = fileHelper.Create(opt.Output)
 		if err != nil {
 			return nil, err
 		}

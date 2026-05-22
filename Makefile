@@ -62,11 +62,11 @@ build-all: build
 	@$(GO_BUILD) -all
 
 .PHONY: build-dev
-build-dev: _check-build
+build-dev: generate
 	@$(GO_BUILD) -tags debug
 
 .PHONY: build
-build: _check-build
+build: generate
 	$(GO_BUILD)
 
 .PHONY: build-docs
@@ -83,7 +83,3 @@ _check-docker:
 		echo "Please set DOCKER_CLI manually or install nerdctl/docker."; \
 		exit 1; \
 	fi
-
-.PHONY: _check-build
-_check-build: toolchain lint generate
-	@mkdir -p build

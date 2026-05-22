@@ -5,21 +5,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/options"
 
+	"github.com/duakc/mt"
 	"github.com/duakc/mt/debug"
 	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
 
-var errDomainNotEnabled = errors.New("not enabled")
-
 type Domain struct {
+	taskCtx    context.Context
+	taskCancel context.CancelFunc
+
+	closed    chan struct{}
+	closeOnce sync.Once
+	closeErr  error
+
 	logger         *zap.Logger
 	provider       adapter.Provider
 	datasource     adapter.Datasource
@@ -33,7 +40,7 @@ type Domain struct {
 
 func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	if !opt.Enabled || len(opt.Domain) == 0 {
-		return nil, errDomainNotEnabled
+		return nil, nil
 	}
 	if len(opt.Datasource) == 0 {
 		return nil, fmt.Errorf("missing datasource")
@@ -62,13 +69,13 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		logger.Warn("timeout too short, consider to increase the timeout")
 	}
 
-	provider, found := providerManager.Lookup(opt.Provider)
-	if !found {
-		return nil, &adapter.ManagedNotFoundError{Name: opt.Provider}
+	provider, providerFound := providerManager.Lookup(opt.Provider)
+	if !providerFound {
+		return nil, &adapter.ProviderNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Provider)}
 	}
-	datasource, found := datasourceManager.Lookup(opt.Datasource)
-	if !found {
-		return nil, &adapter.ManagedNotFoundError{Name: opt.Datasource}
+	datasource, datasourceFound := datasourceManager.Lookup(opt.Datasource)
+	if !datasourceFound {
+		return nil, &adapter.DatasourceNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Datasource)}
 	}
 
 	return &Domain{
@@ -84,7 +91,39 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	}, nil
 }
 
-func (o *Domain) UpdateOnce(ctx context.Context) error {
+func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
+	switch stage {
+	case services.StagePreStart, services.StagePostStart:
+		if err := services.Start(ctx, stage, o.provider); err != nil {
+			return err
+		}
+		return services.Start(ctx, stage, o.datasource)
+	case services.StageStart:
+		o.taskCtx, o.taskCancel = context.WithCancel(ctx)
+		o.closed = make(chan struct{})
+		err := o.update(o.taskCtx)
+		if err != nil {
+			return err
+		}
+		return o.updateLoop()
+	default:
+		panic("unknown stage: " + stage.String())
+	}
+}
+
+func (o *Domain) Close() error {
+	o.closeOnce.Do(func() {
+		o.taskCancel()
+		<-o.closed
+		o.closeErr = errors.Join(
+			o.closeErr,
+			services.CloseService(o.provider),
+			services.CloseService(o.datasource))
+	})
+	return o.closeErr
+}
+
+func (o *Domain) update(ctx context.Context) error {
 	logger := o.logger
 
 	ctx, cancel := context.WithTimeout(ctx, o.timeout)
@@ -99,7 +138,7 @@ func (o *Domain) UpdateOnce(ctx context.Context) error {
 			return fmt.Errorf("no available IP address found")
 		}
 
-		logger.Info("no available IP address found")
+		logger.Info("no available IP address from datasource, skip this update")
 		return nil
 	}
 
@@ -111,21 +150,46 @@ func (o *Domain) UpdateOnce(ctx context.Context) error {
 	return nil
 }
 
-func (o *Domain) UpdateLoop(ctx context.Context) {
-	ticker := time.NewTicker(o.updateInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			err := o.UpdateOnce(ctx)
-			if err != nil {
-				o.logger.Error("update failed", zap.Error(err))
-			}
-			ticker.Reset(o.updateInterval)
-		case <-ctx.Done():
-			o.logger.Warn("quited", zap.Error(ctx.Err()))
-			return
-		}
+func (o *Domain) updateLoop() error {
+	if o.taskCtx == nil {
+		panic("nil task context")
 	}
+	if mt.Done(o.taskCtx) {
+		return o.taskCtx.Err()
+	}
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				o.closeErr = err
+			}
+			close(o.closed)
+		}()
+		defer o.taskCancel()
+		ctx := o.taskCtx
+		logger := o.logger
+		ticker := time.NewTicker(o.updateInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Warn("quited", zap.Error(ctx.Err()))
+				if causeErr := context.Cause(ctx); causeErr != nil && !errors.Is(causeErr, context.Canceled) {
+					o.closeErr = causeErr
+				}
+				return
+			case <-ticker.C:
+				err := o.update(ctx)
+				if err != nil {
+					logger.Error("update failed", zap.Error(err))
+				}
+			}
+		}
+	}()
+	return nil
 }

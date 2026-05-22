@@ -9,7 +9,6 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/generic"
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
@@ -18,6 +17,7 @@ import (
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/common/generic"
 	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"

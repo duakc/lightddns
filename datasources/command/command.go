@@ -11,18 +11,17 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/filehelper"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/filehelper"
 	"github.com/duakc/mt/sh"
 	"github.com/duakc/mt/xtypes"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const DatasourceType = constpkg.DatasourceTypeCommand
@@ -37,6 +36,8 @@ func init() {
 
 func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.Datasource, error) {
 	logger := option.AbstractDatasourceOption.CreateLogger(services.LookupPtr[zap.Logger](ctx))
+	fileHelper := services.Lookup[filehelper.Helper](ctx)
+
 	command := sh.New()
 	command.Envs(option.Env.Values)
 
@@ -61,7 +62,8 @@ func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.D
 	}
 
 	if option.Stdin != "" {
-		stdin, err := filehelper.Open(option.Stdin)
+		// TODO: make input stdin become more stable
+		stdin, err := fileHelper.Open(option.Stdin)
 		if err != nil {
 			return nil, fmt.Errorf("open stdin: %w", err)
 		}
@@ -70,7 +72,7 @@ func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.D
 	}
 
 	if option.Stdout != "" {
-		stdout, err := filehelper.Create(option.Stdout)
+		stdout, err := fileHelper.Create(option.Stdout)
 		if err != nil {
 			return nil, fmt.Errorf("open stdout: %w", err)
 		}
@@ -83,7 +85,7 @@ func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.D
 	}
 
 	if option.Stderr != "" {
-		stderr, err := filehelper.Create(option.Stderr)
+		stderr, err := fileHelper.Create(option.Stderr)
 		if err != nil {
 			return nil, fmt.Errorf("open stderr: %w", err)
 		}
@@ -174,7 +176,7 @@ func runCommand(ctx context.Context, logger *zap.Logger,
 		}
 	}
 	logger.Debug("exit succeed", zap.Int("exit_code", exitCode))
-	if ce := logger.Check(zapcore.TraceLevel, "command output"); ce != nil {
+	if ce := logger.Check(zap.TraceLevel, "command output"); ce != nil {
 		ce.Write(zap.Int("len", buf.Len()), zap.String("output", string(buf.Bytes())))
 	}
 

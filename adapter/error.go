@@ -7,6 +7,10 @@ import (
 
 var ErrRequireToken = errors.New("token required")
 
+func NewManagedNotFoundError(name string) *ManagedNotFoundError {
+	return &ManagedNotFoundError{Name: name}
+}
+
 type ManagedNotFoundError struct {
 	Name string
 }

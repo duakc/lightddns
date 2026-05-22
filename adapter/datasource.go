@@ -113,3 +113,11 @@ func (e *DatasourceError) Error() string {
 func (e *DatasourceError) Unwrap() error {
 	return e.Err
 }
+
+type DatasourceNotFoundError struct {
+	*ManagedNotFoundError
+}
+
+func (e *DatasourceNotFoundError) Error() string {
+	return fmt.Sprintf("datasource: %s", e.ManagedNotFoundError.Error())
+}
