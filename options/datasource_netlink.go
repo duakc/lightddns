@@ -3,7 +3,7 @@ package options
 import constpkg "github.com/duakc/lightddns/constant"
 
 type NetlinkDatasourceOption struct {
-	AbstractDatasourceOption
+	AbstractDatasourceOption `yaml:",inline"`
 
 	IfName       string `json:"ifName,omitempty"       yaml:"ifName,omitempty"`
 	IfIndex      int    `json:"ifIndex,omitempty"      yaml:"ifIndex,omitempty"`

@@ -6,7 +6,7 @@ import (
 )
 
 type CommandDatasourceOption struct {
-	AbstractDatasourceOption
+	AbstractDatasourceOption `yaml:",inline"`
 
 	Cmd DualStack[badyaml.Listable[string]] `json:"cmd" yaml:"cmd"`
 

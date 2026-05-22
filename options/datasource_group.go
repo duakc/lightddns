@@ -5,7 +5,7 @@ type DatasourceGrouper interface {
 }
 
 type AbstractDatasourceGroupOption struct {
-	AbstractDatasourceOption
+	AbstractDatasourceOption `yaml:",inline"`
 
 	Datasources []string `json:"datasources" yaml:"datasources"`
 }

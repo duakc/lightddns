@@ -9,7 +9,7 @@ import (
 )
 
 type DatasourceOption struct {
-	AbstractDatasourceOption
+	AbstractDatasourceOption `yaml:",inline"`
 
 	Option any `json:"-" yaml:"-"`
 }
@@ -17,7 +17,7 @@ type DatasourceOption struct {
 type _DatasourceOption DatasourceOption
 
 func (do *DatasourceOption) UnmarshalYAML(bs []byte) error {
-	err := badyaml.Unmarshal(bs, (*_DatasourceOption)(do))
+	err := goyaml.Unmarshal(bs, (*_DatasourceOption)(do))
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func (do *DatasourceOption) UnmarshalYAML(bs []byte) error {
 	if err != nil {
 		return err
 	}
-	return goyaml.Unmarshal(bs, do.Option)
+	return badyaml.Unmarshal(bs, do.Option)
 }
 
 type AbstractDatasourceOption struct {

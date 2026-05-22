@@ -3,7 +3,7 @@ package options
 import constpkg "github.com/duakc/lightddns/constant"
 
 type DatasourceGroupSumOption struct {
-	AbstractDatasourceGroupOption
+	AbstractDatasourceGroupOption `yaml:",inline"`
 
 	FastFail bool `json:"fastFail,omitempty" yaml:"fastFail,omitempty"`
 }

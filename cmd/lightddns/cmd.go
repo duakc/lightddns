@@ -6,7 +6,6 @@ import (
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
 	"github.com/duakc/lightddns/constant"
-
 	// registry
 	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -56,5 +55,4 @@ func main() {
 	if err := rootCommand.Execute(); err != nil {
 		zaplog.Fatal("execute failed", zap.Error(err))
 	}
-
 }

@@ -9,7 +9,7 @@ import (
 )
 
 type ProviderOption struct {
-	AbstractProviderOption
+	AbstractProviderOption `yaml:",inline"`
 
 	Option any `json:"-" yaml:"-"`
 }
@@ -17,7 +17,7 @@ type ProviderOption struct {
 type _ProviderOption ProviderOption
 
 func (po *ProviderOption) UnmarshalYAML(bs []byte) error {
-	err := badyaml.Unmarshal(bs, (*_ProviderOption)(po))
+	err := goyaml.Unmarshal(bs, (*_ProviderOption)(po))
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func (po *ProviderOption) UnmarshalYAML(bs []byte) error {
 	if err != nil {
 		return err
 	}
-	return goyaml.Unmarshal(bs, po.Option)
+	return badyaml.Unmarshal(bs, po.Option)
 }
 
 type AbstractProviderOption struct {

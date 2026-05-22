@@ -27,11 +27,11 @@ func NewManagedType(typ, name string) AbstractManagedType {
 }
 
 func (a AbstractManagedType) Type() string {
-	return a.name
+	return a.typ
 }
 
 func (a AbstractManagedType) Name() string {
-	return a.typ
+	return a.name
 }
 
 type Manager[T managedType] interface {

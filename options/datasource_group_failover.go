@@ -3,7 +3,7 @@ package options
 import constpkg "github.com/duakc/lightddns/constant"
 
 type DatasourceGroupFailoverOption struct {
-	AbstractDatasourceGroupOption
+	AbstractDatasourceGroupOption `yaml:",inline"`
 }
 
 func (DatasourceGroupFailoverOption) UsedType() string {

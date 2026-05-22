@@ -25,7 +25,7 @@ func Run(ctx context.Context) {
 	if err != nil {
 		zaplog.Fatal("GenSchema", zap.Error(err))
 	}
-	if err := os.Mkdir(filepath.Dir(output), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		zaplog.Fatal("Mkdir", zap.Error(err))
 	}
 	if err := os.WriteFile(output, schema, 0o666); err != nil {

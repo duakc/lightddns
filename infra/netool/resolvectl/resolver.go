@@ -161,15 +161,21 @@ func (r *defaultResolveClient) lookupToExchange(ctx context.Context,
 func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transports.Transport,
 	message *mDns.Msg,
 ) (response *mDns.Msg, err error) {
-	logger := r.logger
+	if len(message.Question) != 1 {
+		r.logger.Error("bad question length", zap.Int("length", len(message.Question)))
+		return nil, &RcodeError{Code: mDns.RcodeNameError}
+	}
 	question := message.Question[0]
+
+	logger := r.logger.WithLazy(
+		zap.String("type", mDns.TypeToString[question.Qtype]),
+		zap.String("fqdn", question.Name))
 	cacheMessage, cached := r.cache.Get(question)
 	now := time.Now()
+	logger.Trace("new exchange")
 	if cached {
 		expired := cacheMessage.expire.After(now)
-		logger.Trace("cached",
-			zap.String("fqdn", question.Name),
-			zap.Bool("expired", expired))
+		logger.Debug("cached", zap.Bool("expired", expired))
 		if expired {
 			r.cache.Remove(question)
 			goto exchange
@@ -182,11 +188,7 @@ func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transp
 	}
 exchange:
 	exchangedMessage, err, _ := r.sf.Do(question, func() (*mDns.Msg, error) {
-		if ce := logger.Check(zapcore.DebugLevel, "exchange"); ce != nil {
-			ce.Write(
-				zap.String("type", mDns.TypeToString[question.Qtype]),
-				zap.String("fqdn", question.Name))
-		}
+		logger.Debug("start a new exchange from upstream")
 		responseMessage, err := dnsTransport.Exchange(ctx, message)
 		if err != nil {
 			return nil, err
@@ -195,11 +197,16 @@ exchange:
 		if r.cache.Len() > r.cacheMax {
 			r.cache.RemoveOldest()
 		}
-		if ce := logger.Check(zapcore.InfoLevel, "exchanged"); ce != nil {
-			ce.Write(
+		if ce := logger.Check(zapcore.DebugLevel, "exchanged"); ce != nil {
+			var fields = []zap.Field{
 				zap.String("type", mDns.TypeToString[question.Qtype]),
 				zap.String("fqdn", question.Name),
-				zap.Uint32("ttl", ttl))
+				zap.Uint32("ttl", ttl),
+			}
+			if addresses := transports.MessageToAddresses(responseMessage); len(addresses) > 0 {
+				fields = append(fields, zap.Stringers("addresses", addresses))
+			}
+			ce.Write(fields...)
 		}
 
 		r.cache.Add(question, dnsCacheMessage{

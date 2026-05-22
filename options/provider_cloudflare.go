@@ -3,9 +3,9 @@ package options
 import constpkg "github.com/duakc/lightddns/constant"
 
 type CloudflareProviderOption struct {
-	AbstractProviderOption
-	ConnectOption
-	HTTPOption
+	AbstractProviderOption `yaml:",inline"`
+	ConnectOption          `yaml:",inline"`
+	HTTPOption             `yaml:",inline"`
 
 	Token string `json:"token"           yaml:"token"`
 	Proxy bool   `json:"proxy,omitempty" yaml:"proxy,omitempty"`

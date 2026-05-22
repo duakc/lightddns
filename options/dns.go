@@ -54,7 +54,7 @@ func (do *DNSOption) UnmarshalYAML(data []byte) error {
 
 func (do *DNSOption) NewTransport(ctx context.Context, dialer dialerx.Dialer) (transports.Transport, error) {
 	switch do.Type {
-	case transports.TransportTypeSystem:
+	case transports.TransportTypeSystem, "":
 		return &transports.SystemTransport{}, nil
 	case transports.TransportTypeTLS:
 		return transports.NewTLS(ctx, dialer,

@@ -11,9 +11,9 @@ type DualStack[T any] struct {
 }
 
 type HTTPDatasourceOption struct {
-	AbstractDatasourceOption
-	ConnectOption
-	HTTPOption
+	AbstractDatasourceOption `yaml:",inline"`
+	ConnectOption            `yaml:",inline"`
+	HTTPOption               `yaml:",inline"`
 
 	URL badyaml.URL `json:"url" yaml:"url"`
 
