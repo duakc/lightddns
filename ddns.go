@@ -103,6 +103,19 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	return ld, nil
 }
 
+func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
+	var err error
+	for i := 0; i < len(ld.domains); i++ {
+		domain := ld.domains[i]
+		updateErr := domain.Update(ctx)
+		if fastfail && updateErr != nil {
+			return updateErr
+		}
+		err = errors.Join(err, updateErr)
+	}
+	return err
+}
+
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 	var err error
 	for i := 0; i < len(ld.domains); i++ {

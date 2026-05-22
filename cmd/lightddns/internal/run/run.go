@@ -26,65 +26,88 @@ import (
 type Arguments struct {
 	Options options.Options
 
-	Config string
-	Once   bool
+	Config       string
+	Once         bool
+	OnceFastFail bool
 }
 
 var (
 	Command = &cobra.Command{
 		Use:   "run",
 		Short: "Run " + constpkg.Project,
+		Long:  "Start the DDNS updater daemon. Monitors IP changes from datasources and pushes updates to DNS providers on the configured interval.",
 		Run:   entry,
 	}
 
-	arg Arguments
+	commandArgument Arguments
 )
 
 func init() {
-	Command.Flags().StringVarP(&arg.Config, "config", "c", "", "Set config file path")
-	Command.Flags().BoolVar(&arg.Once, "once", false, "Trigger once and quit")
+	Command.Flags().StringVarP(&commandArgument.Config, "config", "c", "", "Path to the configuration file")
+	Command.Flags().BoolVar(&commandArgument.Once, "once", false, "Update all domains once and exit")
+	Command.Flags().BoolVar(&commandArgument.OnceFastFail, "once-fastfail", false,
+		"Exit immediately on the first update error (requires --once)")
 	// TODO: add a fast way to configure options rather than config file
 }
 
 func entry(cmd *cobra.Command, args []string) {
-	if arg.Config == "" {
+	if commandArgument.Config == "" {
 		_ = cmd.Help()
 		return
 	}
-	if err := openConfigBind(arg.Config, &arg.Options); err != nil {
-		zaplog.Fatal("read config file failed", zap.String("file", arg.Config), zap.Error(err))
+	if err := openConfigBind(commandArgument.Config, &commandArgument.Options); err != nil {
+		zaplog.Fatal("read config file failed", zap.String("file", commandArgument.Config), zap.Error(err))
 	}
 	ctx := globalcontext.Load()
 
-	ddns, err := lightddns.New(ctx, arg.Options)
+	ddns, err := lightddns.New(ctx, commandArgument.Options)
 	if err != nil {
 		zaplog.Fatal("initial instance failed", zap.Error(err))
 	}
+	signalCtx, cancel := gos.InterruptSignalContext(ctx)
+	defer cancel()
+	if commandArgument.Once {
+		runInstanceOnce(signalCtx, ddns)
+		return
+	}
 
-	runInstance(ctx, ddns)
+	runInstance(signalCtx, ddns)
+}
+
+func runInstanceOnce(ctx context.Context, ddns *lightddns.LightDDNS) {
+	// pre-start
+	if err := ddns.Start(ctx, services.StagePreStart); err != nil {
+		zaplog.Fatal("start instance failed", zap.Error(err))
+	}
+
+	// once-start
+	if err := ddns.StartOnce(ctx, commandArgument.OnceFastFail); err != nil {
+		zaplog.Fatal("update once failed", zap.Error(err))
+	}
+
+	if err := ddns.Close(); err != nil {
+		zaplog.Fatal("close instance failed", zap.Error(err))
+	}
 }
 
 func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) {
-	ctx, cancel := gos.InterruptSignalContext(ctx)
-	defer cancel()
-
-	err := services.StartService(ctx, ddns)
-	if err != nil {
-		zaplog.Fatal("start service failed", zap.Error(err))
+	if err := services.StartService(ctx, ddns); err != nil {
+		zaplog.Fatal("start instance failed", zap.Error(err))
 	}
+
 	// wait
 	<-ctx.Done()
-	err = services.CloseService(ddns)
-	if err != nil {
-		zaplog.Warn("close failed", zap.Error(err))
-	}
-}
 
-type configTemplateContext struct {
-	Env map[string]string
+	if err := services.CloseService(ddns); err != nil {
+		zaplog.Warn("close instance failed", zap.Error(err))
+	}
 }
 
 func openConfigBind(file string, opt *options.Options) error {
+	type configTemplateContext struct {
+		Env map[string]string
+	}
+
 	tempFile, err := template.ParseFiles(file)
 	if err != nil {
 		return err

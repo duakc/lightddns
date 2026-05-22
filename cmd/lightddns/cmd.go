@@ -1,11 +1,12 @@
 package main
 
 import (
-	"errors"
-
+	"github.com/duakc/lightddns/cmd/lightddns/internal/check"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/globalcontext"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
+	"github.com/duakc/lightddns/constant"
+
 	// registry
 	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -19,7 +20,8 @@ import (
 )
 
 var rootCommand = &cobra.Command{
-	Use:              "lightddns",
+	Use:              constant.Project,
+	Short:            constant.Project + " is a lightweight dynamic DNS updater",
 	PersistentPreRun: preRun,
 }
 
@@ -29,11 +31,12 @@ var (
 )
 
 func init() {
-	rootCommand.Flags().StringVarP(&workingDirectory, "workdir", "D", ".", "working directory")
+	rootCommand.Flags().StringVarP(&workingDirectory, "workdir", "D", ".", "Working directory")
 
 	rootCommand.AddCommand(
 		run.Command,
-		version.Command)
+		version.Command,
+		check.Command)
 }
 
 func preRun(cmd *cobra.Command, args []string) {
@@ -54,8 +57,4 @@ func main() {
 		zaplog.Fatal("execute failed", zap.Error(err))
 	}
 
-	// resources clean
-	if err := errors.Join(helper.Close()); err != nil {
-		zaplog.Fatal("close failed", zap.Error(err))
-	}
 }

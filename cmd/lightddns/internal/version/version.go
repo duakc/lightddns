@@ -26,7 +26,7 @@ var Command = &cobra.Command{
 }
 
 func init() {
-	Command.Flags().StringVarP(&outputMethod, "format", "f", "", "Set the output format, one of [json, yaml ,plain(default)]")
+	Command.Flags().StringVarP(&outputMethod, "format", "f", "", "Output format: json, yaml, or plain (default)")
 }
 
 type Info struct {

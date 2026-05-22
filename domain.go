@@ -101,7 +101,7 @@ func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
 	case services.StageStart:
 		o.taskCtx, o.taskCancel = context.WithCancel(ctx)
 		o.closed = make(chan struct{})
-		err := o.update(o.taskCtx)
+		err := o.Update(o.taskCtx)
 		if err != nil {
 			return err
 		}
@@ -113,8 +113,12 @@ func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
 
 func (o *Domain) Close() error {
 	o.closeOnce.Do(func() {
-		o.taskCancel()
-		<-o.closed
+		if o.taskCancel != nil {
+			o.taskCancel()
+		}
+		if o.closed != nil {
+			<-o.closed
+		}
 		o.closeErr = errors.Join(
 			o.closeErr,
 			services.CloseService(o.provider),
@@ -123,7 +127,7 @@ func (o *Domain) Close() error {
 	return o.closeErr
 }
 
-func (o *Domain) update(ctx context.Context) error {
+func (o *Domain) Update(ctx context.Context) error {
 	logger := o.logger
 
 	ctx, cancel := context.WithTimeout(ctx, o.timeout)
@@ -184,7 +188,7 @@ func (o *Domain) updateLoop() error {
 				}
 				return
 			case <-ticker.C:
-				err := o.update(ctx)
+				err := o.Update(ctx)
 				if err != nil {
 					logger.Error("update failed", zap.Error(err))
 				}
