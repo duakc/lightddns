@@ -10,6 +10,7 @@ import (
 
 	"github.com/duakc/mt/debug"
 	"github.com/duakc/mt/gosys"
+
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 )
@@ -26,8 +27,8 @@ type SmartCore struct {
 }
 
 func NewSmartCore(enc zapcore.Encoder, w zapcore.WriteSyncer,
-	lvl zapcore.LevelEnabler) *SmartCore {
-
+	lvl zapcore.LevelEnabler,
+) *SmartCore {
 	smart := &SmartCore{}
 	if bufferWriteSyncer, isBuffer := w.(*zapcore.BufferedWriteSyncer); isBuffer {
 		smart.flushBuffer = bufferWriteSyncer
@@ -83,6 +84,7 @@ var _ zapcore.Core = (*splitLevelCore)(nil)
 
 type splitLevelCore struct {
 	zapcore.Core
+
 	flushLevel zapcore.Level
 }
 

@@ -198,7 +198,7 @@ exchange:
 			r.cache.RemoveOldest()
 		}
 		if ce := logger.Check(zapcore.DebugLevel, "exchanged"); ce != nil {
-			var fields = []zap.Field{
+			fields := []zap.Field{
 				zap.String("type", mDns.TypeToString[question.Qtype]),
 				zap.String("fqdn", question.Name),
 				zap.Uint32("ttl", ttl),

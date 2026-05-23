@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/duakc/mt/debug"
+	"github.com/duakc/mt/services/closeme"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -17,9 +19,14 @@ var NOP = zap.NewNop()
 
 func NewDefault(output io.Writer, level zapcore.LevelEnabler, options []zap.Option) *zap.Logger {
 	coreEncoder := zapcore.NewJSONEncoder(DefaultJSONEncoderConfig())
-	smartCore := zapcore.Core(NewSmartCore(coreEncoder, zapcore.Lock(zapcore.AddSync(output)), level))
+
+	var core zapcore.Core
+	smartCore := NewSmartCore(coreEncoder, zapcore.Lock(zapcore.AddSync(output)), level)
+	defer closeme.AddClose(smartCore)
+
+	core = smartCore
 	if level.Enabled(zapcore.WarnLevel) {
-		smartCore = newSplitLevelCore(smartCore, zapcore.WarnLevel)
+		core = newSplitLevelCore(core, zapcore.WarnLevel)
 	}
 
 	if stackTraceLevel := os.Getenv(EnvEnableStackTrace); stackTraceLevel != "" {
@@ -32,7 +39,7 @@ func NewDefault(output io.Writer, level zapcore.LevelEnabler, options []zap.Opti
 	if debug.Enabled {
 		options = append(options, zap.Development())
 	}
-	return zap.New(smartCore, options...)
+	return zap.New(core, options...)
 }
 
 func DoNotPanic(logger *zap.Logger) *zap.Logger {

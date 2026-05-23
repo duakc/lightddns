@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/duakc/lightddns/cmd/lightddns/internal/check"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/globalcontext"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
@@ -12,6 +15,7 @@ import (
 	_ "github.com/duakc/lightddns/providers"
 
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/closeme"
 	"github.com/duakc/mt/services/filehelper"
 
 	"github.com/spf13/cobra"
@@ -24,10 +28,7 @@ var rootCommand = &cobra.Command{
 	PersistentPreRun: preRun,
 }
 
-var (
-	workingDirectory string
-	helper           filehelper.Helper
-)
+var workingDirectory string
 
 func init() {
 	rootCommand.Flags().StringVarP(&workingDirectory, "workdir", "D", ".", "Working directory")
@@ -41,17 +42,23 @@ func init() {
 func preRun(cmd *cobra.Command, args []string) {
 	ctx := services.NewRegistry(globalcontext.Load(), services.NewDefaultRegistry())
 
-	files, err := filehelper.NewMkdir(workingDirectory)
+	fileHelper, err := filehelper.NewMkdir(workingDirectory)
 	if err != nil {
 		zaplog.Fatal("create working directory failed", zap.Error(err))
 	}
-	helper = files
-	services.Store(ctx, files)
+	defer closeme.AddClose(fileHelper)
+
+	services.Store(ctx, fileHelper)
 
 	globalcontext.Store(ctx)
 }
 
 func main() {
+	defer func() {
+		if err := closeme.Close(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "close failed: %v", err)
+		}
+	}()
 	if err := rootCommand.Execute(); err != nil {
 		zaplog.Fatal("execute failed", zap.Error(err))
 	}
