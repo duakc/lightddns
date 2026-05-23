@@ -172,7 +172,7 @@ func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transp
 		zap.String("fqdn", question.Name))
 	cacheMessage, cached := r.cache.Get(question)
 	now := time.Now()
-	logger.Trace("new exchange")
+	logger.Debug("new exchange")
 	if cached {
 		expired := cacheMessage.expire.After(now)
 		logger.Debug("cached", zap.Bool("expired", expired))

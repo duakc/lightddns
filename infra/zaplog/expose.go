@@ -11,14 +11,14 @@ import (
 )
 
 var (
-	defaultLevel  = zap.NewAtomicLevelAt(zap.TraceLevel)
+	defaultLevel  = zap.NewAtomicLevelAt(zap.DebugLevel)
 	defaultLogger = createDefault(defaultLevel)
 )
 
 func createDefault(lvl zapcore.LevelEnabler) *zap.Logger {
 	if debug.IsTestEnv() || !debug.Enabled {
 		// omit log message on test
-		defaultLevel.SetLevel(zap.PanicLevel)
+		defaultLevel.SetLevel(zap.ErrorLevel)
 	}
 
 	var options []zap.Option
@@ -41,10 +41,6 @@ func NewPackage(pkg ...string) *zap.Logger {
 
 func Sugar() *zap.SugaredLogger {
 	return defaultLogger.Sugar()
-}
-
-func Trace(msg string, fields ...zap.Field) {
-	defaultLogger.Trace(msg, fields...)
 }
 
 func Debug(msg string, fields ...zap.Field) {

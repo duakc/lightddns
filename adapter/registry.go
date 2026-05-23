@@ -14,7 +14,7 @@ import (
 )
 
 func Register[T managedType, O any](R Registry[T], typ string, constructor GenericObjectConstructor[T, O]) {
-	managerLogger.Trace("new type registered", zap.String("type", typ))
+	managerLogger.Debug("new type registered", zap.String("type", typ))
 	R.registry(typ, func() any {
 		return new(O)
 	}, func(ctx context.Context, option any) (T, error) {
@@ -72,7 +72,7 @@ func (R *defaultRegistry[T]) Create(ctx context.Context, typ string, option any)
 		panic("mismatch type excepted: " + typ + ", got: " + returned.Type())
 	}
 
-	managerLogger.Trace("registered object created",
+	managerLogger.Debug("registered object created",
 		zap.String("type", typ),
 		zap.String("name", returned.Name()))
 
@@ -87,7 +87,7 @@ func (R *defaultRegistry[T]) CreateOption(typ string) (any, error) {
 	if create == nil {
 		return nil, fmt.Errorf("unregistered type: %s", typ)
 	}
-	managerLogger.Trace("new option created", zap.String("type", typ))
+	managerLogger.Debug("new option created", zap.String("type", typ))
 	return create(), nil
 }
 

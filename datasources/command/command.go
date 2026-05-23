@@ -176,7 +176,7 @@ func runCommand(ctx context.Context, logger *zap.Logger,
 		}
 	}
 	logger.Debug("exit succeed", zap.Int("exit_code", exitCode))
-	if ce := logger.Check(zap.TraceLevel, "command output"); ce != nil {
+	if ce := logger.Check(zap.DebugLevel, "command output"); ce != nil {
 		ce.Write(zap.Int("len", buf.Len()), zap.String("output", string(buf.Bytes())))
 	}
 
