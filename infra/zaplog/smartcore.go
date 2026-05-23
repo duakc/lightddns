@@ -60,8 +60,13 @@ func (c *SmartCore) Sync() error {
 	if err != nil && c.outputWriteIsSync {
 		// fix sync error : https://github.com/uber-go/zap/issues/991
 		if gosys.IsWindows {
-			if _, ok := errors.AsType[*fs.PathError](err); ok {
-				err = nil
+			var pathErr *fs.PathError
+			if errors.As(err, &pathErr) {
+				// ERROR_INVALID_HANDLE(6) or ERROR_INVALID_FUNCTION(1):
+				// handle doesn't support sync (e.g., stdout redirected to pipe)
+				if errno, ok := pathErr.Err.(syscall.Errno); ok && (errno == 6 || errno == 1) {
+					err = nil
+				}
 			}
 		} else {
 			if errors.Is(err, syscall.EBADF) || errors.Is(err, syscall.ENOTTY) {

@@ -16,6 +16,7 @@ import (
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/mtmap"
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/filehelper"
 
 	goyaml "github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
@@ -55,10 +56,10 @@ func entry(cmd *cobra.Command, args []string) {
 		_ = cmd.Help()
 		return
 	}
-	if err := openConfigBind(commandArgument.Config, &commandArgument.Options); err != nil {
+	ctx := globalcontext.Load()
+	if err := openConfigBind(ctx, commandArgument.Config, &commandArgument.Options); err != nil {
 		zaplog.Fatal("read config file failed", zap.String("file", commandArgument.Config), zap.Error(err))
 	}
-	ctx := globalcontext.Load()
 
 	ddns, err := lightddns.New(ctx, commandArgument.Options)
 	if err != nil {
@@ -103,12 +104,13 @@ func runInstance(ctx context.Context, ddns *lightddns.LightDDNS) {
 	}
 }
 
-func openConfigBind(file string, opt *options.Options) error {
+func openConfigBind(ctx context.Context, file string, opt *options.Options) error {
 	type configTemplateContext struct {
 		Env map[string]string
 	}
+	fileHelper := services.Lookup[filehelper.Helper](ctx)
 
-	tempFile, err := template.ParseFiles(file)
+	tempFile, err := template.ParseFiles(fileHelper.Path(file))
 	if err != nil {
 		return err
 	}

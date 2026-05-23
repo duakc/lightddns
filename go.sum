@@ -5,6 +5,8 @@ github.com/duakc/mt v0.0.0-20260522032401-a4b652ea0442 h1:/fTlulz8hH/3O9QQ3KqjE9
 github.com/duakc/mt v0.0.0-20260522032401-a4b652ea0442/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/mt v0.0.0-20260523082952-ebe111533fcf h1:VBsunEs0G7MqVQXDN2m9lUJMmvAV0x48x2ePHuKYaj8=
 github.com/duakc/mt v0.0.0-20260523082952-ebe111533fcf/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260523084850-554beb20d007 h1:2UlgUEHAKSAuSFGVmrb0bA7Sep6IT9cszWL0KrfL2I4=
+github.com/duakc/mt v0.0.0-20260523084850-554beb20d007/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
 github.com/elastic/go-freelru v0.16.0/go.mod h1:bSdWT4M0lW79K8QbX6XY2heQYSCqD7THoYf82pT/H3I=
 github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=

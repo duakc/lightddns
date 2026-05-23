@@ -42,7 +42,7 @@ func init() {
 func preRun(cmd *cobra.Command, args []string) {
 	ctx := services.NewRegistry(globalcontext.Load(), services.NewDefaultRegistry())
 
-	fileHelper, err := filehelper.NewMkdir(workingDirectory)
+	fileHelper, err := filehelper.New(workingDirectory)
 	if err != nil {
 		zaplog.Fatal("create working directory failed", zap.Error(err))
 	}
