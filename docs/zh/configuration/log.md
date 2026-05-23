@@ -12,7 +12,7 @@ output: ""
 
 日志级别：
 
-可用值: `trace | debug | info | warn | error | dpanic | panic | fatal`。
+可用值: `debug | info | warn | error | panic | fatal`。
 
 留空使用 `info`
 

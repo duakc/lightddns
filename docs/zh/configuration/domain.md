@@ -56,7 +56,7 @@ datasources:
 
 domains:
   - domain: example.com
-    datasource: data-http 
+    datasource: data-http
 ```
 
 ## `ttl`
@@ -72,8 +72,8 @@ ttl: 300
 
 ## `ipv4` / `ipv6`
 
-控制该域名的启用的网站栈。
-留空代表 `IPv4` 和 `IPv6` 同时启用。
+控制该域名要更新的 IP 版本（IPv4 / IPv6）。
+留空代表 IPv4 和 IPv6 同时启用。
 
 
 ## `interval`

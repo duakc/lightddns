@@ -3,16 +3,18 @@
 Global logging configuration.
 
 ```yaml
-log:
-  level: info
-
-  disabled: false
-  output: ""
+level: info
+disabled: false
+output: ""
 ```
 
 ## `level`
 
-Log level. Uses [zap](https://github.com/uber-go/zap) levels: `debug | info | warn | error | dpanic | panic | fatal`.
+Log level. Uses [zap](https://github.com/uber-go/zap) levels:
+
+`debug | info | warn | error | panic | fatal`.
+
+When empty, defaults to `info`.
 
 ## `disabled`
 
