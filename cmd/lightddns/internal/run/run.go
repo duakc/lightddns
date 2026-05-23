@@ -115,7 +115,7 @@ func openConfigBind(ctx context.Context, file string, opt *options.Options) erro
 		return err
 	}
 	var tempContext configTemplateContext
-	tempContext.Env = fullEnv()
+	tempContext.Env = fullEnv(fileHelper)
 	configBuffer := bytes.NewBuffer(nil)
 	if err := tempFile.Execute(configBuffer, tempContext); err != nil {
 		return err
@@ -125,7 +125,7 @@ func openConfigBind(ctx context.Context, file string, opt *options.Options) erro
 	return decoder.Decode(opt)
 }
 
-func fullEnv() map[string]string {
+func fullEnv(fileHelper filehelper.Helper) map[string]string {
 	result := make(map[string]string)
 
 	for _, v := range os.Environ() {
@@ -135,7 +135,7 @@ func fullEnv() map[string]string {
 		}
 	}
 	if _, err := os.Stat(".env"); err == nil {
-		envFile, err := os.ReadFile(".env")
+		envFile, err := fileHelper.Root().ReadFile(".env")
 		if err != nil {
 			zaplog.Warn(".env file found but read failed", zap.Error(err))
 			return result
