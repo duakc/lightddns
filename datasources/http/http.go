@@ -2,7 +2,6 @@ package http
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,14 +13,15 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
-	"github.com/duakc/mt/services"
 
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
@@ -41,20 +41,28 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	if option.Method == "" {
 		option.Method = http.MethodGet
 	}
-	isDomainName := true
-	if !netool.IsDomainName(option.URL.URL.Host) {
-		ipAddress := option.URL.URL.Host
-		addr, err := netip.ParseAddr(ipAddress)
-		if err != nil {
-			return nil, fmt.Errorf("unknown address: %w: %w", err, dialerx.ErrNoAddressToDialer)
+	v4URL, v6URL := option.URL.IPv4, option.URL.IPv6
+	if v4URL.Raw == "" && v6URL.Raw == "" {
+		return nil, fmt.Errorf("url: at least one of ipv4 or ipv6 must be specified")
+	}
+
+	// If a URL host is a literal IP, force its stack and disable the other.
+	for stack, url := range map[string]*badyaml.URL{"ipv4": &v4URL, "ipv6": &v6URL} {
+		if url.Raw == "" || netool.IsDomainName(url.URL.Host) {
+			continue
 		}
-		isDomainName = false
-		if netool.IsIPv4(addr) {
-			option.DialStrategy = dialerx.DialOnlyIPv4
-		} else {
-			option.DialStrategy = dialerx.DialOnlyIPv6
+		addr, err := netip.ParseAddr(url.URL.Host)
+		if err != nil {
+			return nil, fmt.Errorf("url.%s: unknown address: %w: %w", stack, err, dialerx.ErrNoAddressToDialer)
+		}
+		if (stack == "ipv4") != netool.IsIPv4(addr) {
+			return nil, fmt.Errorf("url.%s: address family mismatch: %s", stack, addr)
 		}
 	}
+
+	needDNS := (v4URL.Raw != "" && netool.IsDomainName(v4URL.URL.Host)) ||
+		(v6URL.Raw != "" && netool.IsDomainName(v6URL.URL.Host))
+
 	dialerOptions, err := option.ConnectOption.Options()
 	if err != nil {
 		return nil, fmt.Errorf("dialer: %w", err)
@@ -65,35 +73,33 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	}
 
 	var (
-		logger = option.AbstractDatasourceOption.CreateLogger(services.LookupPtr[zap.Logger](ctx))
+		logger = option.AbstractDatasourceOption.CreateLogger(
+			zaplog.FromContext(ctx))
 		v4, v6 *requestContext
 	)
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
-	if isDomainName {
-		connectDialer = resolvectl.NewDialer(ctx, connectDialer, mt.Must(option.DNS.NewTransport(ctx, connectDialer)))
+	if needDNS {
+		connectDialer = resolvectl.NewDialer(ctx, connectDialer,
+			mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)
 	}
 
-	if option.DialStrategy != dialerx.DialOnlyIPv6 {
-		// enable ipv4
+	if v4URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv6 {
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
-		v4, err = newRequestContext(string(option.Method), option.URL.Raw,
+		v4, err = newRequestContext(string(option.Method), v4URL.Raw,
 			option.Headers.Header, httpClient,
-			cmp.Or(option.JSON.Str, option.JSON.Obj.IPv4),
-			cmp.Or(option.Regex.Str, option.Regex.Obj.IPv4))
+			option.JSON.IPv4, option.Regex.IPv4)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if option.DialStrategy != dialerx.DialOnlyIPv4 {
-		// enable ipv6
+	if v6URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv4 {
 		httpClient := httpxx.NewClient(append(httpOptions,
 			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
-		v6, err = newRequestContext(string(option.Method), option.URL.Raw,
+		v6, err = newRequestContext(string(option.Method), v6URL.Raw,
 			option.Headers.Header, httpClient,
-			cmp.Or(option.JSON.Str, option.JSON.Obj.IPv6),
-			cmp.Or(option.Regex.Str, option.Regex.Obj.IPv6))
+			option.JSON.IPv6, option.Regex.IPv6)
 		if err != nil {
 			return nil, err
 		}

@@ -24,12 +24,12 @@ headers:
 ```
 
 ??? note "Behavior"
-    The HTTP datasource creates separate IPv4 and IPv6 request contexts based on `dialStrategy`:
+    The HTTP datasource creates independent IPv4 and IPv6 request contexts, each pinned to its own `tcp4`/`tcp6` dialer:
 
-    - Non-`ipv4_only` mode creates an IPv6 context (`tcp6` dialer)
-    - Non-`ipv6_only` mode creates an IPv4 context (`tcp4` dialer)
+    - An IPv4 context is created when `url.ipv4` is set and `dialStrategy` is not `ipv6_only`
+    - An IPv6 context is created when `url.ipv6` is set and `dialStrategy` is not `ipv4_only`
 
-    Each context uses its own `json`/`regex` expression for IP extraction. The final result merges IPv4 and IPv6.
+    Each context uses its own URL plus the corresponding `json`/`regex` expression. The final result merges IPv4 and IPv6.
 
 ---
 
@@ -39,6 +39,8 @@ headers:
 
 The request URL for retrieving the IP address. **Must include the `http://` or `https://` scheme**.
 
+**Short form** (`string`) — same URL used for both IPv4 and IPv6 requests:
+
 ```yaml
 # Returns plain-text IP
 url: https://api.ip.sb/ip
@@ -47,7 +49,15 @@ url: https://api.ip.sb/ip
 url: https://api64.ipify.org?format=json
 ```
 
-If the URL host is an IP address rather than a domain name, `dialStrategy` is automatically overridden to match the IP's version (IPv4 to `ipv4_only`, IPv6 to `ipv6_only`).
+**Object form** — separate endpoints for each stack. Useful when IPv4 and IPv6 lookups live on different hosts. Either stack may be omitted to disable that family entirely.
+
+```yaml
+url:
+  ipv4: https://api.ipify.org
+  ipv6: https://api6.ipify.org
+```
+
+If a URL host is a literal IP address rather than a domain name, the address family must match the stack it is assigned to (an IPv4 literal under `ipv4`, an IPv6 literal under `ipv6`).
 
 ---
 

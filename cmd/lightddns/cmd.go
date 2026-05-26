@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -16,11 +17,14 @@ import (
 
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"
+	"github.com/duakc/mt/services/container"
 	"github.com/duakc/mt/services/filehelper"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
+
+var closeManager closeme.Manager
 
 var rootCommand = &cobra.Command{
 	Use:              constant.Project,
@@ -42,21 +46,25 @@ func init() {
 func preRun(cmd *cobra.Command, args []string) {
 	ctx := services.NewRegistry(globalcontext.Load(), services.NewDefaultRegistry())
 
+	closeManager = closeme.NewManager()
+
 	fileHelper, err := filehelper.New(workingDirectory)
 	if err != nil {
 		zaplog.Fatal("create working directory failed", zap.Error(err))
 	}
-	defer closeme.AddClose(fileHelper)
+	defer closeme.AddClose(closeManager, fileHelper)
 
-	services.Store(ctx, fileHelper)
+	services.Store[filehelper.Helper](ctx, fileHelper)
+	services.Store[closeme.Manager](ctx, closeManager)
+	services.Store[container.Provider](ctx, container.NewDefaultProvider())
 
 	globalcontext.Store(ctx)
 }
 
 func main() {
 	defer func() {
-		if err := closeme.Close(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "close failed: %v", err)
+		if err := errors.Join(closeManager.Close(), closeme.Default.Close()); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "close resources failed:\n%v", err)
 		}
 	}()
 	if err := rootCommand.Execute(); err != nil {

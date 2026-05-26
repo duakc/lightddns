@@ -12,7 +12,10 @@ import (
 type Duration time.Duration
 
 func (d *Duration) UnmarshalYAML(data []byte) error {
-	s := mt.UnquoteString(string(data))
+	s, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
 	if len(s) == 0 {
 		*d = Duration(0)
 		return nil
@@ -60,8 +63,11 @@ func (E *EnvironmentVariable) Lookup(key string) string {
 type LogLevel zapcore.Level
 
 func (L *LogLevel) UnmarshalYAML(data []byte) error {
-	levelString := mt.UnquoteString(string(data))
-	level, err := zapcore.ParseLevel(levelString)
+	s, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
+	level, err := zapcore.ParseLevel(s)
 	if err != nil {
 		return err
 	}

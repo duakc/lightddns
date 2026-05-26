@@ -13,12 +13,12 @@ import (
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/common/generic"
-	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -49,11 +49,11 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 		httpxx.ClientOptionWithToken(option.Token),
 		httpxx.ClientOptionWithDialer(
 			resolvectl.NewDialer(ctx, connectDialer,
-				mt.Must(option.DNS.NewTransport(ctx, connectDialer)))))
+				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
 
 	cf := &Cloudflare{
 		logger: option.AbstractProviderOption.CreateLogger(
-			services.LookupPtr[zap.Logger](ctx),
+			zaplog.FromContext(ctx),
 		),
 		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),
 		zones:  new(generic.SyncMap[string, string]),

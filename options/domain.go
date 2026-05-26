@@ -5,11 +5,12 @@ import (
 )
 
 type DomainOption struct {
+	Enabled bool `json:"enabled" yaml:"enabled"`
+
 	Domain badyaml.DomainName `json:"domain" yaml:"domain"`
 
-	Enabled    bool   `json:"enabled"    yaml:"enabled"`
-	Provider   string `json:"provider"   yaml:"provider"`
-	Datasource string `json:"datasource" yaml:"datasource"`
+	Provider   string `json:"provider,omitempty"   yaml:"provider,omitempty"`
+	Datasource string `json:"datasource,omitempty" yaml:"datasource,omitempty"`
 
 	TTL  uint32 `json:"ttl,omitempty"  yaml:"ttl,omitempty"`
 	IPv4 bool   `json:"ipv4,omitempty" yaml:"ipv4,omitempty"`

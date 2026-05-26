@@ -29,8 +29,8 @@ func (do *DatasourceOption) UnmarshalYAML(bs []byte) error {
 }
 
 type AbstractDatasourceOption struct {
-	Type string `json:"type" yaml:"type"`
-	Name string `json:"name" yaml:"name"`
+	Type string `json:"type"           yaml:"type"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 func (AbstractDatasourceOption) UsedType() string {

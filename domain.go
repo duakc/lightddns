@@ -10,11 +10,13 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/debug"
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/container"
 
 	"go.uber.org/zap"
 )
@@ -42,18 +44,13 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, nil
 	}
-	if len(opt.Datasource) == 0 {
-		return nil, fmt.Errorf("missing datasource")
-	}
-	if len(opt.Provider) == 0 {
-		return nil, fmt.Errorf("missing provider")
-	}
 	if !opt.IPv4 && !opt.IPv6 {
 		opt.IPv4 = true
 		opt.IPv6 = true
 	}
 
-	logger := services.LookupPtr[zap.Logger](ctx).Named(string(opt.Domain))
+	logger := zaplog.FromContext(ctx).With(
+		zap.String("domain", string(opt.Domain)))
 	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
 	providerManager := services.Lookup[adapter.ProviderManager](ctx)
 
@@ -130,10 +127,14 @@ func (o *Domain) Close() error {
 func (o *Domain) Update(ctx context.Context) error {
 	logger := o.logger
 
-	ctx, cancel := context.WithTimeout(ctx, o.timeout)
+	containerProvider := services.Lookup[container.Provider](ctx)
+	ctx = containerProvider.New(ctx)
+	defer containerProvider.Release(ctx)
+
+	cancelContext, cancel := context.WithTimeout(ctx, o.timeout)
 	defer cancel()
 
-	netips, err := adapter.MergeDatasources(ctx,
+	netips, err := adapter.MergeDatasources(cancelContext,
 		[]adapter.Datasource{o.datasource}, o.ipv4, o.ipv6, true)
 	if err != nil {
 		return err
@@ -142,13 +143,13 @@ func (o *Domain) Update(ctx context.Context) error {
 			return fmt.Errorf("no available IP address found")
 		}
 
-		logger.Info("no available IP address from datasource, skip this update")
+		logger.Warn("no available IP address from datasource, skip this update")
 		return nil
 	}
 
 	logger.Debug("found ip", zap.Stringers("ip", netips))
 
-	if err := o.provider.Update(ctx, o.domainName, o.ttl, netips); err != nil {
+	if err := o.provider.Update(cancelContext, o.domainName, o.ttl, netips); err != nil {
 		return fmt.Errorf("update domain(%s) failed: %w", o.domainName, err)
 	}
 	return nil
@@ -161,7 +162,6 @@ func (o *Domain) updateLoop() error {
 	if mt.Done(o.taskCtx) {
 		return o.taskCtx.Err()
 	}
-
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -182,10 +182,13 @@ func (o *Domain) updateLoop() error {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Warn("quited", zap.Error(ctx.Err()))
-				if causeErr := context.Cause(ctx); causeErr != nil && !errors.Is(causeErr, context.Canceled) {
-					o.closeErr = causeErr
-				}
+				//if causeErr := context.Cause(ctx); causeErr != nil &&
+				//	!errors.Is(causeErr, context.Canceled) && !errors.Is(causeErr, signal.NotifyContext()) {
+				//	o.closeErr = causeErr
+				//}
+				//if o.closed != nil {
+				//	logger.Warn("quited", zap.Error(o.closeErr))
+				//}
 				return
 			case <-ticker.C:
 				err := o.Update(ctx)

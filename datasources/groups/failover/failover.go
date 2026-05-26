@@ -9,6 +9,7 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -32,7 +33,7 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 	logger := option.AbstractDatasourceOption.CreateLogger(
-		services.LookupPtr[zap.Logger](ctx))
+		zaplog.FromContext(ctx))
 
 	var datasources []adapter.Datasource
 	manager := services.Lookup[adapter.DatasourceManager](ctx)

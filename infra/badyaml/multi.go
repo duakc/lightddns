@@ -2,9 +2,6 @@ package badyaml
 
 import (
 	"fmt"
-	"strconv"
-
-	"github.com/duakc/mt"
 )
 
 type StringOrNumber struct {
@@ -13,13 +10,16 @@ type StringOrNumber struct {
 }
 
 func (bn *StringOrNumber) UnmarshalYAML(data []byte) error {
-	unquoted := mt.UnquoteString(string(data))
 	*bn = StringOrNumber{} // reset
-	if num, err := strconv.ParseInt(unquoted, 10, 64); err == nil {
+	if num, err := UnmarshalType[int64](data); err == nil {
 		bn.Num = num
-	} else {
-		bn.Str = unquoted
+		return nil
 	}
+	str, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
+	bn.Str = str
 	return nil
 }
 

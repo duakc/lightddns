@@ -11,8 +11,7 @@ import (
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/internal"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
-
-	"github.com/duakc/mt/services"
+	"github.com/duakc/lightddns/infra/zaplog"
 
 	"go.uber.org/zap"
 )
@@ -22,6 +21,8 @@ type ResolveDialer struct {
 
 	dialer    dialerx.Dialer
 	transport transports.Transport
+
+	resolver ResolveClient
 }
 
 func (r *ResolveDialer) DialContext(ctx context.Context, network string, address string) (net.Conn, error) {
@@ -59,9 +60,8 @@ func (r *ResolveDialer) DialContext(ctx context.Context, network string, address
 	} else if network == "udp6" || network == "tcp6" || network == "ip6" {
 		strategy = ResolveIPv6
 	}
-	resolver := services.LookupDefault[ResolveClient](ctx, DefaultResolveClient)
 	var addresses []netip.Addr
-	addresses, err = resolver.Lookup(ctx, r.transport, host, strategy)
+	addresses, err = r.resolver.Lookup(ctx, r.transport, host, strategy)
 	if err != nil {
 		return nil, fmt.Errorf("lookup: %w", err)
 	}
@@ -76,7 +76,11 @@ func (r *ResolveDialer) DialContext(ctx context.Context, network string, address
 		internal.DefaultHappyEyeballFallbackDelay)
 }
 
-func NewDialer(ctx context.Context, dialer dialerx.Dialer, transport transports.Transport) *ResolveDialer {
-	logger := services.LookupPtrDefault[zap.Logger](ctx, resolverLogger)
-	return &ResolveDialer{logger: logger, dialer: dialer, transport: transport}
+func NewDialer(ctx context.Context,
+	dialer dialerx.Dialer,
+	transport transports.Transport,
+	resolver ResolveClient,
+) *ResolveDialer {
+	logger := zaplog.FromContext(ctx)
+	return &ResolveDialer{logger: logger, dialer: dialer, transport: transport, resolver: resolver}
 }

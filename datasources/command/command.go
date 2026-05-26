@@ -12,6 +12,7 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -35,7 +36,7 @@ func init() {
 }
 
 func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.Datasource, error) {
-	logger := option.AbstractDatasourceOption.CreateLogger(services.LookupPtr[zap.Logger](ctx))
+	logger := option.AbstractDatasourceOption.CreateLogger(zaplog.FromContext(ctx))
 	fileHelper := services.Lookup[filehelper.Helper](ctx)
 
 	command := sh.New()

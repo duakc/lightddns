@@ -16,6 +16,9 @@ type ManagedNotFoundError struct {
 }
 
 func (e *ManagedNotFoundError) Error() string {
+	if e.Name == "" {
+		return "empty name"
+	}
 	return fmt.Sprintf("`%s` not found", e.Name)
 }
 

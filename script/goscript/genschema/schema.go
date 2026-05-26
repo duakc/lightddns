@@ -14,6 +14,19 @@ import (
 	"github.com/duakc/mt"
 )
 
+func dualStack(item *jsonschema.Schema) *jsonschema.Schema {
+	return &jsonschema.Schema{AnyOf: []*jsonschema.Schema{
+		item,
+		{
+			Type: JSONTypeObject,
+			Properties: map[string]*jsonschema.Schema{
+				"ipv4": item,
+				"ipv6": item,
+			},
+		},
+	}}
+}
+
 var (
 	optionsTypeMappingTable     = make(map[reflect.Type]*jsonschema.Schema)
 	optionsTypeMappingTableOnce sync.Once
@@ -32,7 +45,9 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.DomainName]()] = singleType(JSONTypeString)
 
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.StringOrNumber]()] = stringOr(singleType(JSONTypeNumber))
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.StringOrObject[options.DualStack[string]]]()] = stringOr(mt.Must(jsonschema.For[options.DualStack[string]](nil)))
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[string]]()] = dualStack(singleType(JSONTypeString))
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[badyaml.URL]]()] = dualStack(singleType(JSONTypeString))
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[badyaml.Listable[string]]]()] = dualStack(listAble(JSONTypeString))
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()] = enumSchema(JSONTypeString, "debug", "info", "warn", "error", "panic", "fatal")
 
 		optionsTypeMappingTable[reflect.TypeFor[dialerx.DialStrategy]()] = enumSchema(JSONTypeString, mt.Map(

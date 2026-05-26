@@ -24,12 +24,12 @@ headers:
 ```
 
 ??? note "行为说明"
-    HTTP 数据源根据 `dialStrategy` 分别创建 IPv4 和 IPv6 的请求上下文：
+    HTTP 数据源会分别创建 IPv4 和 IPv6 的独立请求上下文，各自固定使用 `tcp4`/`tcp6` 拨号器：
 
-    - 非 `ipv4_only` 模式创建 IPv6 上下文（`tcp6` 拨号）
-    - 非 `ipv6_only` 模式创建 IPv4 上下文（`tcp4` 拨号）
+    - 当 `url.ipv4` 已配置且 `dialStrategy` 不为 `ipv6_only` 时创建 IPv4 上下文
+    - 当 `url.ipv6` 已配置且 `dialStrategy` 不为 `ipv4_only` 时创建 IPv6 上下文
 
-    各自的 `json`/`regex` 表达式独立提取对应 IP，最终合并返回。
+    每个上下文使用自己的 URL 以及对应的 `json`/`regex` 表达式，最终合并 IPv4 和 IPv6 结果返回。
 
 ---
 
@@ -39,6 +39,8 @@ headers:
 
 获取 IP 地址的请求 URL。**必须携带 `http://` 或 `https://` 协议头**。
 
+**简写形式**（`string`）— IPv4 和 IPv6 共用同一个 URL：
+
 ```yaml
 # 返回纯文本 IP
 url: https://api.ip.sb/ip
@@ -47,7 +49,15 @@ url: https://api.ip.sb/ip
 url: https://api64.ipify.org?format=json
 ```
 
-若 URL 主机部分是 IP 地址而非域名，`dialStrategy` 会自动覆盖为该 IP 对应的版本（IPv4 → `ipv4_only`，IPv6 → `ipv6_only`）。
+**对象形式** — 单独为 IPv4 和 IPv6 指定不同的端点。适合两栈服务部署在不同主机的情况。省略某一栈即可禁用该协议族：
+
+```yaml
+url:
+  ipv4: https://api.ipify.org
+  ipv6: https://api6.ipify.org
+```
+
+若 URL 主机部分是 IP 字面量而非域名，其地址族必须与所在栈一致（IPv4 字面量放在 `ipv4` 下，IPv6 字面量放在 `ipv6` 下）。
 
 ---
 

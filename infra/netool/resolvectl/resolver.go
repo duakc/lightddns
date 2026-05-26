@@ -15,7 +15,6 @@ import (
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/common/generic"
 	"github.com/duakc/mt/debug"
-	"github.com/duakc/mt/services"
 
 	"github.com/elastic/go-freelru"
 	mDns "github.com/miekg/dns"
@@ -58,7 +57,10 @@ type defaultResolveClient struct {
 
 func NewResolver(ctx context.Context) ResolveClient {
 	seed := maphash.MakeSeed()
-	logger := services.LookupPtrDefault[zap.Logger](ctx, resolverLogger)
+	logger := zaplog.FromContext(ctx)
+	if logger == zaplog.NOP && debug.Enabled {
+		logger = resolverLogger
+	}
 	return &defaultResolveClient{
 		logger: logger.Named("resolver"),
 		cache: mt.Must(freelru.NewSharded[mDns.Question, dnsCacheMessage](defaultCacheSize,

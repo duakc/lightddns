@@ -1,15 +1,9 @@
 package zaplog
 
 import (
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
-	"syscall"
 	"time"
 
 	"github.com/duakc/mt/debug"
-	"github.com/duakc/mt/gosys"
 
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
@@ -48,41 +42,16 @@ func NewSmartCore(enc zapcore.Encoder, w zapcore.WriteSyncer,
 	}
 
 	smart.ioCore = zapcore.NewCore(enc, smart.flushBuffer, lvl)
-	if w == os.Stdout || w == os.Stderr {
-		smart.outputWriteIsSync = true
-	}
 	smart.Core = smart.ioCore
 	return smart
 }
 
 func (c *SmartCore) Sync() error {
-	err := c.Core.Sync()
-	if err != nil && c.outputWriteIsSync {
-		// fix sync error : https://github.com/uber-go/zap/issues/991
-		if gosys.IsWindows {
-			var pathErr *fs.PathError
-			if errors.As(err, &pathErr) {
-				// ERROR_INVALID_HANDLE(6) or ERROR_INVALID_FUNCTION(1):
-				// handle doesn't support sync (e.g., stdout redirected to pipe)
-				if errno, ok := pathErr.Err.(syscall.Errno); ok && (errno == 6 || errno == 1) {
-					err = nil
-				}
-			}
-		} else {
-			if errors.Is(err, syscall.EBADF) || errors.Is(err, syscall.ENOTTY) {
-				err = nil
-			}
-		}
-		if err != nil {
-			_, _ = fmt.Fprintf(
-				os.Stderr,
-				"%v sync error: %v\n",
-				time.Now(),
-				err,
-			)
-		}
-	}
-	return err
+	return c.flushBuffer.Sync()
+}
+
+func (c *SmartCore) Close() error {
+	return c.flushBuffer.Stop()
 }
 
 var _ zapcore.Core = (*splitLevelCore)(nil)
@@ -107,8 +76,4 @@ func (c *splitLevelCore) Write(entry zapcore.Entry, fields []zapcore.Field) erro
 		err = multierr.Append(err, c.Core.Sync())
 	}
 	return err
-}
-
-func (c *SmartCore) Close() error {
-	return c.flushBuffer.Stop()
 }

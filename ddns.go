@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
@@ -13,6 +13,8 @@ import (
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/closeme"
+	"github.com/duakc/mt/services/container"
 	"github.com/duakc/mt/services/filehelper"
 
 	"go.uber.org/zap"
@@ -33,12 +35,18 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		return nil, fmt.Errorf("create logger: %w", err)
 	}
 
+	loggerFactory := zaplog.NewFactory(logger)
+	services.Store[zaplog.Factory](ctx, loggerFactory)
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
-	datasourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
-
-	services.StorePtr[zap.Logger](ctx, logger)
 	services.Store[adapter.ProviderManager](ctx, providerManager)
+	datasourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
 	services.Store[adapter.DatasourceManager](ctx, datasourceManager)
+
+	// pass logger to downstream
+	containerProvider := services.Lookup[container.Provider](ctx)
+	ctx = containerProvider.New(ctx)
+	defer containerProvider.Release(ctx)
+	zaplog.WithContext(ctx, logger)
 
 	logger = logger.Named("main")
 	resortedDatasources, err := resortDatasources(opt.Datasources)
@@ -70,6 +78,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		defaultProviderName   string
 		defaultDatasourceName string
 	)
+
 	if len(opt.Providers) == 1 {
 		defaultProviderName = opt.Providers[0].Name
 	}
@@ -84,7 +93,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		domain, err := NewDomain(ctx, domainOption)
 		if domain == nil && err == nil {
 			// not enabled
-			logger.Info("domain not enabled", zap.String("domain", string(domainOption.Domain)))
+			logger.Warn("domain not enabled", zap.String("domain", string(domainOption.Domain)))
 			continue
 		}
 		if err != nil {
@@ -217,13 +226,14 @@ func newLoggerWithOptions(ctx context.Context, opt options.LogOption) (*zap.Logg
 		err        error
 	)
 	zaplog.DefaultLevel(level)
+	closeManager := services.Lookup[closeme.Manager](ctx)
 
-	var outputFD *os.File
+	var outputFD io.Writer
 	switch strings.ToLower(opt.Output) {
 	case "stdout", "":
-		outputFD = os.Stdout
+		outputFD = zaplog.Stdout
 	case "stderr":
-		outputFD = os.Stderr
+		outputFD = zaplog.Stderr
 	default:
 		outputFD, err = fileHelper.Create(opt.Output)
 		if err != nil {
@@ -231,6 +241,6 @@ func newLoggerWithOptions(ctx context.Context, opt options.LogOption) (*zap.Logg
 		}
 	}
 
-	logger := zaplog.NewDefault(outputFD, level, nil)
+	logger := zaplog.NewDefault(closeManager, outputFD, level, nil)
 	return logger, nil
 }

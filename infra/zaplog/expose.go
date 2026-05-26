@@ -1,10 +1,10 @@
 package zaplog
 
 import (
-	"os"
 	"strings"
 
 	"github.com/duakc/mt/debug"
+	"github.com/duakc/mt/services/closeme"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -27,7 +27,7 @@ func createDefault(lvl zapcore.LevelEnabler) *zap.Logger {
 	}
 	options = append(options, zap.AddCallerSkip(1))
 
-	return NewDefault(os.Stderr, lvl, options).
+	return NewDefault(closeme.Default, Stderr, lvl, options).
 		Named("default")
 }
 

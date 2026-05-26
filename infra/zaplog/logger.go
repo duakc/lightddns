@@ -17,12 +17,12 @@ const (
 
 var NOP = zap.NewNop()
 
-func NewDefault(output io.Writer, level zapcore.LevelEnabler, options []zap.Option) *zap.Logger {
+func NewDefault(closeManager closeme.Manager, output io.Writer, level zapcore.LevelEnabler, options []zap.Option) *zap.Logger {
 	coreEncoder := zapcore.NewJSONEncoder(DefaultJSONEncoderConfig())
 
 	var core zapcore.Core
-	smartCore := NewSmartCore(coreEncoder, zapcore.Lock(zapcore.AddSync(output)), level)
-	defer closeme.AddClose(smartCore)
+	smartCore := NewSmartCore(coreEncoder, zapcore.AddSync(output), level)
+	defer closeme.AddClose(closeManager, smartCore)
 
 	core = smartCore
 	if level.Enabled(zapcore.WarnLevel) {

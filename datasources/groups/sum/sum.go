@@ -7,6 +7,7 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/services"
@@ -30,7 +31,7 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 	}
 
 	logger := option.AbstractDatasourceOption.CreateLogger(
-		services.LookupPtr[zap.Logger](ctx))
+		zaplog.FromContext(ctx))
 
 	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
 	var datasources []adapter.Datasource

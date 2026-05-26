@@ -2,22 +2,21 @@ package badyaml
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	urlpkg "net/url"
 	"strings"
 
 	"github.com/duakc/lightddns/infra/netool"
-
-	"github.com/duakc/mt"
-
-	goyaml "github.com/goccy/go-yaml"
 )
 
 type HTTPMethod string
 
 func (m *HTTPMethod) UnmarshalYAML(data []byte) error {
-	method := strings.ToUpper(mt.UnquoteString(string(data)))
+	s, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
+	method := strings.ToUpper(s)
 	switch method {
 	case "", http.MethodGet, http.MethodPost, http.MethodPut, http.MethodConnect,
 		http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPatch,
@@ -36,21 +35,20 @@ type HTTPHeader struct {
 
 func (h *HTTPHeader) UnmarshalYAML(data []byte) error {
 	m := make(map[string]any)
-	if err := Unmarshal(data, m); err != nil {
+	if err := Unmarshal(data, &m); err != nil {
 		return err
 	}
 	h.Header = make(http.Header)
 	for k, v := range m {
 		switch val := v.(type) {
 		case string:
-			val = mt.UnquoteString(val)
 			h.Header.Add(k, val)
 		case []any:
 			for _, item := range val {
 				if s, ok := item.(string); ok {
-					h.Header.Add(k, mt.UnquoteString(s))
+					h.Header.Add(k, s)
 				} else {
-					h.Header.Add(k, mt.UnquoteString(fmt.Sprint(s)))
+					h.Header.Add(k, fmt.Sprint(item))
 				}
 			}
 		}
@@ -64,33 +62,29 @@ type URL struct {
 }
 
 func (m *URL) UnmarshalYAML(data []byte) error {
-	url := mt.UnquoteString(string(data))
-	parse, err := urlpkg.Parse(url)
+	s, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
+	parse, err := urlpkg.Parse(s)
 	if err != nil {
 		return err
 	}
 	m.URL = parse
-	m.Raw = url
+	m.Raw = s
 	return nil
 }
 
 type DomainName string
 
 func (d *DomainName) UnmarshalYAML(data []byte) error {
-	s := mt.UnquoteString(string(data))
+	s, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
 	if !netool.IsDomainName(s) {
 		return fmt.Errorf("invalid domain name: %s", s)
 	}
 	*d = DomainName(s)
 	return nil
-}
-
-func Unmarshal(data []byte, v any, options ...goyaml.DecodeOption) error {
-	return goyaml.UnmarshalWithOptions(data, v, append(options,
-		goyaml.DisallowUnknownField())...)
-}
-
-func NewDecoder(r io.Reader, options ...goyaml.DecodeOption) *goyaml.Decoder {
-	return goyaml.NewDecoder(r, append(options,
-		goyaml.DisallowUnknownField())...)
 }

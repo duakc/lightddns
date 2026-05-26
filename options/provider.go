@@ -29,8 +29,8 @@ func (po *ProviderOption) UnmarshalYAML(bs []byte) error {
 }
 
 type AbstractProviderOption struct {
-	Type string `json:"type" yaml:"type"`
-	Name string `json:"name" yaml:"name"`
+	Type string `json:"type"           yaml:"type"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 func (AbstractProviderOption) UsedType() string {

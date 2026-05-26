@@ -8,6 +8,7 @@ Light weight DDNS Prog
 - [ ] Complete doc
 - [ ] Web config generator (in the docs page)
 - [ ] Add more providers ( aws, tencent, alibaba ... )
+- [ ] Add deb, rpm, nix, pkg.zst and so on installation methods.
 
 ## Considering TODOs
 Below Todos need more consideration.
