@@ -69,6 +69,7 @@ func GenSchema() ([]byte, error) {
 
 		providerTag   = lookupTagIn[options.Options, options.ProviderOption]()
 		datasourceTag = lookupTagIn[options.Options, options.DatasourceOption]()
+		servicesTag   = lookupTagIn[options.Options, options.ServiceOption]()
 	)
 	rootSchema.Properties = make(map[string]*jsonschema.Schema)
 	rootSchema.Properties[logTag] = mustFor[options.LogOption]()
@@ -76,6 +77,7 @@ func GenSchema() ([]byte, error) {
 
 	rootSchema.Properties[providerTag] = providerSchema()
 	rootSchema.Properties[datasourceTag] = datasourceSchema()
+	rootSchema.Properties[servicesTag] = servicesSchema()
 
 	rootSchema.Required = append(rootSchema.Required, domainTag, providerTag, datasourceTag)
 
@@ -88,6 +90,10 @@ func providerSchema() *jsonschema.Schema {
 
 func datasourceSchema() *jsonschema.Schema {
 	return schemaFromRegistry(adapter.DatasourceRegister)
+}
+
+func servicesSchema() *jsonschema.Schema {
+	return schemaFromRegistry(adapter.ServiceRegistry)
 }
 
 type schemaRegistry interface {

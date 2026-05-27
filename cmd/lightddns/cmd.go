@@ -14,6 +14,7 @@ import (
 	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
 	_ "github.com/duakc/lightddns/providers"
+	_ "github.com/duakc/lightddns/services"
 
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"

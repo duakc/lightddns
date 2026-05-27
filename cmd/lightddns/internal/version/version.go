@@ -26,7 +26,7 @@ var Command = &cobra.Command{
 }
 
 func init() {
-	Command.Flags().StringVarP(&outputMethod, "format", "f", "", "Output format: json, yaml, or plain (default)")
+	Command.Flags().StringVarP(&outputMethod, "format", "f", "plain", "Output format: json, yaml, or plain (default)")
 }
 
 type Info struct {
@@ -36,6 +36,7 @@ type Info struct {
 	Debug      bool
 	Datasource []string
 	Provider   []string
+	Services   []string
 }
 
 func entry(cmd *cobra.Command, args []string) {
@@ -45,7 +46,10 @@ func entry(cmd *cobra.Command, args []string) {
 		I.JSON()
 	case "yaml", "yml":
 		I.YAML()
+	case "plain":
+		I.Plain()
 	default:
+		_, _ = fmt.Fprintf(os.Stderr, "unknown output method: %s, use plain as default\n", outputMethod)
 		I.Plain()
 	}
 }
@@ -53,9 +57,12 @@ func entry(cmd *cobra.Command, args []string) {
 func NewInfo() Info {
 	datasourceTypes := adapter.DatasourceRegister.Types()
 	providerTypes := adapter.ProviderRegister.Types()
+	serviceTypes := adapter.ServiceRegistry.Types()
 
 	sort.Strings(datasourceTypes)
 	sort.Strings(providerTypes)
+	sort.Strings(serviceTypes)
+
 	return Info{
 		Name:    constpkg.Project,
 		Version: constpkg.Version,
@@ -64,6 +71,7 @@ func NewInfo() Info {
 		Debug:      debug.Enabled,
 		Datasource: datasourceTypes,
 		Provider:   providerTypes,
+		Services:   serviceTypes,
 	}
 }
 
@@ -81,9 +89,11 @@ func (I Info) Plain() {
 	const temp = `%s: Version: %s, Branch: %s, Debug: %t
 Supported Datasource: %s
 Supported Provider: %s
+Supported Services: %s
 `
 	_, _ = fmt.Fprintf(os.Stderr, temp, I.Name,
 		I.Version, I.Branch, I.Debug,
 		strings.Join(I.Datasource, ","),
-		strings.Join(I.Provider, ","))
+		strings.Join(I.Provider, ","),
+		strings.Join(I.Services, ","))
 }

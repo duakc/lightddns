@@ -1,7 +1,6 @@
 package lightddns
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -73,23 +72,10 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 			zap.String("name", providerOption.Name))
 	}
 
-	var (
-		domains               []*Domain
-		defaultProviderName   string
-		defaultDatasourceName string
-	)
-
-	if len(opt.Providers) == 1 {
-		defaultProviderName = opt.Providers[0].Name
-	}
-	if len(opt.Datasources) == 1 {
-		defaultDatasourceName = opt.Datasources[0].Name
-	}
+	var domains []*Domain
 
 	for i := 0; i < len(opt.Domains); i++ {
 		domainOption := opt.Domains[i]
-		domainOption.Provider = cmp.Or(domainOption.Provider, defaultProviderName)
-		domainOption.Datasource = cmp.Or(domainOption.Datasource, defaultDatasourceName)
 		domain, err := NewDomain(ctx, domainOption)
 		if domain == nil && err == nil {
 			// not enabled
