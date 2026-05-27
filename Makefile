@@ -13,6 +13,8 @@ GO_BUILD=$(GO_SCRIPT) build -verbose \
 			-workdir $(MAIN_WORKDIR) -binary $(NAME)\
 			-output $(BUILD_OUTPUT)
 
+GO_LINT=golangci-lint
+
 ifeq ($(origin DOCKER_CLI), undefined)
     DOCKER_CLI := $(shell command -v nerdctl || command -v docker)
 endif
@@ -41,16 +43,16 @@ toolchain:
 
 .PHONY: fmt
 fmt:
-	@golangci-lint fmt ./...
+	$(GO_LINT) fmt ./...
 
 .PHONY: lint
 lint: fmt
-	@go vet ./...
-	@golangci-lint run ./...
+	go vet ./...
+	$(GO_LINT) run --timeout=30s ./...
 
 .PHONY: lint-fix
 lint-fix:
-	@golangci-lint run --fix ./...
+	$(GO_LINT) run --timeout=30s --fix ./...
 
 .PHONY: clean
 clean:
@@ -67,7 +69,7 @@ build-dev: generate
 
 .PHONY: build
 build: generate
-	$(GO_BUILD)
+	@$(GO_BUILD)
 
 .PHONY: build-docs
 build-docs:

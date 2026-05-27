@@ -34,7 +34,9 @@ jobs:
         with:
           version: v2.11.4
           install-mode: binary
-          verify: false
+          verify: true
+          # a hack, let the linter install but not run it.
+          args: '--help'
       - name: Test
         run: |
           make test
