@@ -3,7 +3,7 @@ run:
   go: "1.26.2"
   timeout: "30s"
   tests: false
-  tags:
+  build-tags:
     - debug
 linters:
   default: none
