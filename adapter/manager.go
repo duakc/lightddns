@@ -126,3 +126,15 @@ func (M *DefaultManager[T]) Lookup(name string) (T, bool) {
 	}
 	return mt.Zero[T](), false
 }
+
+func CollectManagedItem[T managedType](M Manager[T], names []string) ([]T, error) {
+	var items []T
+	for _, name := range names {
+		item, ok := M.Lookup(name)
+		if !ok {
+			return nil, &ManagedNotFoundError{name}
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}

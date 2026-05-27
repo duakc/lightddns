@@ -68,6 +68,7 @@ func (R *defaultRegistry[T]) Create(ctx context.Context, typ string, option any)
 	if err != nil {
 		return mt.Zero[T](), err
 	}
+
 	if err == nil && debug.Enabled && returned.Type() != typ {
 		panic("mismatch type excepted: " + typ + ", got: " + returned.Type())
 	}

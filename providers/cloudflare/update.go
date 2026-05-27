@@ -12,22 +12,22 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) error {
+func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
 	logger := c.logger
 	logger.Debug("new update request",
 		zap.Stringers("addresses", addr),
 		zap.String("domain", domain))
 	zoneID, err := c.getZoneID(ctx, domain)
 	if err != nil {
-		return fmt.Errorf("getZoneID: %w", err)
+		return false, fmt.Errorf("getZoneID: %w", err)
 	}
 	diffRecords, err := c.diff(ctx, domain, addr)
 	if diff, er := isDiff(diffRecords, err); !diff || er != nil {
 		if len(diffRecords) == 0 && er == nil {
 			logger.Info("no difference since last updated, skip")
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("diff: %w", err)
+		return false, fmt.Errorf("diff: %w", err)
 	}
 	for i := 0; i < len(diffRecords); i++ {
 		var err error
@@ -49,10 +49,10 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr
 			err = c.client.DeleteDNSRecord(ctx, zoneID, rc.ID)
 		}
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func ipToUpdateDNSRecord(name string, ip netip.Addr, ttl uint32, PrivateRouting bool, Proxied bool) internal.UpdateDNSRecordRequest {

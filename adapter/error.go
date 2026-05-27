@@ -5,7 +5,10 @@ import (
 	"fmt"
 )
 
-var ErrRequireToken = errors.New("token required")
+var (
+	ErrRequireToken          = errors.New("token required")
+	ErrManagedItemNotEnabled = errors.New("managed item not enabled")
+)
 
 func NewManagedNotFoundError(name string) *ManagedNotFoundError {
 	return &ManagedNotFoundError{Name: name}

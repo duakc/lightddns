@@ -10,6 +10,7 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/container"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -28,6 +30,14 @@ type Domain struct {
 	closed    chan struct{}
 	closeOnce sync.Once
 	closeErr  error
+
+	activationCounter    prometheus.Counter
+	updateSuccessCounter prometheus.Counter
+	updateFailureCounter prometheus.Counter
+	noIpAddressCounter   prometheus.Counter
+	actualUpdateCounter  prometheus.Counter
+	updateDuration       prometheus.Observer
+	lastUpdateTimestamp  prometheus.Gauge
 
 	logger         *zap.Logger
 	provider       adapter.Provider
@@ -75,11 +85,22 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		return nil, &adapter.DatasourceNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Datasource)}
 	}
 
+	metricsRegistry := services.Lookup[metrics.Registry](ctx)
+	domainName := string(opt.Domain)
+
 	return &Domain{
+		activationCounter:    metricsRegistry.Counter(constpkg.MetricDomainActivationTotal, domainName),
+		updateSuccessCounter: metricsRegistry.Counter(constpkg.MetricDomainUpdateSuccessTotal, domainName),
+		updateFailureCounter: metricsRegistry.Counter(constpkg.MetricDomainUpdateFailureTotal, domainName),
+		noIpAddressCounter:   metricsRegistry.Counter(constpkg.MetricDomainNoIPAddressTotal, domainName),
+		actualUpdateCounter:  metricsRegistry.Counter(constpkg.MetricDomainActualUpdateTotal, domainName),
+		updateDuration:       metricsRegistry.Histogram(constpkg.MetricDomainUpdateDurationSeconds, domainName),
+		lastUpdateTimestamp:  metricsRegistry.Gauge(constpkg.MetricDomainLastUpdateTimestamp, domainName),
+
 		logger:         logger,
 		provider:       provider,
 		datasource:     datasource,
-		domainName:     string(opt.Domain),
+		domainName:     domainName,
 		updateInterval: updateInterval,
 		timeout:        timeout,
 		ttl:            opt.TTL,
@@ -124,8 +145,19 @@ func (o *Domain) Close() error {
 	return o.closeErr
 }
 
-func (o *Domain) Update(ctx context.Context) error {
+func (o *Domain) Update(ctx context.Context) (err error) {
 	logger := o.logger
+	start := time.Now()
+	o.activationCounter.Inc()
+	defer func() {
+		o.updateDuration.Observe(time.Since(start).Seconds())
+		o.lastUpdateTimestamp.Set(float64(time.Now().Unix()))
+		if err != nil {
+			o.updateFailureCounter.Inc()
+		} else {
+			o.updateSuccessCounter.Inc()
+		}
+	}()
 
 	containerProvider := services.Lookup[container.Provider](ctx)
 	ctx = containerProvider.New(ctx)
@@ -139,6 +171,7 @@ func (o *Domain) Update(ctx context.Context) error {
 	if err != nil {
 		return err
 	} else if len(netips) == 0 {
+		o.noIpAddressCounter.Inc()
 		if debug.Enabled {
 			return fmt.Errorf("no available IP address found")
 		}
@@ -149,8 +182,12 @@ func (o *Domain) Update(ctx context.Context) error {
 
 	logger.Debug("found ip", zap.Stringers("ip", netips))
 
-	if err := o.provider.Update(cancelContext, o.domainName, o.ttl, netips); err != nil {
+	changed, err := o.provider.Update(cancelContext, o.domainName, o.ttl, netips)
+	if err != nil {
 		return fmt.Errorf("update domain(%s) failed: %w", o.domainName, err)
+	}
+	if changed {
+		o.actualUpdateCounter.Inc()
 	}
 	return nil
 }

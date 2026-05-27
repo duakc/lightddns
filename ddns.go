@@ -8,9 +8,12 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
+	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
+	"github.com/duakc/mt"
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"
 	"github.com/duakc/mt/services/container"
@@ -20,12 +23,40 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+func init() {
+	domainLabel := []string{constpkg.MetricLabelDomain}
+
+	metrics.RegisterCounter(constpkg.MetricDomainActivationTotal,
+		"Total number of times a domain update was triggered.", domainLabel)
+	metrics.RegisterCounter(constpkg.MetricDomainUpdateSuccessTotal,
+		"Total number of domain updates that completed without error.", domainLabel)
+	metrics.RegisterCounter(constpkg.MetricDomainUpdateFailureTotal,
+		"Total number of domain updates that returned an error.", domainLabel)
+	metrics.RegisterCounter(constpkg.MetricDomainNoIPAddressTotal,
+		"Total number of domain updates skipped because the datasource produced no IP address.", domainLabel)
+	metrics.RegisterCounter(constpkg.MetricDomainActualUpdateTotal,
+		"Total number of domain updates that actually mutated DNS records at the provider.", domainLabel)
+
+	metrics.RegisterHistogram(constpkg.MetricDomainUpdateDurationSeconds,
+		"Duration of a domain update cycle.", domainLabel, nil)
+
+	metrics.RegisterGauge(constpkg.MetricDomainLastUpdateTimestamp,
+		"Unix timestamp of the most recent domain update attempt.", domainLabel)
+
+	metrics.RegisterGauge(constpkg.MetricBuildInfo,
+		"Build information. Value is always 1.",
+		[]string{constpkg.MetricLabelVersion, constpkg.MetricLabelBranch})
+}
+
 type LightDDNS struct {
-	logger  *zap.Logger
-	domains []*Domain
+	logger   *zap.Logger
+	domains  []*Domain
+	services []adapter.Service
 
 	providerManager   adapter.ProviderManager
 	datasourceManager adapter.DatasourceManager
+	serviceManager    adapter.ServiceManager
+	metricsRegistry   metrics.Registry
 }
 
 func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
@@ -40,6 +71,12 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	services.Store[adapter.ProviderManager](ctx, providerManager)
 	datasourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
 	services.Store[adapter.DatasourceManager](ctx, datasourceManager)
+	serviceManager := adapter.NewManager[adapter.Service](adapter.ServiceRegistry)
+
+	serviceOptions := opt.Services
+	metricsRegistry := metrics.New(prometheusEnabled(serviceOptions))
+	services.Store[metrics.Registry](ctx, metricsRegistry)
+	metricsRegistry.Gauge(constpkg.MetricBuildInfo, constpkg.Version, constpkg.Branch).Set(1)
 
 	// pass logger to downstream
 	containerProvider := services.Lookup[container.Provider](ctx)
@@ -59,17 +96,39 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 			return nil, fmt.Errorf("create datasource `%s,type=%s` failed: %w",
 				datasourceOption.Name, datasourceOption.Type, err)
 		}
-		logger.Debug("new datasource created", zap.String("type", datasourceOption.Type),
+		logger.Info("new datasource created",
+			zap.String("type", datasourceOption.Type),
 			zap.String("name", datasourceOption.Name))
 	}
+
 	for i := 0; i < len(opt.Providers); i++ {
 		providerOption := opt.Providers[i]
 		if err := providerManager.Create(ctx, providerOption.Type, providerOption.Option); err != nil {
 			return nil, fmt.Errorf("create provider `%s,type=%s` failed: %w",
 				providerOption.Name, providerOption.Type, err)
 		}
-		logger.Debug("new provider created", zap.String("type", providerOption.Type),
+		logger.Info("new provider created",
+			zap.String("type", providerOption.Type),
 			zap.String("name", providerOption.Name))
+	}
+
+	serviceNames := make([]string, 0, len(serviceOptions))
+	for i := 0; i < len(serviceOptions); i++ {
+		serviceOption := serviceOptions[i]
+		if err := serviceManager.Create(ctx, serviceOption.Type, serviceOption.Option); err != nil {
+			if errors.Is(err, adapter.ErrManagedItemNotEnabled) {
+				logger.Warn("service not enabled",
+					zap.String("type", serviceOption.Type),
+					zap.String("name", serviceOption.Name))
+				continue
+			}
+			return nil, fmt.Errorf("create service `%s,type=%s` failed: %w",
+				serviceOption.Name, serviceOption.Type, err)
+		}
+		serviceNames = append(serviceNames, serviceOption.Name)
+		logger.Info("new service created",
+			zap.String("type", serviceOption.Type),
+			zap.String("name", serviceOption.Name))
 	}
 
 	var domains []*Domain
@@ -93,6 +152,10 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		domains:           domains,
 		providerManager:   providerManager,
 		datasourceManager: datasourceManager,
+		serviceManager:    serviceManager,
+		metricsRegistry:   metricsRegistry,
+
+		services: mt.Must(adapter.CollectManagedItem(serviceManager, serviceNames)),
 	}
 
 	return ld, nil
@@ -113,6 +176,9 @@ func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
 
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 	var err error
+	for i := 0; i < len(ld.services); i++ {
+		err = errors.Join(err, services.Start(ctx, stage, ld.services[i]))
+	}
 	for i := 0; i < len(ld.domains); i++ {
 		domain := ld.domains[i]
 		err = errors.Join(err, domain.Start(ctx, stage))
@@ -125,6 +191,9 @@ func (ld *LightDDNS) Close() error {
 	for i := 0; i < len(ld.domains); i++ {
 		domain := ld.domains[i]
 		err = errors.Join(err, domain.Close())
+	}
+	for i := len(ld.services) - 1; i >= 0; i-- {
+		err = errors.Join(err, services.CloseService(ld.services[i]))
 	}
 	return err
 }
@@ -229,4 +298,16 @@ func newLoggerWithOptions(ctx context.Context, opt options.LogOption) (*zap.Logg
 
 	logger := zaplog.NewDefault(closeManager, outputFD, level, nil)
 	return logger, nil
+}
+
+func prometheusEnabled(svcs []options.ServiceOption) bool {
+	for i := 0; i < len(svcs); i++ {
+		if svcs[i].Type != constpkg.ServiceTypePrometheus {
+			continue
+		}
+		if po, ok := svcs[i].Option.(*options.PrometheusServiceOption); ok && po.Enabled {
+			return true
+		}
+	}
+	return false
 }
