@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"time"
 
@@ -56,21 +57,18 @@ func New(ctx context.Context, option options.PrometheusServiceOption) (adapter.S
 	if port == 0 {
 		port = defaultPort
 	}
-	path := option.Path
-	if path == "" {
-		path = defaultPath
+	httpPath := option.Path
+	if httpPath == "" {
+		httpPath = defaultPath
 	}
-	logger := zaplog.FromContext(ctx).With(
-		zap.String("type", "service"),
-		zap.String("service_type", ServiceType)).
-		Named(option.Name)
 
-	return &Prometheus{
+	prometheus := &Prometheus{
 		AbstractManagedType: adapter.NewManagedType(ServiceType, option.Name),
-		logger:              logger,
 		addr:                net.JoinHostPort(option.Listen, strconv.FormatUint(uint64(port), 10)),
-		path:                path,
-	}, nil
+		path:                path.Clean(httpPath),
+	}
+	prometheus.logger = adapter.CreateServiceLogger(zaplog.FromContext(ctx), prometheus)
+	return prometheus, nil
 }
 
 func (s *Prometheus) Start(ctx context.Context, stage services.Stage) error {

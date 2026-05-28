@@ -26,9 +26,10 @@ func TestRunCommand(t *testing.T) {
 		cmd   string
 		shCmd *sh.Cmd
 
-		exitCode int
-		ip       []netip.Addr
-		err      error
+		exitCode  int
+		stdinData []byte
+		ip        []netip.Addr
+		err       error
 	}{
 		{cmd: "echo 1.1.1.1", ip: []netip.Addr{ip1}},
 		{cmd: "echo 1.1.1.1 && exit 1;", ip: []netip.Addr{ip1}, exitCode: 1},
@@ -53,7 +54,7 @@ func TestRunCommand(t *testing.T) {
 		}
 		ip, err := runCommand(timeout, zaplog.NOP, cmd, xtypes.Joined[string]{
 			Array: nil, Join: cc.cmd,
-		}, cc.exitCode, false)
+		}, cc.exitCode, false, cc.stdinData)
 		cancel()
 
 		if cc.err == nil {

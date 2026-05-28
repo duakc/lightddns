@@ -2,6 +2,7 @@ package command
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
+	"github.com/duakc/mt/services/closeme"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
@@ -36,21 +38,23 @@ func init() {
 }
 
 func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.Datasource, error) {
-	logger := option.AbstractDatasourceOption.CreateLogger(zaplog.FromContext(ctx))
-	fileHelper := services.Lookup[filehelper.Helper](ctx)
-
 	command := sh.New()
 	command.Envs(option.Env.Values)
 
 	cc := &Command{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 
-		logger: logger,
-
 		cmdIPv4:  xtypes.NewJoinedString(option.Cmd.IPv4.Value, " "),
 		cmdIPv6:  xtypes.NewJoinedString(option.Cmd.IPv6.Value, " "),
 		exitCode: option.ExitCode,
+
+		stdin:  option.Stdin,
+		stdout: option.Stdout,
+		stderr: option.Stderr,
 	}
+
+	logger := adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), cc)
+	cc.logger = logger
 
 	if option.Shell == "none" {
 		cc.noShell = true
@@ -60,38 +64,6 @@ func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.D
 			return nil, fmt.Errorf("unknown shell: %s", option.Shell)
 		}
 		command.Shell = shell
-	}
-
-	if option.Stdin != "" {
-		// TODO: make input stdin become more stable
-		stdin, err := fileHelper.Open(option.Stdin)
-		if err != nil {
-			return nil, fmt.Errorf("open stdin: %w", err)
-		}
-		cc.closers = append(cc.closers, stdin)
-		command.Stdin = stdin
-	}
-
-	if option.Stdout != "" {
-		stdout, err := fileHelper.Create(option.Stdout)
-		if err != nil {
-			return nil, fmt.Errorf("open stdout: %w", err)
-		}
-		cc.closers = append(cc.closers, stdout)
-		command.Stdout = stdout
-		if option.Stderr == "" {
-			// redirect stderr to the same stdout
-			command.Stderr = stdout
-		}
-	}
-
-	if option.Stderr != "" {
-		stderr, err := fileHelper.Create(option.Stderr)
-		if err != nil {
-			return nil, fmt.Errorf("open stderr: %w", err)
-		}
-		cc.closers = append(cc.closers, stderr)
-		command.Stderr = stderr
 	}
 
 	cc.cmd = command
@@ -109,8 +81,12 @@ type Command struct {
 
 	exitCode int
 
-	closers []io.Closer
+	closers closeme.Manager
 	noShell bool
+
+	stdinData []byte
+
+	stdin, stdout, stderr string
 }
 
 func (c *Command) IP(ctx context.Context) ([]netip.Addr, error) {
@@ -118,7 +94,8 @@ func (c *Command) IP(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {
-	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv4, c.exitCode, c.noShell)
+	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv4,
+		c.exitCode, c.noShell, c.stdinData)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +103,8 @@ func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (c *Command) IPv6(ctx context.Context) ([]netip.Addr, error) {
-	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv6, c.exitCode, c.noShell)
+	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv6,
+		c.exitCode, c.noShell, c.stdinData)
 	if err != nil {
 		return nil, err
 	}
@@ -134,15 +112,53 @@ func (c *Command) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (c *Command) Close() error {
-	var err error
-	for _, closer := range c.closers {
-		err = errors.Join(err, closer.Close())
+	return c.closers.Close()
+}
+
+func (c *Command) Start(ctx context.Context, stage services.Stage) error {
+	switch stage {
+	case services.StagePreStart:
+		fileHelper := services.Lookup[filehelper.Helper](ctx)
+		if c.stdin != "" {
+			stdin, err := fileHelper.Root().ReadFile(c.stdin)
+			if err != nil {
+				return fmt.Errorf("open stdin: %w", err)
+			}
+
+			c.stdinData = stdin
+		}
+		if c.stdout != "" {
+			stdout, err := fileHelper.Create(c.stdout)
+			if err != nil {
+				return fmt.Errorf("open stdout: %w", err)
+			}
+			closeme.AddClose(c.closers, stdout)
+			c.cmd.Stdout = stdout
+			if c.stderr == "" {
+				// redirect stderr to the same stdout
+				c.cmd.Stderr = stdout
+			}
+		}
+
+		if c.stderr != "" {
+			stderr, err := fileHelper.Create(c.stderr)
+			if err != nil {
+				return fmt.Errorf("open stderr: %w", err)
+			}
+			closeme.AddClose(c.closers, stderr)
+			c.cmd.Stderr = stderr
+		}
+	case services.StagePostStart, services.StageStart:
+		return nil
+	default:
+		panic("unknown stage: " + stage.String())
 	}
-	return err
+	return nil
 }
 
 func runCommand(ctx context.Context, logger *zap.Logger,
 	cmd *sh.Cmd, command xtypes.Joined[string], exitCode int, noShell bool,
+	stdinData []byte,
 ) ([]netip.Addr, error) {
 	const maxOutputBufferSize = 1 << 16
 
@@ -159,6 +175,9 @@ func runCommand(ctx context.Context, logger *zap.Logger,
 	runCmd := *cmd
 	runCmd.Stdout = io.MultiWriter(buf, runCmd.Stdout)
 	runCmd.Stderr = io.MultiWriter(buf, runCmd.Stderr)
+	if len(stdinData) > 0 {
+		runCmd.Stdin = bytes.NewReader(stdinData)
+	}
 
 	logger.Debug("run", zap.String("shell", cmd.Shell.String()))
 	var err error

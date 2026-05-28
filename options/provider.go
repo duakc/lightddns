@@ -5,7 +5,6 @@ import (
 	"github.com/duakc/lightddns/infra/badyaml"
 
 	goyaml "github.com/goccy/go-yaml"
-	"go.uber.org/zap"
 )
 
 type ProviderOption struct {
@@ -35,11 +34,4 @@ type AbstractProviderOption struct {
 
 func (AbstractProviderOption) UsedType() string {
 	return "abstract_provider"
-}
-
-func (o AbstractProviderOption) CreateLogger(logger *zap.Logger) *zap.Logger {
-	return logger.With(
-		zap.String("type", "provider"),
-		zap.String("provider_type", o.Type)).
-		Named(o.Name)
 }

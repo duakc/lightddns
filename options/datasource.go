@@ -5,7 +5,6 @@ import (
 	"github.com/duakc/lightddns/infra/badyaml"
 
 	goyaml "github.com/goccy/go-yaml"
-	"go.uber.org/zap"
 )
 
 type DatasourceOption struct {
@@ -35,11 +34,4 @@ type AbstractDatasourceOption struct {
 
 func (AbstractDatasourceOption) UsedType() string {
 	return "abstract_datasource"
-}
-
-func (o AbstractDatasourceOption) CreateLogger(logger *zap.Logger) *zap.Logger {
-	return logger.With(
-		zap.String("type", "datasource"),
-		zap.String("datasource_type", o.Type)).
-		Named(o.Name)
 }

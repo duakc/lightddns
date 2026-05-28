@@ -52,15 +52,14 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
 
 	cf := &Cloudflare{
-		logger: option.AbstractProviderOption.CreateLogger(
-			zaplog.FromContext(ctx),
-		),
 		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),
 		zones:  new(generic.SyncMap[string, string]),
 
 		name:    option.Name,
 		proxied: option.Proxy,
 	}
+
+	cf.logger = adapter.CreatProviderLogger(zaplog.FromContext(ctx), cf)
 
 	return cf, nil
 }
