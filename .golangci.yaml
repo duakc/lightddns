@@ -30,7 +30,11 @@ linters:
           yaml: camel
         overrides:
           - pkg: "providers/cloudflare/internal"
-            ignore: true
+            rules:
+              json: snake
+          - pkg: "providers/tencentcloud/internal"
+            rules:
+              json: pascal
 
     depguard:
       rules:

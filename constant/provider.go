@@ -5,5 +5,6 @@ const (
 )
 
 const (
-	ProviderTypeCloudflare = "cloudflare"
+	ProviderTypeCloudflare   = "cloudflare"
+	ProviderTypeTencentCloud = "tencentcloud"
 )
