@@ -5,8 +5,8 @@ github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XL
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/duakc/mt v0.0.0-20260526145546-65f57cadbd39 h1:X1SUT+/xeqLdfak+7hBDDAebI+8Tw80xNkEMTWrOLn4=
-github.com/duakc/mt v0.0.0-20260526145546-65f57cadbd39/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260528134134-70b5edeb0646 h1:dP1JpHVv2J2vZuNDPX0JTo5WHNAO9MELQGVuz52qE6E=
+github.com/duakc/mt v0.0.0-20260528134134-70b5edeb0646/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
 github.com/elastic/go-freelru v0.16.0/go.mod h1:bSdWT4M0lW79K8QbX6XY2heQYSCqD7THoYf82pT/H3I=
 github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=

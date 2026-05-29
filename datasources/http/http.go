@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	urlpkg "net/url"
 	"regexp"
 
 	"github.com/duakc/lightddns/adapter"
@@ -72,11 +73,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		return nil, fmt.Errorf("http: %w", err)
 	}
 
-	var (
-		logger = option.AbstractDatasourceOption.CreateLogger(
-			zaplog.FromContext(ctx))
-		v4, v6 *requestContext
-	)
+	var v4, v6 *requestContext
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	if needDNS {
@@ -106,10 +103,10 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	}
 	httpds := &Httpds{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		logger:              logger,
+		v4:                  v4,
+		v6:                  v6,
 	}
-	httpds.v4 = v4
-	httpds.v6 = v6
+	httpds.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), httpds)
 	return httpds, nil
 }
 
@@ -147,7 +144,7 @@ func (c *Httpds) IP(ctx context.Context) ([]netip.Addr, error) {
 
 type requestContext struct {
 	method  string
-	url     string
+	url     *urlpkg.URL
 	headers http.Header
 
 	requester httpxx.HTTPRequester
@@ -171,8 +168,12 @@ func newRequestContext(method string, url string, headers http.Header,
 			return nil, fmt.Errorf("MatchRegex: %w", err)
 		}
 	}
+	parsedURL, err := urlpkg.Parse(url)
+	if err != nil {
+		return nil, fmt.Errorf("parse url: %w", err)
+	}
 	R.method = method
-	R.url = url
+	R.url = parsedURL
 	R.headers = headers
 	R.requester = requester
 
@@ -197,7 +198,7 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 	}
 	const maxBodySize = 10 * 1024 * 1024
 
-	if response.Header.Get("Content-Type") == "application/json" && rc.jsonMatch != nil {
+	if httpxx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.jsonMatch != nil {
 		var jsonObject any
 		if err := json.NewDecoder(io.LimitReader(response.Body, maxBodySize)).Decode(&jsonObject); err != nil {
 			return nil, fmt.Errorf("decode JSON: %w", err)

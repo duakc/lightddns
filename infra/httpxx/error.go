@@ -2,19 +2,16 @@ package httpxx
 
 import (
 	"fmt"
-	"net/http"
 )
 
+// BadStatusCodeError is returned when a response status code is not accepted
+// by the caller's ReqConfig.AcceptStatus predicate.
 type BadStatusCodeError struct {
-	Excepted int `json:"excepted"`
-	Got      int `json:"got"`
+	Got int `json:"got"`
 }
 
 func (E *BadStatusCodeError) Error() string {
-	if E.Excepted == 0 {
-		E.Excepted = http.StatusOK
-	}
-	return fmt.Sprintf("bad status code: excepted %d, got %d", E.Excepted, E.Got)
+	return fmt.Sprintf("unacceptable status code: %d", E.Got)
 }
 
 type BaseResponseError struct {

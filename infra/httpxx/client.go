@@ -76,27 +76,48 @@ func ClientOptionWithRoundTripper(t http.RoundTripper) HTTPClientOption {
 	})
 }
 
+// ClientOptionWithProxy configures the proxy on the underlying *http.Transport.
+// It is a no-op if a custom RoundTripper has replaced the default transport
+// (see ClientOptionWithRoundTripper).
 func ClientOptionWithProxy(httpProxyURL, httpsProxyURL, noProxyURL string) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
+		t, ok := c.Client.Transport.(*http.Transport)
+		if !ok {
+			return
+		}
 		cfg := httpproxy.Config{
 			HTTPProxy:  httpProxyURL,
 			HTTPSProxy: httpsProxyURL,
 			NoProxy:    noProxyURL,
 		}
-		c.Client.Transport.(*http.Transport).Proxy = func(req *http.Request) (*urlpkg.URL, error) {
+		t.Proxy = func(req *http.Request) (*urlpkg.URL, error) {
 			return cfg.ProxyFunc()(req.URL)
 		}
 	})
 }
 
+// ClientOptionEnableProxy enables proxy lookup from the environment on the
+// underlying *http.Transport. It is a no-op if a custom RoundTripper has
+// replaced the default transport (see ClientOptionWithRoundTripper).
 func ClientOptionEnableProxy() HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
-		c.Client.Transport.(*http.Transport).Proxy = http.ProxyFromEnvironment
+		t, ok := c.Client.Transport.(*http.Transport)
+		if !ok {
+			return
+		}
+		t.Proxy = http.ProxyFromEnvironment
 	})
 }
 
+// ClientOptionWithDialer sets a custom dialer on the underlying *http.Transport.
+// It is a no-op if a custom RoundTripper has replaced the default transport
+// (see ClientOptionWithRoundTripper).
 func ClientOptionWithDialer(d dialerx.Dialer) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
-		c.Client.Transport.(*http.Transport).DialContext = d.DialContext
+		t, ok := c.Client.Transport.(*http.Transport)
+		if !ok {
+			return
+		}
+		t.DialContext = d.DialContext
 	})
 }

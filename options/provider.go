@@ -27,11 +27,30 @@ func (po *ProviderOption) UnmarshalYAML(bs []byte) error {
 	return badyaml.Unmarshal(bs, po.Option)
 }
 
+func (po *ProviderOption) setName(name string) {
+	po.AbstractProviderOption.setName(name)
+	if setter, canSetName := po.Option.(nameSetter); canSetName {
+		setter.setName(name)
+	}
+}
+
+var (
+	_ nameSetter    = (*AbstractProviderOption)(nil)
+	_ VariantOption = (*AbstractProviderOption)(nil)
+)
+
 type AbstractProviderOption struct {
 	Type string `json:"type"           yaml:"type"`
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
-func (AbstractProviderOption) UsedType() string {
+func (O *AbstractProviderOption) MajorType() string {
+	return "provider"
+}
+
+func (O *AbstractProviderOption) UsedType() string {
 	return "abstract_provider"
 }
+
+func (O *AbstractProviderOption) setName(name string) { O.Name = name }
+func (O *AbstractProviderOption) getName() string     { return O.Name }

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Register[T managedType, O any](R Registry[T], typ string, constructor GenericObjectConstructor[T, O]) {
+func Register[T ManagedType, O any](R Registry[T], typ string, constructor GenericObjectConstructor[T, O]) {
 	managerLogger.Debug("new type registered", zap.String("type", typ))
 	R.registry(typ, func() any {
 		return new(O)
@@ -26,7 +26,7 @@ func Register[T managedType, O any](R Registry[T], typ string, constructor Gener
 	})
 }
 
-type Registry[T managedType] interface {
+type Registry[T ManagedType] interface {
 	Create(ctx context.Context, typ string, option any) (T, error)
 	CreateOption(typ string) (any, error)
 	Types() []string
@@ -35,20 +35,20 @@ type Registry[T managedType] interface {
 }
 
 type (
-	GenericObjectConstructor[T managedType, O any] func(ctx context.Context, option O) (T, error)
+	GenericObjectConstructor[T ManagedType, O any] func(ctx context.Context, option O) (T, error)
 
 	optionConstructor                func() any
-	objectConstructor[T managedType] func(ctx context.Context, option any) (T, error)
+	objectConstructor[T ManagedType] func(ctx context.Context, option any) (T, error)
 )
 
-func NewRegister[T managedType]() Registry[T] {
+func NewRegister[T ManagedType]() Registry[T] {
 	return &defaultRegistry[T]{
 		typeToObject: make(map[string]objectConstructor[T]),
 		typeToOption: make(map[string]optionConstructor),
 	}
 }
 
-type defaultRegistry[T managedType] struct {
+type defaultRegistry[T ManagedType] struct {
 	access sync.Mutex
 
 	typeToOption map[string]optionConstructor

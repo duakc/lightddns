@@ -27,11 +27,30 @@ func (do *DatasourceOption) UnmarshalYAML(bs []byte) error {
 	return badyaml.Unmarshal(bs, do.Option)
 }
 
+func (do *DatasourceOption) setName(name string) {
+	do.AbstractDatasourceOption.setName(name)
+	if setter, canSetName := do.Option.(nameSetter); canSetName {
+		setter.setName(name)
+	}
+}
+
+var (
+	_ nameSetter    = (*AbstractDatasourceOption)(nil)
+	_ VariantOption = (*AbstractDatasourceOption)(nil)
+)
+
 type AbstractDatasourceOption struct {
 	Type string `json:"type"           yaml:"type"`
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
-func (AbstractDatasourceOption) UsedType() string {
+func (O *AbstractDatasourceOption) MajorType() string {
+	return "datasource"
+}
+
+func (O *AbstractDatasourceOption) UsedType() string {
 	return "abstract_datasource"
 }
+
+func (O *AbstractDatasourceOption) getName() string     { return O.Name }
+func (O *AbstractDatasourceOption) setName(name string) { O.Name = name }

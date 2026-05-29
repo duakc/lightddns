@@ -9,6 +9,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+var _ Registry = (*noopRegistry)(nil)
+
 type noopRegistry struct{}
 
 func newNoopRegistry() Registry { return noopRegistry{} }
@@ -17,10 +19,49 @@ func (noopRegistry) ContextInject(ctx context.Context) context.Context {
 	return services.InjectMe[Registry](ctx, noopRegistry{})
 }
 
-func (noopRegistry) Counter(string, ...string) prometheus.Counter    { return nopCounter{} }
-func (noopRegistry) Gauge(string, ...string) prometheus.Gauge        { return nopGauge{} }
-func (noopRegistry) Histogram(string, ...string) prometheus.Observer { return nopObserver{} }
-func (noopRegistry) Gatherer() prometheus.Gatherer                   { return prometheus.NewRegistry() }
+func (noopRegistry) CounterVec(string, string, []string) CounterVec { return nopCounterVec{} }
+func (noopRegistry) CounterVecVerbose(prometheus.CounterOpts, []string) CounterVec {
+	return nopCounterVec{}
+}
+
+func (noopRegistry) GaugeVec(string, string, []string) GaugeVec { return nopGaugeVec{} }
+func (noopRegistry) GaugeVecVerbose(prometheus.GaugeOpts, []string) GaugeVec {
+	return nopGaugeVec{}
+}
+
+func (noopRegistry) HistogramVec(string, string, []string, []float64) HistogramVec {
+	return nopHistogramVec{}
+}
+
+func (noopRegistry) HistogramVecVerbose(prometheus.HistogramOpts, []string) HistogramVec {
+	return nopHistogramVec{}
+}
+
+func (noopRegistry) SummaryVec(string, string, []string, map[float64]float64) SummaryVec {
+	return nopSummaryVec{}
+}
+
+func (noopRegistry) SummaryVecVerbose(prometheus.SummaryOpts, []string) SummaryVec {
+	return nopSummaryVec{}
+}
+
+func (noopRegistry) Gatherer() prometheus.Gatherer { return prometheus.NewRegistry() }
+
+type nopCounterVec struct{}
+
+func (nopCounterVec) With(...string) prometheus.Counter { return nopCounter{} }
+
+type nopGaugeVec struct{}
+
+func (nopGaugeVec) With(...string) prometheus.Gauge { return nopGauge{} }
+
+type nopHistogramVec struct{}
+
+func (nopHistogramVec) With(...string) prometheus.Observer { return nopObserver{} }
+
+type nopSummaryVec struct{}
+
+func (nopSummaryVec) With(...string) prometheus.Observer { return nopObserver{} }
 
 type nopCounter struct{}
 

@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/duakc/mt/services"
+
 	"go.uber.org/zap"
 )
 
 type Service interface {
-	managedType
+	ManagedType
 	services.LifeCycle
 }
 

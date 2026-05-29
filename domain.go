@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -21,6 +22,18 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+)
+
+// Metrics declared by Domain. Final names are
+// "ddns_domain_<leaf>" after ddnsmetric.Factory prefixes them.
+const (
+	metricActivationTotal       = "activation_total"
+	metricUpdateSuccessTotal    = "update_success_total"
+	metricUpdateFailureTotal    = "update_failure_total"
+	metricNoIPAddressTotal      = "no_ip_address_total"
+	metricActualUpdateTotal     = "actual_update_total"
+	metricUpdateDurationSeconds = "update_duration_seconds"
+	metricLastUpdateTimestamp   = "last_update_timestamp_seconds"
 )
 
 type Domain struct {
@@ -76,31 +89,20 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		logger.Warn("timeout too short, consider to increase the timeout")
 	}
 
-	provider, providerFound := providerManager.Lookup(opt.Provider)
+	provider, providerFound := providerManager.LookupDefault(opt.Provider)
 	if !providerFound {
 		return nil, &adapter.ProviderNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Provider)}
 	}
-	datasource, datasourceFound := datasourceManager.Lookup(opt.Datasource)
+	datasource, datasourceFound := datasourceManager.LookupDefault(opt.Datasource)
 	if !datasourceFound {
 		return nil, &adapter.DatasourceNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Datasource)}
 	}
 
-	metricsRegistry := services.Lookup[metrics.Registry](ctx)
-	domainName := string(opt.Domain)
-
 	return &Domain{
-		activationCounter:    metricsRegistry.Counter(constpkg.MetricDomainActivationTotal, domainName),
-		updateSuccessCounter: metricsRegistry.Counter(constpkg.MetricDomainUpdateSuccessTotal, domainName),
-		updateFailureCounter: metricsRegistry.Counter(constpkg.MetricDomainUpdateFailureTotal, domainName),
-		noIpAddressCounter:   metricsRegistry.Counter(constpkg.MetricDomainNoIPAddressTotal, domainName),
-		actualUpdateCounter:  metricsRegistry.Counter(constpkg.MetricDomainActualUpdateTotal, domainName),
-		updateDuration:       metricsRegistry.Histogram(constpkg.MetricDomainUpdateDurationSeconds, domainName),
-		lastUpdateTimestamp:  metricsRegistry.Gauge(constpkg.MetricDomainLastUpdateTimestamp, domainName),
-
 		logger:         logger,
 		provider:       provider,
 		datasource:     datasource,
-		domainName:     domainName,
+		domainName:     string(opt.Domain),
 		updateInterval: updateInterval,
 		timeout:        timeout,
 		ttl:            opt.TTL,
@@ -111,7 +113,9 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 
 func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
 	switch stage {
-	case services.StagePreStart, services.StagePostStart:
+	case services.StagePreStart:
+		reg := services.Lookup[metrics.Registry](ctx)
+		o.registerMetrics(ddnsmetric.NewFactory(reg, ddnsmetric.Namespace, ddnsmetric.SubsystemDomain))
 		if err := services.Start(ctx, stage, o.provider); err != nil {
 			return err
 		}
@@ -124,6 +128,11 @@ func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
 			return err
 		}
 		return o.updateLoop()
+	case services.StagePostStart:
+		if err := services.Start(ctx, stage, o.provider); err != nil {
+			return err
+		}
+		return services.Start(ctx, stage, o.datasource)
 	default:
 		panic("unknown stage: " + stage.String())
 	}
@@ -159,9 +168,12 @@ func (o *Domain) Update(ctx context.Context) (err error) {
 		}
 	}()
 
+	var cont container.Container
 	containerProvider := services.Lookup[container.Provider](ctx)
-	ctx = containerProvider.New(ctx)
-	defer containerProvider.Release(ctx)
+	ctx, cont = containerProvider.New(ctx)
+	defer containerProvider.Release(cont)
+	cont.IncRef()
+	defer cont.DecRef()
 
 	cancelContext, cancel := context.WithTimeout(ctx, o.timeout)
 	defer cancel()
@@ -236,4 +248,24 @@ func (o *Domain) updateLoop() error {
 		}
 	}()
 	return nil
+}
+
+func (o *Domain) registerMetrics(factory ddnsmetric.Factory) {
+	labels := []string{constpkg.MetricLabelDomain}
+	o.activationCounter = factory.CounterVec(metricActivationTotal,
+		"Total number of times a domain update was triggered.", labels).With(o.domainName)
+	o.updateSuccessCounter = factory.CounterVec(metricUpdateSuccessTotal,
+		"Total number of domain updates that completed without error.", labels).With(o.domainName)
+	o.updateFailureCounter = factory.CounterVec(metricUpdateFailureTotal,
+		"Total number of domain updates that returned an error.", labels).With(o.domainName)
+	o.noIpAddressCounter = factory.CounterVec(metricNoIPAddressTotal,
+		"Total number of domain updates skipped because the datasource produced no IP address.",
+		labels).With(o.domainName)
+	o.actualUpdateCounter = factory.CounterVec(metricActualUpdateTotal,
+		"Total number of domain updates that actually mutated DNS records at the provider.",
+		labels).With(o.domainName)
+	o.updateDuration = factory.HistogramVec(metricUpdateDurationSeconds,
+		"Duration of a domain update cycle.", labels, nil).With(o.domainName)
+	o.lastUpdateTimestamp = factory.GaugeVec(metricLastUpdateTimestamp,
+		"Unix timestamp of the most recent domain update attempt.", labels).With(o.domainName)
 }

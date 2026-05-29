@@ -2,7 +2,7 @@ package sum
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter"
@@ -30,9 +30,6 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	logger := option.AbstractDatasourceOption.CreateLogger(
-		zaplog.FromContext(ctx))
-
 	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
 	var datasources []adapter.Datasource
 
@@ -47,12 +44,14 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 
 	sum := &Sum{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		logger:              logger,
 		datasources:         datasources,
 		fastFail:            option.FastFail,
 	}
+	sum.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), sum)
 	return sum, nil
 }
+
+var _ adapter.DatasourceGroup = (*Sum)(nil)
 
 type Sum struct {
 	adapter.AbstractManagedType
@@ -60,6 +59,28 @@ type Sum struct {
 	logger      *zap.Logger
 	fastFail    bool
 	datasources []adapter.Datasource
+}
+
+func (s *Sum) Start(ctx context.Context, stage services.Stage) error {
+	for i := 0; i < len(s.datasources); i++ {
+		err := services.Start(ctx, stage, s.datasources[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Sum) Close() error {
+	var err error
+	for i := 0; i < len(s.datasources); i++ {
+		err = errors.Join(err, services.CloseService(s.datasources[i]))
+	}
+	return err
+}
+
+func (s *Sum) Grouped() []adapter.Datasource {
+	return s.datasources
 }
 
 func (s *Sum) IP(ctx context.Context) ([]netip.Addr, error) {
@@ -75,12 +96,5 @@ func (s *Sum) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (s *Sum) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, error) {
-	ips, err := adapter.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
-	switch {
-	case err != nil:
-		return nil, err
-	case len(ips) == 0:
-		return nil, fmt.Errorf("no IP addresses found")
-	}
-	return ips, nil
+	return adapter.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
 }

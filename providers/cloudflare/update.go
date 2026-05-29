@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"time"
 
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
@@ -13,10 +14,10 @@ import (
 )
 
 func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
-	logger := c.logger
+	logger := c.logger.With(zap.String("domain", domain))
 	logger.Debug("new update request",
-		zap.Stringers("addresses", addr),
-		zap.String("domain", domain))
+		zap.Stringers("addresses", addr))
+
 	zoneID, err := c.getZoneID(ctx, domain)
 	if err != nil {
 		return false, fmt.Errorf("getZoneID: %w", err)
@@ -37,16 +38,20 @@ func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr
 			zap.String("ip", updateRequest.Content),
 			zap.String("domain", updateRequest.Name),
 		}
+		start := time.Now()
 		switch {
 		case rc.toCreate:
 			logger.Info("create", logFields...)
 			err = c.client.CreateDNSRecords(ctx, zoneID, updateRequest)
+			c.recordAPICall(opCreateDNS, start, err)
 		case rc.toUpdate:
 			logger.Info("update", logFields...)
 			err = c.client.UpdateDNSRecords(ctx, zoneID, rc.ID, updateRequest)
+			c.recordAPICall(opUpdateDNS, start, err)
 		case rc.toDelete:
 			logger.Info("delete", logFields...)
 			err = c.client.DeleteDNSRecord(ctx, zoneID, rc.ID)
+			c.recordAPICall(opDeleteDNS, start, err)
 		}
 		if err != nil {
 			return false, err

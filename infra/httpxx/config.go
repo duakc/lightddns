@@ -11,12 +11,13 @@ import (
 	urlpkg "net/url"
 	"path"
 	"slices"
-	"strings"
 )
+
+type AcceptCodeFunc func(code int) bool
 
 type ReqConfig struct {
 	Method  string
-	BaseURL string
+	BaseURL *urlpkg.URL
 
 	Query        urlpkg.Values
 	ExtendPath   []string
@@ -24,9 +25,42 @@ type ReqConfig struct {
 
 	// inputs order:
 	Body any
+
+	// AcceptStatus reports whether a response status code is acceptable.
+	// If nil, the default is "any status code < 400".
+	AcceptStatus AcceptCodeFunc
 }
 
-func NewReqConfig(method string, baseURL string) ReqConfig {
+// Accepts reports whether code is acceptable according to AcceptStatus.
+// When AcceptStatus is nil, the default "< 400" rule is used. This lets
+// downstream consumers and tests stay agnostic about whether the field
+// was explicitly set.
+func (rc ReqConfig) Accepts(code int) bool {
+	if rc.AcceptStatus == nil {
+		return code < 400
+	}
+	return rc.AcceptStatus(code)
+}
+
+func StatusAcceptEqual(codec int) AcceptCodeFunc {
+	return func(code int) bool {
+		return code == codec
+	}
+}
+
+func StatusAcceptGreater(codec int) AcceptCodeFunc {
+	return func(code int) bool {
+		return code > codec
+	}
+}
+
+func StatusAcceptLess(codec int) AcceptCodeFunc {
+	return func(code int) bool {
+		return code < codec
+	}
+}
+
+func NewReqConfig(method string, baseURL *urlpkg.URL) ReqConfig {
 	return ReqConfig{
 		Method:       method,
 		BaseURL:      baseURL,
@@ -35,69 +69,78 @@ func NewReqConfig(method string, baseURL string) ReqConfig {
 	}
 }
 
+// ToRequestContext builds an *http.Request from rc. It does not mutate rc:
+// ExtendHeader and Query are read-only; any header that needs to be added
+// (e.g. an inferred Content-Type) is written to a clone, never the original.
 func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if rc.BaseURL == nil {
+		return nil, fmt.Errorf("BaseURL is required")
+	}
 
-	rc.BaseURL = strings.TrimSuffix(rc.BaseURL, "/") // remove trailing slash
-	url := rc.BaseURL + "/" + path.Join(rc.ExtendPath...)
-	if q := rc.Query.Encode(); q != "" {
-		url += "?" + q
+	u := *rc.BaseURL
+	if len(rc.ExtendPath) != 0 {
+		u.Path = path.Join(append([]string{u.Path}, rc.ExtendPath...)...)
+	}
+	if len(rc.Query) > 0 {
+		q := u.Query()
+		for k, v := range rc.Query {
+			for _, vv := range v {
+				q.Add(k, vv)
+			}
+		}
+		u.RawQuery = q.Encode()
+	}
+
+	header := rc.ExtendHeader.Clone()
+	if header == nil {
+		header = make(http.Header)
 	}
 
 	var body io.Reader
-	contentType := rc.ExtendHeader.Get("Content-Type")
 	if rc.Body != nil && slices.Contains([]string{
 		http.MethodPost, http.MethodPut, http.MethodPatch,
 	}, rc.Method) {
+		defaultContentType := ""
 		switch x := rc.Body.(type) {
 		case json.Marshaler:
-			if contentType == "" {
-				contentType = "application/json"
-			}
+			defaultContentType = "application/json"
 			data, err := x.MarshalJSON()
 			if err != nil {
 				return nil, fmt.Errorf("marshal JSON: %w", err)
 			}
 			body = bytes.NewBuffer(data)
 		case encoding.BinaryMarshaler:
-			if contentType == "" {
-				contentType = "application/octet-stream"
-			}
+			defaultContentType = "application/octet-stream"
 			data, err := x.MarshalBinary()
 			if err != nil {
 				return nil, fmt.Errorf("marshal binary: %w", err)
 			}
 			body = bytes.NewBuffer(data)
 		case encoding.TextMarshaler:
-			if contentType == "" {
-				contentType = "text/plain"
-			}
+			defaultContentType = "text/plain"
 			text, err := x.MarshalText()
 			if err != nil {
 				return nil, fmt.Errorf("marshal text: %w", err)
 			}
 			body = bytes.NewBuffer(text)
 		case io.Reader:
-			if contentType == "" {
-				return nil, fmt.Errorf("undermined Content-Type")
+			if header.Get("Content-Type") == "" {
+				return nil, fmt.Errorf("undetermined Content-Type")
 			}
 			body = x
 		}
+		if defaultContentType != "" && header.Get("Content-Type") == "" {
+			header.Set("Content-Type", defaultContentType)
+		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, rc.Method, url, body)
+	req, err := http.NewRequestWithContext(ctx, rc.Method, u.String(), body)
 	if err != nil {
 		return nil, err
 	}
-	for h, v := range rc.ExtendHeader {
-		for i := 0; i < len(v); i++ {
-			req.Header.Add(h, v[i])
-		}
-	}
-	if contentType != "" {
-		req.Header.Add("Content-Type", contentType)
-	}
+	req.Header = header
 	return req, nil
 }

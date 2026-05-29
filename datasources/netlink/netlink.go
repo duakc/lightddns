@@ -28,16 +28,15 @@ func init() {
 }
 
 func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.Datasource, error) {
-	return &Netlink{
+	n := &Netlink{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		logger: option.AbstractDatasourceOption.CreateLogger(
-			zaplog.FromContext(ctx),
-		),
-		interfaceFinder: control.NewDefaultInterfaceFinder(),
-		interfaceName:   option.IfName,
-		interfaceIndex:  option.IfIndex,
-		allowPrivate:    option.AllowPrivate,
-	}, nil
+		interfaceFinder:     control.NewDefaultInterfaceFinder(),
+		interfaceName:       option.IfName,
+		interfaceIndex:      option.IfIndex,
+		allowPrivate:        option.AllowPrivate,
+	}
+	n.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), n)
+	return n, nil
 }
 
 type Netlink struct {

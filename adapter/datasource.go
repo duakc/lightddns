@@ -9,11 +9,14 @@ import (
 	"slices"
 
 	"github.com/duakc/lightddns/infra/netool"
+
+	"github.com/duakc/mt/services"
+
 	"go.uber.org/zap"
 )
 
 type Datasource interface {
-	managedType
+	ManagedType
 	IP(context.Context) ([]netip.Addr, error)
 }
 
@@ -21,6 +24,13 @@ type DatasourceDualStack interface {
 	Datasource
 	IPv4(ctx context.Context) ([]netip.Addr, error)
 	IPv6(ctx context.Context) ([]netip.Addr, error)
+}
+
+type DatasourceGroup interface {
+	Datasource
+	services.LifeCycle
+
+	Grouped() []Datasource
 }
 
 type (

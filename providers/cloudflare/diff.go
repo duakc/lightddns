@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"time"
 
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
@@ -50,7 +51,9 @@ func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr)
 	return differentRecords, nil
 }
 
-func (c *Cloudflare) diffType(ctx context.Context, domain, zoneID string, addr []netip.Addr, typ string) ([]dnsUpdateRequest, error) {
+func (c *Cloudflare) diffType(ctx context.Context, domain, zoneID string, addr []netip.Addr, typ string) (result []dnsUpdateRequest, err error) {
+	start := time.Now()
+	defer func() { c.recordAPICall(opListDNSRecords, start, err) }()
 	records, err := c.client.ListDNSRecords(domain, zoneID, typ)
 	if err != nil {
 		return nil, fmt.Errorf("ListDNSRecords: %w", err)

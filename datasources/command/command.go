@@ -15,11 +15,11 @@ import (
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
-	"github.com/duakc/mt/services/closeme"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
+	"github.com/duakc/mt/services/closeme"
 	"github.com/duakc/mt/services/filehelper"
 	"github.com/duakc/mt/sh"
 	"github.com/duakc/mt/xtypes"

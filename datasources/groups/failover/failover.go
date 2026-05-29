@@ -2,6 +2,7 @@ package failover
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"sync"
@@ -32,9 +33,6 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 	if len(option.Datasources) == 0 {
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
-	logger := option.AbstractDatasourceOption.CreateLogger(
-		zaplog.FromContext(ctx))
-
 	var datasources []adapter.Datasource
 	manager := services.Lookup[adapter.DatasourceManager](ctx)
 	for i := 0; i < len(option.Datasources); i++ {
@@ -48,12 +46,14 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 
 	failover := &FailOver{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		logger:              logger,
 		datasources:         datasources,
 		lastSuccess:         0,
 	}
+	failover.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), failover)
 	return failover, nil
 }
+
+var _ adapter.DatasourceGroup = (*FailOver)(nil)
 
 type FailOver struct {
 	adapter.AbstractManagedType
@@ -62,6 +62,29 @@ type FailOver struct {
 	datasources []adapter.Datasource
 	lastSuccess int
 	access      sync.Mutex
+}
+
+func (f *FailOver) Start(ctx context.Context, stage services.Stage) error {
+	for i := 0; i < len(f.datasources); i++ {
+		err := services.Start(ctx, stage, f.datasources[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *FailOver) Close() error {
+	var err error
+
+	for i := 0; i < len(f.datasources); i++ {
+		err = errors.Join(err, services.CloseService(f.datasources))
+	}
+	return err
+}
+
+func (f *FailOver) Grouped() []adapter.Datasource {
+	return f.datasources
 }
 
 func (f *FailOver) IP(ctx context.Context) ([]netip.Addr, error) {

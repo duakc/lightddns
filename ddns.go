@@ -8,50 +8,35 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
-	"github.com/duakc/mt"
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"
 	"github.com/duakc/mt/services/container"
 	"github.com/duakc/mt/services/filehelper"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func init() {
-	domainLabel := []string{constpkg.MetricLabelDomain}
-
-	metrics.RegisterCounter(constpkg.MetricDomainActivationTotal,
-		"Total number of times a domain update was triggered.", domainLabel)
-	metrics.RegisterCounter(constpkg.MetricDomainUpdateSuccessTotal,
-		"Total number of domain updates that completed without error.", domainLabel)
-	metrics.RegisterCounter(constpkg.MetricDomainUpdateFailureTotal,
-		"Total number of domain updates that returned an error.", domainLabel)
-	metrics.RegisterCounter(constpkg.MetricDomainNoIPAddressTotal,
-		"Total number of domain updates skipped because the datasource produced no IP address.", domainLabel)
-	metrics.RegisterCounter(constpkg.MetricDomainActualUpdateTotal,
-		"Total number of domain updates that actually mutated DNS records at the provider.", domainLabel)
-
-	metrics.RegisterHistogram(constpkg.MetricDomainUpdateDurationSeconds,
-		"Duration of a domain update cycle.", domainLabel, nil)
-
-	metrics.RegisterGauge(constpkg.MetricDomainLastUpdateTimestamp,
-		"Unix timestamp of the most recent domain update attempt.", domainLabel)
-
-	metrics.RegisterGauge(constpkg.MetricBuildInfo,
-		"Build information. Value is always 1.",
-		[]string{constpkg.MetricLabelVersion, constpkg.MetricLabelBranch})
-}
+// Root-level metric names (no subsystem). Final name composed with
+// prometheus.BuildFQName(ddnsmetric.Namespace, "", <leaf>).
+const (
+	metricBuildInfo = "build_info"
+)
 
 type LightDDNS struct {
-	logger   *zap.Logger
-	domains  []*Domain
-	services []adapter.Service
+	logger  *zap.Logger
+	domains []*Domain
+
+	datasources []adapter.Datasource
+	providers   []adapter.Provider
+	services    []adapter.Service
 
 	providerManager   adapter.ProviderManager
 	datasourceManager adapter.DatasourceManager
@@ -73,49 +58,74 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	services.Store[adapter.DatasourceManager](ctx, datasourceManager)
 	serviceManager := adapter.NewManager[adapter.Service](adapter.ServiceRegistry)
 
-	serviceOptions := opt.Services
-	metricsRegistry := metrics.New(prometheusEnabled(serviceOptions))
+	metricsRegistry := metrics.New(prometheusEnabled(opt.Services))
 	services.Store[metrics.Registry](ctx, metricsRegistry)
-	metricsRegistry.Gauge(constpkg.MetricBuildInfo, constpkg.Version, constpkg.Branch).Set(1)
 
 	// pass logger to downstream
+	var cont container.Container
 	containerProvider := services.Lookup[container.Provider](ctx)
-	ctx = containerProvider.New(ctx)
-	defer containerProvider.Release(ctx)
+	ctx, cont = containerProvider.New(ctx)
+	defer containerProvider.Release(cont)
+
+	cont.IncRef()
+	defer cont.DecRef()
+
 	zaplog.WithContext(ctx, logger)
 
-	logger = logger.Named("main")
+	logger = logger.Named("init")
 	resortedDatasources, err := resortDatasources(opt.Datasources)
 	if err != nil {
 		return nil, fmt.Errorf("resort: %w", err)
 	}
 
+	var (
+		datasources []adapter.Datasource
+		providers   []adapter.Provider
+		services    []adapter.Service
+	)
+
 	for i := 0; i < len(resortedDatasources); i++ {
+		var (
+			datasource adapter.Datasource
+			err        error
+		)
+
 		datasourceOption := resortedDatasources[i]
-		if err := datasourceManager.Create(ctx, datasourceOption.Type, datasourceOption.Option); err != nil {
+		if datasource, err = datasourceManager.Create(ctx, datasourceOption.Type, datasourceOption.Option); err != nil {
 			return nil, fmt.Errorf("create datasource `%s,type=%s` failed: %w",
 				datasourceOption.Name, datasourceOption.Type, err)
 		}
+
+		datasources = append(datasources, datasource)
 		logger.Info("new datasource created",
 			zap.String("type", datasourceOption.Type),
 			zap.String("name", datasourceOption.Name))
 	}
 
 	for i := 0; i < len(opt.Providers); i++ {
+		var (
+			provider adapter.Provider
+			err      error
+		)
 		providerOption := opt.Providers[i]
-		if err := providerManager.Create(ctx, providerOption.Type, providerOption.Option); err != nil {
+		if provider, err = providerManager.Create(ctx, providerOption.Type, providerOption.Option); err != nil {
 			return nil, fmt.Errorf("create provider `%s,type=%s` failed: %w",
 				providerOption.Name, providerOption.Type, err)
 		}
+		providers = append(providers, provider)
 		logger.Info("new provider created",
 			zap.String("type", providerOption.Type),
 			zap.String("name", providerOption.Name))
 	}
 
-	serviceNames := make([]string, 0, len(serviceOptions))
-	for i := 0; i < len(serviceOptions); i++ {
-		serviceOption := serviceOptions[i]
-		if err := serviceManager.Create(ctx, serviceOption.Type, serviceOption.Option); err != nil {
+	for i := 0; i < len(opt.Services); i++ {
+		var (
+			service adapter.Service
+			err     error
+		)
+
+		serviceOption := opt.Services[i]
+		if service, err = serviceManager.Create(ctx, serviceOption.Type, serviceOption.Option); err != nil {
 			if errors.Is(err, adapter.ErrManagedItemNotEnabled) {
 				logger.Warn("service not enabled",
 					zap.String("type", serviceOption.Type),
@@ -125,7 +135,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 			return nil, fmt.Errorf("create service `%s,type=%s` failed: %w",
 				serviceOption.Name, serviceOption.Type, err)
 		}
-		serviceNames = append(serviceNames, serviceOption.Name)
+		services = append(services, service)
 		logger.Info("new service created",
 			zap.String("type", serviceOption.Type),
 			zap.String("name", serviceOption.Name))
@@ -149,13 +159,15 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 
 	ld := &LightDDNS{
 		logger:            logger,
-		domains:           domains,
 		providerManager:   providerManager,
 		datasourceManager: datasourceManager,
 		serviceManager:    serviceManager,
 		metricsRegistry:   metricsRegistry,
 
-		services: mt.Must(adapter.CollectManagedItem(serviceManager, serviceNames)),
+		domains:     domains,
+		datasources: datasources,
+		providers:   providers,
+		services:    services,
 	}
 
 	return ld, nil
@@ -175,6 +187,18 @@ func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
 }
 
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
+	if stage == services.StagePreStart {
+		var cont container.Container
+		containerProvider := services.Lookup[container.Provider](ctx)
+		ctx, cont = containerProvider.New(ctx)
+		defer containerProvider.Release(cont)
+		cont.IncRef()
+		defer cont.DecRef()
+
+		ddnsmetric.Pass(ctx, ld.metricsRegistry)
+
+		setupPrometheus(ld.metricsRegistry)
+	}
 	var err error
 	for i := 0; i < len(ld.services); i++ {
 		err = errors.Join(err, services.Start(ctx, stage, ld.services[i]))
@@ -184,6 +208,17 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 		err = errors.Join(err, domain.Start(ctx, stage))
 	}
 	return err
+}
+
+// setupPrometheus registers root-level metrics (those without a per-variant
+// subsystem). Called once from Start(PreStart) — kept out of New() so the
+// check command's bare-New path doesn't touch prometheus state.
+func setupPrometheus(reg metrics.Registry) {
+	reg.GaugeVec(
+		prometheus.BuildFQName(ddnsmetric.Namespace, "", metricBuildInfo),
+		"Build information. Value is always 1.",
+		[]string{constpkg.MetricLabelVersion, constpkg.MetricLabelBranch},
+	).With(constpkg.Version, constpkg.Branch).Set(1)
 }
 
 func (ld *LightDDNS) Close() error {

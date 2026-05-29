@@ -14,7 +14,7 @@ type ValidClient struct {
 
 func (vc *ValidClient) Do(r *http.Request) (*http.Response, error) {
 	rr, e := vc.HTTPRequester.Do(r)
-	if e == nil && r == nil {
+	if e == nil && rr == nil {
 		panic("bad implementation of HTTPRequester")
 	}
 	return rr, e

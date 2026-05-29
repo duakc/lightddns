@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	urlpkg "net/url"
 
 	"github.com/duakc/lightddns/infra/httpxx"
+
+	"github.com/duakc/mt"
 )
 
-const cloudflareApiEndpoint = "https://api.cloudflare.com/client/v4/zones"
+var cloudflareApiEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
 
 type Client struct {
 	client httpxx.HTTPRequester
