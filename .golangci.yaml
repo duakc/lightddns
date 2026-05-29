@@ -28,6 +28,10 @@ linters:
         rules:
           json: camel
           yaml: camel
+        overrides:
+          - pkg: "providers/cloudflare/internal"
+            ignore: true
+
     depguard:
       rules:
         main:
