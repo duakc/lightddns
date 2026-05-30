@@ -1,7 +1,7 @@
 package options
 
 import (
-	"github.com/duakc/lightddns/infra/httpxx"
+	"github.com/duakc/lightddns/infra/netool/httpx"
 )
 
 type HTTPOption struct {
@@ -10,8 +10,8 @@ type HTTPOption struct {
 	HTTPSProxy     string `json:"httpsProxy,omitempty"     yaml:"httpsProxy,omitempty"`
 }
 
-func (ho HTTPOption) Options() ([]httpxx.HTTPClientOption, error) {
-	var options []httpxx.HTTPClientOption
+func (ho HTTPOption) Options() ([]httpx.HTTPClientOption, error) {
+	var options []httpx.HTTPClientOption
 
 	if ho.HTTPProxy != "" || ho.HTTPSProxy != "" {
 		if ho.HTTPProxy == "" {
@@ -21,9 +21,9 @@ func (ho HTTPOption) Options() ([]httpxx.HTTPClientOption, error) {
 			ho.HTTPSProxy = ho.HTTPProxy
 		}
 		if ho.HTTPProxy == "" && ho.HTTPSProxy == "" && ho.UseSystemProxy {
-			options = append(options, httpxx.ClientOptionEnableProxy())
+			options = append(options, httpx.ClientOptionEnableProxy())
 		} else {
-			options = append(options, httpxx.ClientOptionWithProxy(ho.HTTPProxy, ho.HTTPSProxy, ""))
+			options = append(options, httpx.ClientOptionWithProxy(ho.HTTPProxy, ho.HTTPSProxy, ""))
 		}
 	}
 	return options, nil

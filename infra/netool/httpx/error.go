@@ -1,11 +1,11 @@
-package httpxx
+package httpx
 
 import (
 	"fmt"
 )
 
 // BadStatusCodeError is returned when a response status code is not accepted
-// by the caller's ReqConfig.AcceptStatus predicate.
+// by the caller's RespPolicy.AcceptCode predicate.
 type BadStatusCodeError struct {
 	Got int `json:"got"`
 }

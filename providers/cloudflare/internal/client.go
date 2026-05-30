@@ -6,7 +6,7 @@ import (
 	"net/http"
 	urlpkg "net/url"
 
-	"github.com/duakc/lightddns/infra/httpxx"
+	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
 )
@@ -14,17 +14,17 @@ import (
 var cloudflareApiEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
 
 type Client struct {
-	client httpxx.HTTPRequester
+	client httpx.HTTPRequester
 }
 
-func NewClient(ctx context.Context, client httpxx.HTTPRequester) *Client {
+func NewClient(ctx context.Context, client httpx.HTTPRequester) *Client {
 	return &Client{
 		client: client,
 	}
 }
 
-func (c *Client) NewRequestConfig(method string) httpxx.ReqConfig {
-	return httpxx.NewReqConfig(method, cloudflareApiEndpoint)
+func (c *Client) NewRequestConfig(method string) httpx.ReqConfig {
+	return httpx.NewReqConfig(method, cloudflareApiEndpoint)
 }
 
 func (c *Client) ListZones() *PageConfig[Zone] {
@@ -53,7 +53,8 @@ func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 ) error {
 	r := c.NewRequestConfig(http.MethodPost)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records")
-	createResult, response, err := httpxx.JSONRequest[Response](ctx, c.client, r, content)
+	r.Body = content
+	createResult, response, err := httpx.JSONRequest[Response](ctx, c.client, r, httpx.RespPolicy{})
 	if response != nil {
 		defer response.Body.Close()
 	}
@@ -66,7 +67,8 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 ) error {
 	r := c.NewRequestConfig(http.MethodPatch)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", recordID)
-	createResult, response, err := httpxx.JSONRequest[Response](ctx, c.client, r, content)
+	r.Body = content
+	createResult, response, err := httpx.JSONRequest[Response](ctx, c.client, r, httpx.RespPolicy{})
 	if response != nil {
 		defer response.Body.Close()
 	}
@@ -87,10 +89,10 @@ func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return &httpxx.BaseResponseError{Err: err, Method: r.Method}
+		return &httpx.BaseResponseError{Err: err, Method: r.Method}
 	}
 	if resp != nil && resp.StatusCode != http.StatusOK {
-		return &httpxx.BadStatusCodeError{
+		return &httpx.BadStatusCodeError{
 			Got: resp.StatusCode,
 		}
 	}

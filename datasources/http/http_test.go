@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
 
@@ -25,18 +25,18 @@ func TestRequestContext_Handle(t *testing.T) {
 		{
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
-				"https://ipinfo.io", nil, httpxx.NewClient(), ".ip", "")),
+				"https://ipinfo.io", nil, httpx.NewClient(), ".ip", "")),
 		},
 		{
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
-				"https://api.ip.sb/ip", nil, httpxx.NewClient(), "", "")),
+				"https://api.ip.sb/ip", nil, httpx.NewClient(), "", "")),
 		},
 		{
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
-				"https://api.ip.sb/ip", nil, httpxx.NewClient(
-					httpxx.ClientOptionWithDialer(dialerx.NewDialerWithOption(
+				"https://api.ip.sb/ip", nil, httpx.NewClient(
+					httpx.ClientOptionWithDialer(dialerx.NewDialerWithOption(
 						dialerx.WithDialStrategy(dialerx.DialOnlyIPv4)))),
 				"", "")),
 			ipVersion: "4",
@@ -44,17 +44,17 @@ func TestRequestContext_Handle(t *testing.T) {
 		{
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
-				"https://myip.ipip.net", nil, httpxx.NewClient(), "", `当前 IP：\s*(.+?)\s*来自于：`)),
+				"https://myip.ipip.net", nil, httpx.NewClient(), "", `当前 IP：\s*(.+?)\s*来自于：`)),
 		},
 		{
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
-				"https://api64.ipify.org", nil, httpxx.NewClient(), "", "")),
+				"https://api64.ipify.org", nil, httpx.NewClient(), "", "")),
 		},
 		{
 			ctx: context.Background(),
 			reqContext: mt.Must(newRequestContext(http.MethodGet,
-				"https://api64.ipify.org?format=json", nil, httpxx.NewClient(), ".ip", "")),
+				"https://api64.ipify.org?format=json", nil, httpx.NewClient(), ".ip", "")),
 		},
 	}
 	for testIndex, tc := range testCases {

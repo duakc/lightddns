@@ -12,10 +12,10 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/httpx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -68,13 +68,13 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	clientOptions = append(clientOptions,
-		httpxx.ClientOptionWithToken(option.Token),
-		httpxx.ClientOptionWithDialer(
+		httpx.ClientOptionWithToken(option.Token),
+		httpx.ClientOptionWithDialer(
 			resolvectl.NewDialer(ctx, connectDialer,
 				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
 
 	cf := &Cloudflare{
-		client: internal.NewClient(ctx, httpxx.NewClient(clientOptions...)),
+		client: internal.NewClient(ctx, httpx.NewClient(clientOptions...)),
 		zones:  new(generic.SyncMap[string, string]),
 
 		name:    option.Name,

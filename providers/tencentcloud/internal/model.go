@@ -48,3 +48,29 @@ func (c *Common) Headers() (http.Header, error) {
 
 	return h, nil
 }
+
+type DomainInfo struct {
+	CNAMESpeedup     string   `json:"CNAMESpeedup"`
+	CreatedOn        string   `json:"CreatedOn"`
+	DNSStatus        string   `json:"DNSStatus"`
+	DomainId         int      `json:"DomainId"`
+	EffectiveDNS     []string `json:"EffectiveDNS"`
+	Grade            string   `json:"Grade"`
+	GradeLevel       int      `json:"GradeLevel"`
+	GradeTitle       string   `json:"GradeTitle"`
+	GroupId          int      `json:"GroupId"`
+	IsVip            string   `json:"IsVip"`
+	Name             string   `json:"Name"`
+	Owner            string   `json:"Owner"`
+	Punycode         string   `json:"Punycode"`
+	RecordCount      int      `json:"RecordCount"`
+	Remark           string   `json:"Remark"`
+	SearchEnginePush string   `json:"SearchEnginePush"`
+	Status           string   `json:"Status"`
+	TTL              int      `json:"TTL"`
+	TagList          []string `json:"TagList"`
+	UpdatedOn        string   `json:"UpdatedOn"`
+	VipAutoRenew     string   `json:"VipAutoRenew"`
+	VipEndAt         string   `json:"VipEndAt"`
+	VipStartAt       string   `json:"VipStartAt"`
+}

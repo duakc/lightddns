@@ -15,9 +15,9 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/httpxx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/httpx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
@@ -82,8 +82,8 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	}
 
 	if v4URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv6 {
-		httpClient := httpxx.NewClient(append(httpOptions,
-			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
+		httpClient := httpx.NewClient(append(httpOptions,
+			httpx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
 		v4, err = newRequestContext(string(option.Method), v4URL.Raw,
 			option.Headers.Header, httpClient,
 			option.JSON.IPv4, option.Regex.IPv4)
@@ -92,8 +92,8 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		}
 	}
 	if v6URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv4 {
-		httpClient := httpxx.NewClient(append(httpOptions,
-			httpxx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
+		httpClient := httpx.NewClient(append(httpOptions,
+			httpx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
 		v6, err = newRequestContext(string(option.Method), v6URL.Raw,
 			option.Headers.Header, httpClient,
 			option.JSON.IPv6, option.Regex.IPv6)
@@ -147,14 +147,14 @@ type requestContext struct {
 	url     *urlpkg.URL
 	headers http.Header
 
-	requester httpxx.HTTPRequester
+	requester httpx.HTTPRequester
 
 	jsonMatch  *gojq.Query
 	regexMatch *regexp.Regexp
 }
 
 func newRequestContext(method string, url string, headers http.Header,
-	requester httpxx.HTTPRequester, jq string, re string,
+	requester httpx.HTTPRequester, jq string, re string,
 ) (*requestContext, error) {
 	R := new(requestContext)
 	var err error
@@ -181,7 +181,7 @@ func newRequestContext(method string, url string, headers http.Header,
 }
 
 func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, err error) {
-	R := httpxx.NewReqConfig(rc.method, rc.url)
+	R := httpx.NewReqConfig(rc.method, rc.url)
 	R.ExtendHeader = rc.headers
 	request, err := R.ToRequestContext(ctx)
 	if err != nil {
@@ -189,17 +189,17 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 	}
 	response, err := rc.requester.Do(request)
 	if err != nil {
-		return nil, httpxx.NewBaseResponseError(err, R.Method, "get ip from remote")
+		return nil, httpx.NewBaseResponseError(err, R.Method, "get ip from remote")
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, &httpxx.BadStatusCodeError{Got: response.StatusCode}
+		return nil, &httpx.BadStatusCodeError{Got: response.StatusCode}
 	}
 
 	limitedReader := io.LimitReader(response.Body, constpkg.HTTPMaxBodySize)
 
-	if httpxx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.jsonMatch != nil {
+	if httpx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.jsonMatch != nil {
 		var jsonObject any
 		if err := json.NewDecoder(limitedReader).Decode(&jsonObject); err != nil {
 			return nil, fmt.Errorf("decode JSON: %w", err)

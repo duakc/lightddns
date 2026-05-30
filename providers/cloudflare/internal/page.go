@@ -5,12 +5,12 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/duakc/lightddns/infra/httpxx"
+	"github.com/duakc/lightddns/infra/netool/httpx"
 )
 
 type PageConfig[T any] struct {
-	reqConfig httpxx.ReqConfig
-	requester httpxx.HTTPRequester
+	reqConfig httpx.ReqConfig
+	requester httpx.HTTPRequester
 
 	// internal
 	page    int
@@ -21,7 +21,7 @@ type PageConfig[T any] struct {
 	resultInfo ResultInfo
 }
 
-func NewPaging[T any](req httpxx.ReqConfig, do httpxx.HTTPRequester) *PageConfig[T] {
+func NewPaging[T any](req httpx.ReqConfig, do httpx.HTTPRequester) *PageConfig[T] {
 	if do == nil {
 		panic("nil requester")
 	}
@@ -39,8 +39,8 @@ func (pc *PageConfig[T]) Next(ctx context.Context) ([]T, error) {
 	pc.page++
 	pc.reqConfig.Query.Set("page", strconv.Itoa(pc.page))
 	pc.reqConfig.Query.Set("per_page", strconv.Itoa(pc.perPage))
-	result, response, err := httpxx.JSONRequest[ResponseWithPage[T]](ctx,
-		pc.requester, pc.reqConfig, nil)
+	result, response, err := httpx.JSONRequest[ResponseWithPage[T]](ctx,
+		pc.requester, pc.reqConfig, httpx.RespPolicy{})
 	if response != nil {
 		defer response.Body.Close()
 	}

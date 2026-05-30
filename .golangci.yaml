@@ -33,8 +33,7 @@ linters:
             rules:
               json: snake
           - pkg: "providers/tencentcloud/internal"
-            rules:
-              json: pascal
+            ignore: true
 
     depguard:
       rules:

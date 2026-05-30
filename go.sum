@@ -5,14 +5,6 @@ github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XL
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/duakc/mt v0.0.0-20260528134134-70b5edeb0646 h1:dP1JpHVv2J2vZuNDPX0JTo5WHNAO9MELQGVuz52qE6E=
-github.com/duakc/mt v0.0.0-20260528134134-70b5edeb0646/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260529072614-65d08fa1d22a h1:nQr7OpRFSFY0i/H4TRZ1VeyxznSUeqeVVqdIIojtpxQ=
-github.com/duakc/mt v0.0.0-20260529072614-65d08fa1d22a/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260529092202-a0b5de79864a h1:kzOjlR6H1xN9RL33RSmfJ+8oJ22/rnvZJnqy7zzGTk8=
-github.com/duakc/mt v0.0.0-20260529092202-a0b5de79864a/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260530082816-7d3f709c3af3 h1:fek4oHA1neg4RGysXdOwD3+P2xFGCU1JSDkv1QPhhLw=
-github.com/duakc/mt v0.0.0-20260530082816-7d3f709c3af3/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/mt v0.0.0-20260530085901-16d02828cb1b h1:iXlPkjACWsSHciYY8qhMTok1891WHncYr3bS9z2Lrmk=
 github.com/duakc/mt v0.0.0-20260530085901-16d02828cb1b/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=

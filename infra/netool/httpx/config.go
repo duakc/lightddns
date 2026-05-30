@@ -1,4 +1,4 @@
-package httpxx
+package httpx
 
 import (
 	"bytes"
@@ -14,8 +14,6 @@ import (
 	"slices"
 )
 
-type AcceptCodeFunc func(code int) bool
-
 type ReqConfig struct {
 	Method  string
 	BaseURL *urlpkg.URL
@@ -26,39 +24,6 @@ type ReqConfig struct {
 
 	// inputs order:
 	Body any
-
-	// AcceptStatus reports whether a response status code is acceptable.
-	// If nil, the default is "any status code < 400".
-	AcceptStatus AcceptCodeFunc
-}
-
-// Accepts reports whether code is acceptable according to AcceptStatus.
-// When AcceptStatus is nil, the default "< 400" rule is used. This lets
-// downstream consumers and tests stay agnostic about whether the field
-// was explicitly set.
-func (rc ReqConfig) Accepts(code int) bool {
-	if rc.AcceptStatus == nil {
-		return code < 400
-	}
-	return rc.AcceptStatus(code)
-}
-
-func StatusAcceptEqual(codec int) AcceptCodeFunc {
-	return func(code int) bool {
-		return code == codec
-	}
-}
-
-func StatusAcceptGreater(codec int) AcceptCodeFunc {
-	return func(code int) bool {
-		return code > codec
-	}
-}
-
-func StatusAcceptLess(codec int) AcceptCodeFunc {
-	return func(code int) bool {
-		return code < codec
-	}
 }
 
 func NewReqConfig(method string, baseURL *urlpkg.URL) ReqConfig {
@@ -102,7 +67,7 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 		http.MethodPost, http.MethodPut, http.MethodPatch,
 	}, rc.Method) {
 		var err error
-		body, err = buildBody(rc.Body, header)
+		body, err = BuildBodyReader(rc.Body, header)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +81,7 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 	return req, nil
 }
 
-// buildBody decides how to feed rc.Body to net/http.
+// BuildBodyReader decides how to feed rc.Body to net/http.
 //
 // Routing (first match wins):
 //
@@ -138,7 +103,7 @@ func (rc ReqConfig) ToRequestContext(ctx context.Context) (*http.Request, error)
 //
 // The marshal paths produce a *bytes.Buffer so net/http can populate
 // Content-Length from Buffer.Len.
-func buildBody(body any, header http.Header) (io.Reader, error) {
+func BuildBodyReader(body any, header http.Header) (io.Reader, error) {
 	if header.Get("Content-Length") != "" {
 		r, ok := body.(io.Reader)
 		if !ok {
