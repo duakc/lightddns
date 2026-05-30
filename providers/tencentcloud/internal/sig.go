@@ -56,7 +56,7 @@ type SigContext struct {
 	Service string
 }
 
-func (ctx *SigContext) CanonicalRequest() (string, string, error) {
+func (ctx SigContext) CanonicalRequest() (string, string, error) {
 	var (
 		method      = strings.ToUpper(ctx.Method)
 		queryStr    string
@@ -66,6 +66,7 @@ func (ctx *SigContext) CanonicalRequest() (string, string, error) {
 	case http.MethodGet:
 		encoder := xtypes.RFC3986Query{Values: ctx.Query}
 		queryStr = encoder.Encode()
+		payloadHash = sha256hex("")
 	case http.MethodPost:
 		body := ctx.Body
 		if body == nil {
@@ -96,7 +97,7 @@ func (ctx *SigContext) CanonicalRequest() (string, string, error) {
 	return b.String(), signedHeaders, nil
 }
 
-func (ctx *SigContext) StringToSign(canonicalReq string) (string, string) {
+func (ctx SigContext) StringToSign(canonicalReq string) (string, string) {
 	algo := ctx.SigMethod
 	if algo == "" {
 		algo = "TC3-HMAC-SHA256"
@@ -125,7 +126,7 @@ func (ctx *SigContext) StringToSign(canonicalReq string) (string, string) {
 //   - stringToSign  StringToSign()
 //   - credentialScope  StringToSign()
 //   - signedHeaders  CanonicalRequest()
-func (ctx *SigContext) BuildAuthorization(stringToSign, credentialScope, signedHeaders string) string {
+func (ctx SigContext) BuildAuthorization(stringToSign, credentialScope, signedHeaders string) string {
 	algo := ctx.SigMethod
 	if algo == "" {
 		algo = "TC3-HMAC-SHA256"
@@ -154,6 +155,18 @@ func (ctx *SigContext) BuildAuthorization(stringToSign, credentialScope, signedH
 	b.WriteString(signature)
 
 	return b.String()
+}
+
+func (ctx SigContext) Authorization() (string, error) {
+	canonicalReq, signedHeaders, err := ctx.CanonicalRequest()
+	if err != nil {
+		return "", err
+	}
+
+	stringToSign, credentialScope := ctx.StringToSign(canonicalReq)
+
+	v := ctx.BuildAuthorization(stringToSign, credentialScope, signedHeaders)
+	return v, nil
 }
 
 func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, err error) {

@@ -23,3 +23,19 @@ func IsJsonContentType(contentType string) bool {
 	mediatype, _, err := mime.ParseMediaType(contentType)
 	return err == nil && (mediatype == "application/json" || mediatype == "text/json")
 }
+
+func ExtendHeaders(source, extended http.Header) {
+	for k, v := range extended {
+		for _, vv := range v {
+			source.Add(k, vv)
+		}
+	}
+}
+
+func ExtendHeadersOverride(source, extended http.Header) {
+	for k, v := range extended {
+		for _, vv := range v {
+			source.Set(k, vv)
+		}
+	}
+}

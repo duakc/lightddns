@@ -8,3 +8,7 @@ const (
 	DNSTypeA    = "A"
 	DNSTypeAAAA = "AAAA"
 )
+
+const (
+	HTTPMaxBodySize = 10 * 1024 * 1024
+)

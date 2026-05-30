@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/duakc/mt/common/validator"
@@ -13,27 +15,36 @@ type Common struct {
 	// Timestamp string
 	Version string
 
-	Authorization string
-
 	// optional
-	Token    string
-	Language string
-	Region   string
+	Token     string
+	Language  string
+	Region    string
+	Timestamp int64
 }
 
 func (c *Common) Headers() (http.Header, error) {
-	v := validator.NewGenericValidator(validator.DisallowEmpty[string]())
-	v.Valid(c.Action, "Action")
-	v.Valid(c.Version, "Version")
-	v.Valid(c.Authorization, "Authorization")
-	if err := v.Err(); err != nil {
+	if err := errors.Join(
+		validator.NonEmpty(c.Action, "Action"),
+		validator.NonEmpty(c.Version, "Version"),
+		validator.GreaterThan(c.Timestamp, 0, "Timestamp"),
+	); err != nil {
 		return nil, err
 	}
 
 	h := make(http.Header)
 	h.Set("X-TC-Action", c.Action)
 	h.Set("X-TC-Version", c.Version)
-	h.Set("X-TC-Authorization", c.Authorization)
+	h.Set("X-TC-Timestamp", fmt.Sprintf("%d", c.Timestamp))
 
-	panic("uncompleted")
+	if len(c.Token) > 0 {
+		h.Set("X-TC-Token", c.Token)
+	}
+	if len(c.Language) > 0 {
+		h.Set("X-TC-Language", c.Language)
+	}
+	if len(c.Region) > 0 {
+		h.Set("X-TC-Region", c.Region)
+	}
+
+	return h, nil
 }

@@ -42,3 +42,6 @@ site/
 .wrangler/
 .DS_Store/
 .cache/
+
+
+*.secret.go

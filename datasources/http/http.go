@@ -196,11 +196,12 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 	if response.StatusCode != http.StatusOK {
 		return nil, &httpxx.BadStatusCodeError{Got: response.StatusCode}
 	}
-	const maxBodySize = 10 * 1024 * 1024
+
+	limitedReader := io.LimitReader(response.Body, constpkg.HTTPMaxBodySize)
 
 	if httpxx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.jsonMatch != nil {
 		var jsonObject any
-		if err := json.NewDecoder(io.LimitReader(response.Body, maxBodySize)).Decode(&jsonObject); err != nil {
+		if err := json.NewDecoder(limitedReader).Decode(&jsonObject); err != nil {
 			return nil, fmt.Errorf("decode JSON: %w", err)
 		}
 		iter := rc.jsonMatch.RunWithContext(ctx, jsonObject)
@@ -220,7 +221,7 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 			}
 		}
 	} else {
-		buffer, err := io.ReadAll(io.LimitReader(response.Body, maxBodySize))
+		buffer, err := io.ReadAll(limitedReader)
 		if err != nil {
 			return nil, fmt.Errorf("read response.Body: %w", err)
 		}
