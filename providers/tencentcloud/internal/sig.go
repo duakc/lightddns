@@ -16,6 +16,8 @@ import (
 	"github.com/duakc/mt/xtypes"
 )
 
+const sigAlgo = "TC3-HMAC-SHA256"
+
 func sha256hex(s string) string {
 	b := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(b[:])
@@ -27,7 +29,7 @@ func hmacsha256(s, key string) string {
 	return string(hashed.Sum(nil))
 }
 
-const sigCanonicalURI = "/"
+const sigCanonicalURI = '/'
 
 type SigContext struct {
 	// Method is GET or POST
@@ -43,7 +45,7 @@ type SigContext struct {
 	Body []byte
 
 	// StringToSign
-	SigMethod string // fixed TC3-HMAC-SHA256 now
+	// SigMethod string // fixed TC3-HMAC-SHA256 now
 
 	// This value should equal with X-TC-Timestamp Header
 	Timestamp int64
@@ -85,11 +87,12 @@ func (ctx SigContext) CanonicalRequest() (string, string, error) {
 	var b strings.Builder
 	b.WriteString(method)
 	b.WriteByte('\n')
-	b.WriteString(sigCanonicalURI)
+	b.WriteByte(sigCanonicalURI)
 	b.WriteByte('\n')
 	b.WriteString(queryStr)
 	b.WriteByte('\n')
 	b.WriteString(canonicalHeaders)
+	b.WriteByte('\n')
 	b.WriteString(signedHeaders)
 	b.WriteByte('\n')
 	b.WriteString(payloadHash)
@@ -97,21 +100,14 @@ func (ctx SigContext) CanonicalRequest() (string, string, error) {
 	return b.String(), signedHeaders, nil
 }
 
-func (ctx SigContext) StringToSign(canonicalReq string) (string, string) {
-	algo := ctx.SigMethod
-	if algo == "" {
-		algo = "TC3-HMAC-SHA256"
-	}
+func (ctx SigContext) StringToSign(canonicalReq string) (stringToSign string, credentialScope string) {
 	ts := ctx.Timestamp
-	if ts == 0 {
-		ts = time.Now().Unix()
-	}
 	date := time.Unix(ts, 0).UTC().Format("2006-01-02")
-	credentialScope := date + "/" + ctx.Service + "/tc3_request"
+	credentialScope = date + "/" + ctx.Service + "/tc3_request"
 	hashedReq := sha256hex(canonicalReq)
 
 	var b strings.Builder
-	b.WriteString(algo)
+	b.WriteString(sigAlgo)
 	b.WriteByte('\n')
 	_, _ = fmt.Fprint(&b, ts)
 	b.WriteByte('\n')
@@ -127,15 +123,7 @@ func (ctx SigContext) StringToSign(canonicalReq string) (string, string) {
 //   - credentialScope  StringToSign()
 //   - signedHeaders  CanonicalRequest()
 func (ctx SigContext) BuildAuthorization(stringToSign, credentialScope, signedHeaders string) string {
-	algo := ctx.SigMethod
-	if algo == "" {
-		algo = "TC3-HMAC-SHA256"
-	}
-	ts := ctx.Timestamp
-	if ts == 0 {
-		ts = time.Now().Unix()
-	}
-	date := time.Unix(ts, 0).UTC().Format("2006-01-02")
+	date := time.Unix(ctx.Timestamp, 0).UTC().Format("2006-01-02")
 
 	secretDate := hmacsha256(date, "TC3"+ctx.SecretKey)
 	secretService := hmacsha256(ctx.Service, secretDate)
@@ -144,7 +132,7 @@ func (ctx SigContext) BuildAuthorization(stringToSign, credentialScope, signedHe
 	signature := hex.EncodeToString([]byte(signatureBytes))
 
 	var b strings.Builder
-	b.WriteString(algo)
+	b.WriteString(sigAlgo)
 	b.WriteString(" Credential=")
 	b.WriteString(ctx.SecretId)
 	b.WriteByte('/')
@@ -170,17 +158,29 @@ func (ctx SigContext) Authorization() (string, error) {
 }
 
 func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, err error) {
+	allowed := map[string]bool{"content-type": true, "host": true, "x-tc-action": true}
+
 	signed := make(map[string]string)
-	headerSorted := make([]string, 0, len(headers))
+	headerSorted := make([]string, 0, 3)
 
 	for k, vals := range headers {
 		lower := strings.ToLower(strings.TrimSpace(k))
+		if !allowed[lower] {
+			continue
+		}
+		val := strings.TrimSpace(strings.Join(vals, ","))
+		if lower == "x-tc-action" {
+			val = strings.ToLower(val)
+		}
 		headerSorted = append(headerSorted, lower)
-		signed[lower] = strings.TrimSpace(strings.Join(vals, ","))
+		signed[lower] = val
 	}
 
 	if _, ok := signed["host"]; !ok {
 		return "", "", fmt.Errorf("missing header 'Host'")
+	}
+	if _, ok := signed["content-type"]; !ok {
+		return "", "", fmt.Errorf("missing header 'Content-Type'")
 	}
 
 	sort.Strings(headerSorted)

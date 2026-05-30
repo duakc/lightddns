@@ -15,7 +15,7 @@ const (
 	ContentTypeUrlEncoded = "application/x-www-form-urlencoded"
 
 	// ContentTypeJson ContentTypeFormData POST
-	ContentTypeJson     = "application/json"
+	ContentTypeJson     = "application/json; charset=utf-8"
 	ContentTypeFormData = "multipart/form-data"
 )
 
