@@ -10,9 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/netool/internal"
-
-	"github.com/duakc/mt"
 )
 
 var (
@@ -189,9 +188,13 @@ func (ds DialStrategy) String() string {
 }
 
 func (ds *DialStrategy) UnmarshalYAML(b []byte) error {
-	unqoted := mt.UnquoteString(string(b))
+	unqoted, err := badyaml.UnmarshalType[string](b)
+	if err != nil {
+		return err
+	}
 	if ss, ok := DialStrategyFromString(unqoted); ok {
 		*ds = ss
+		return nil
 	}
 	return fmt.Errorf("unknown dialer strategy: `%s`", unqoted)
 }

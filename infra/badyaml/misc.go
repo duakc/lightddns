@@ -1,7 +1,9 @@
 package badyaml
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/duakc/mt"
@@ -72,5 +74,48 @@ func (L *LogLevel) UnmarshalYAML(data []byte) error {
 		return err
 	}
 	*L = LogLevel(level)
+	return nil
+}
+
+type NotEmpty[T any] struct {
+	Value T
+}
+
+var ErrValuesIsEmpty = errors.New("values is empty")
+
+func (E *NotEmpty[T]) UnmarshalYAML(data []byte) error {
+	ret, err := UnmarshalType[T](data)
+	if err != nil {
+		return err
+	}
+
+	type ZeroChecker interface {
+		IsZero() bool
+	}
+
+	if checker, ok := any(ret).(ZeroChecker); ok && checker.IsZero() {
+		return ErrValuesIsEmpty
+	}
+
+	val := reflect.ValueOf(ret)
+
+	if !val.IsValid() {
+		return fmt.Errorf("value is invalid")
+	}
+
+	kind := val.Kind()
+
+	switch {
+	case (kind == reflect.Slice || kind == reflect.Map) && val.Len() == 0:
+		return ErrValuesIsEmpty
+	case (kind == reflect.Ptr || kind == reflect.Interface || kind == reflect.Chan ||
+		kind == reflect.Func) && val.IsNil():
+		return ErrValuesIsEmpty
+	case val.IsZero():
+		return ErrValuesIsEmpty
+	}
+
+	E.Value = ret
+
 	return nil
 }

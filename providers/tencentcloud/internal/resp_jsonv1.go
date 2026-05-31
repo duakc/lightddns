@@ -9,6 +9,7 @@ import (
 
 type Response[T any] struct {
 	Data      T
+	Error     *APIError
 	RequestID string `json:"RequestId"`
 }
 
@@ -22,7 +23,8 @@ func (r *Response[T]) UnmarshalJSON(data []byte) error {
 	}
 
 	var meta struct {
-		RequestID string `json:"RequestId"`
+		RequestID string    `json:"RequestId"`
+		Error     *APIError `json:"Error"`
 	}
 
 	if err := json.Unmarshal(outer.Resp, &meta); err != nil {
@@ -30,8 +32,12 @@ func (r *Response[T]) UnmarshalJSON(data []byte) error {
 	}
 
 	r.RequestID = meta.RequestID
-
-	if err := json.Unmarshal(outer.Resp, &r.Data); err != nil {
+	if meta.Error != nil {
+		meta.Error.RequestID = meta.RequestID
+		r.Error = meta.Error
+		// On error the response body has no business payload to decode, so
+		// don't attempt to unmarshal Data — leave it zero.
+	} else if err := json.Unmarshal(outer.Resp, &r.Data); err != nil {
 		return fmt.Errorf("unmarshal Data: %w", err)
 	}
 

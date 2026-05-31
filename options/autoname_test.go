@@ -11,19 +11,20 @@ import (
 
 	goyaml "github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func init() {
 	adapter.Register(adapter.DatasourceRegister, "http",
-		func(ctx context.Context, opt options.HTTPDatasourceOption) (adapter.Datasource, error) {
+		func(ctx context.Context, logger *zap.Logger, opt options.HTTPDatasourceOption) (adapter.Datasource, error) {
 			return nil, nil
 		})
 	adapter.Register(adapter.ProviderRegister, "cloudflare",
-		func(ctx context.Context, opt options.CloudflareProviderOption) (adapter.Provider, error) {
+		func(ctx context.Context, logger *zap.Logger, opt options.CloudflareProviderOption) (adapter.Provider, error) {
 			return nil, nil
 		})
 	adapter.Register(adapter.ServiceRegistry, "prometheus",
-		func(ctx context.Context, opt options.PrometheusServiceOption) (adapter.Service, error) {
+		func(ctx context.Context, logger *zap.Logger, opt options.PrometheusServiceOption) (adapter.Service, error) {
 			return nil, nil
 		})
 }

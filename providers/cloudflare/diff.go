@@ -8,10 +8,16 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/infra/ddnsx"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
+
+	"go.uber.org/zap"
 )
 
 func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
+	zaplog.WithContext(ctx, c.logger.With(zap.String("domain", domain)))
+	defer zaplog.KickContext(ctx)
+
 	diffs, err := c.diff(ctx, domain, addr)
 	if err != nil {
 		return false, err
@@ -24,7 +30,7 @@ func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("getZoneID: %w", err)
 	}
-	return ddnsx.Build(ctx, domain, addr, func(ctx context.Context, _, dnsType string) ([]ddnsx.Existing[internal.DNSRecord], error) {
+	return ddnsx.BuildDiffs(ctx, domain, addr, func(ctx context.Context, _, dnsType string) ([]ddnsx.Existing[internal.DNSRecord], error) {
 		return c.listExisting(ctx, domain, zoneID, dnsType)
 	})
 }

@@ -9,6 +9,7 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
 	"go.uber.org/zap"
@@ -16,6 +17,8 @@ import (
 
 func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
 	logger := c.logger.With(zap.String("domain", domain))
+	zaplog.WithContext(ctx, logger)
+	defer zaplog.KickContext(ctx)
 	logger.Debug("new update request", zap.Stringers("addresses", addr))
 
 	zoneID, err := c.getZoneID(ctx, domain)

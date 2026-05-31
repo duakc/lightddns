@@ -11,8 +11,6 @@ import (
 	"github.com/duakc/lightddns/infra/netool"
 
 	"github.com/duakc/mt/services"
-
-	"go.uber.org/zap"
 )
 
 type Datasource interface {
@@ -131,11 +129,4 @@ type DatasourceNotFoundError struct {
 
 func (e *DatasourceNotFoundError) Error() string {
 	return fmt.Sprintf("datasource: %s", e.ManagedNotFoundError.Error())
-}
-
-func CreateDatasourceLogger(logger *zap.Logger, datasource Datasource) *zap.Logger {
-	return logger.With(
-		zap.String("datasource", datasource.Name()),
-		zap.String("datasource_type", datasource.Type())).Named(
-		"datasource")
 }

@@ -100,7 +100,7 @@ func FromContext(ctx context.Context, owner adapter.ManagedType) Factory {
 	case adapter.Service:
 		key = containerKeyService
 	default:
-		return nil
+		panic("unknown adapter type")
 	}
 	f, _ := container.LoadContext[Factory](ctx, key)
 	return f

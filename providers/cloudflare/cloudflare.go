@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
@@ -55,10 +53,11 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.Provider, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProviderOption) (adapter.Provider, error) {
 	if option.Token == "" {
-		return nil, fmt.Errorf("cloudflare(%s): %w", option.Name, adapter.ErrRequireToken)
+		return nil, fmt.Errorf("cloudflare(%s): token is empty", option.Name)
 	}
+
 	dialerOptions, err := option.ConnectOption.Options()
 	if err != nil {
 		return nil, err
@@ -70,20 +69,18 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	clientOptions = append(clientOptions,
-		httpx.ClientOptionWithToken(option.Token),
 		httpx.ClientOptionWithDialer(
-			resolvectl.NewDialer(ctx, connectDialer,
+			resolvectl.NewDialer(connectDialer,
 				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
 
 	cf := &Cloudflare{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		client:              internal.NewClient(ctx, httpx.NewClient(clientOptions...)),
+		client:              internal.NewClient(httpx.NewClient(clientOptions...), option.Token),
 		zones:               new(generic.SyncMap[string, string]),
 
 		proxied: option.Proxy,
+		logger:  logger,
 	}
-
-	cf.logger = adapter.CreatProviderLogger(zaplog.FromContext(ctx), cf)
 
 	return cf, nil
 }
@@ -191,10 +188,17 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (zoneID st
 }
 
 func (c *Cloudflare) fullMatchDomainZoneID(domain string) string {
-	domainToken := strings.Split(domain, ".")
-	for i := len(domainToken) - 2; i > -1; i-- {
-		fullDomain := strings.Join(domainToken[i:], ".")
-		if existedZoneID, existed := c.zones.Load(fullDomain); existed {
+	//domainToken := strings.Split(domain, ".")
+	//for i := len(domainToken) - 2; i > -1; i-- {
+	//	fullDomain := strings.Join(domainToken[i:], ".")
+	//	if existedZoneID, existed := c.zones.Load(fullDomain); existed {
+	//		return existedZoneID
+	//	}
+	//}
+	cutDomains := domains.CutFromHead(domain)
+	for i := 0; i < len(cutDomains); i++ {
+		cutDomain := cutDomains[i]
+		if existedZoneID, existed := c.zones.Load(cutDomain); existed {
 			return existedZoneID
 		}
 	}

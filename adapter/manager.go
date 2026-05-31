@@ -9,6 +9,8 @@ import (
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/services"
+
+	"go.uber.org/zap"
 )
 
 var managerLogger = zaplog.NewPackage("adapter", "manager")
@@ -38,7 +40,7 @@ func (a AbstractManagedType) Name() string {
 type Manager[T ManagedType] interface {
 	services.ContextInjector
 
-	Create(ctx context.Context, typ string, opt any) (T, error)
+	Create(ctx context.Context, logger *zap.Logger, typ string, opt any) (T, error)
 	Lookup(name string) (T, bool)
 	LookupDefault(name string) (T, bool)
 }
@@ -66,8 +68,8 @@ func NewManager[T ManagedType](R Registry[T]) *DefaultManager[T] {
 	}
 }
 
-func (M *DefaultManager[T]) Create(ctx context.Context, typ string, opt any) (T, error) {
-	item, err := M.register.Create(ctx, typ, opt)
+func (M *DefaultManager[T]) Create(ctx context.Context, logger *zap.Logger, typ string, opt any) (T, error) {
+	item, err := M.register.Create(ctx, logger, typ, opt)
 	if err != nil {
 		return mt.Zero[T](), err
 	}

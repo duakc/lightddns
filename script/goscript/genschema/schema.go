@@ -49,6 +49,7 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[badyaml.URL]]()] = dualStack(singleType(JSONTypeString))
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[badyaml.Listable[string]]]()] = dualStack(listAble(JSONTypeString))
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()] = enumSchema(JSONTypeString, "debug", "info", "warn", "error", "panic", "fatal")
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.NotEmpty[string]]()] = singleType(JSONTypeString)
 
 		optionsTypeMappingTable[reflect.TypeFor[dialerx.DialStrategy]()] = enumSchema(JSONTypeString, mt.Map(
 			[]dialerx.DialStrategy{dialerx.DialOnlyIPv4, dialerx.DialOnlyIPv6, dialerx.DialPreferIPv4, dialerx.DialPreferIPv6},

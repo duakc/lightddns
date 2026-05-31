@@ -24,8 +24,6 @@ import (
 
 const defaultCacheSize = 1024
 
-var resolverLogger = zaplog.NewPackage("netool", "resolvectl")
-
 type RcodeError struct {
 	Code     int
 	Excepted int
@@ -35,7 +33,9 @@ func (e *RcodeError) Error() string {
 	return fmt.Sprintf("bad rcode: %s, excepted: %s", mDns.RcodeToString[e.Code], mDns.RcodeToString[e.Excepted])
 }
 
-var DefaultResolveClient = NewResolver(context.Background())
+var DefaultResolveClient = NewResolver()
+
+var resolveLogger = zaplog.NewPackage("netool", "resolvectl")
 
 type ResolveClient interface {
 	Lookup(ctx context.Context, transport transports.Transport, domain string, strategy ResolveStrategy) (addresses []netip.Addr, err error)
@@ -47,22 +47,15 @@ type dnsCacheMessage struct {
 }
 
 type defaultResolveClient struct {
-	logger *zap.Logger
-
 	// cache
 	cacheMax int
 	sf       generic.SingleFlight[mDns.Question, *mDns.Msg]
 	cache    freelru.Cache[mDns.Question, dnsCacheMessage]
 }
 
-func NewResolver(ctx context.Context) ResolveClient {
+func NewResolver() ResolveClient {
 	seed := maphash.MakeSeed()
-	logger := zaplog.FromContext(ctx)
-	if logger == zaplog.NOP && debug.Enabled {
-		logger = resolverLogger
-	}
 	return &defaultResolveClient{
-		logger: logger.Named("resolver"),
 		cache: mt.Must(freelru.NewSharded[mDns.Question, dnsCacheMessage](defaultCacheSize,
 			(&bindSeed[mDns.Question]{seed}).hash())),
 		cacheMax: defaultCacheSize,
@@ -72,6 +65,8 @@ func NewResolver(ctx context.Context) ResolveClient {
 func (r *defaultResolveClient) Lookup(ctx context.Context, transport transports.Transport,
 	domain string, strategy ResolveStrategy,
 ) (addresses []netip.Addr, err error) {
+	logger := zaplog.FromOrDefault(ctx, resolveLogger).
+		WithLazy(zap.String("resolve_domain", domain))
 	//
 	domain = strings.TrimSpace(domain)
 	if len(domain) == 0 || domain == "." {
@@ -99,9 +94,8 @@ func (r *defaultResolveClient) Lookup(ctx context.Context, transport transports.
 	err = group.Run(ctx)
 	if err != nil {
 		if len(ipv6Addresses)+len(ipv4Addresses) != 0 {
-			r.logger.Error("lookup failed but addresses returned",
-				zap.Error(err),
-				zap.String("fqdn", fqdn))
+			logger.Error("lookup failed but addresses returned",
+				zap.Error(err))
 		} else {
 			return nil, err
 		}
@@ -163,15 +157,20 @@ func (r *defaultResolveClient) lookupToExchange(ctx context.Context,
 func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transports.Transport,
 	message *mDns.Msg,
 ) (response *mDns.Msg, err error) {
+	logger := zaplog.FromOrDefault(ctx, resolveLogger)
+
 	if len(message.Question) != 1 {
-		r.logger.Error("bad question length", zap.Int("length", len(message.Question)))
+		logger.Error("bad question length",
+			zap.Int("length", len(message.Question)))
 		return nil, &RcodeError{Code: mDns.RcodeNameError}
 	}
+
 	question := message.Question[0]
 
-	logger := r.logger.WithLazy(
+	logger = logger.WithLazy(
 		zap.String("type", mDns.TypeToString[question.Qtype]),
-		zap.String("fqdn", question.Name))
+		zap.String("resolve_domain", question.Name))
+
 	cacheMessage, cached := r.cache.Get(question)
 	now := time.Now()
 	logger.Debug("new exchange")

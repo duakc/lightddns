@@ -7,8 +7,11 @@ import (
 	urlpkg "net/url"
 
 	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
+
+	"go.uber.org/zap"
 )
 
 var cloudflareApiEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
@@ -17,10 +20,18 @@ type Client struct {
 	client httpx.HTTPRequester
 }
 
-func NewClient(ctx context.Context, client httpx.HTTPRequester) *Client {
+func NewClient(client httpx.HTTPRequester, token string) *Client {
 	return &Client{
-		client: client,
+		client: &httpx.TokenClient{
+			HTTPRequester: client,
+			Token:         token,
+		},
 	}
+}
+
+func actionLogger(ctx context.Context, action string) *zap.Logger {
+	return zaplog.FromOrPackage(ctx, "cloudflare", "internal").
+		With(zap.String("action", action))
 }
 
 func (c *Client) NewRequestConfig(method string) httpx.ReqConfig {
@@ -51,6 +62,8 @@ func (c *Client) ListDNSRecords(name string, zoneID string, qtype string) (*Page
 func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 	content UpdateDNSRecordRequest,
 ) error {
+	logger := actionLogger(ctx, "create_dns_record").With(zap.String("zone_id", zoneID))
+	logger.Debug("cloudflare: api call start")
 	r := c.NewRequestConfig(http.MethodPost)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records")
 	r.Body = content
@@ -59,12 +72,19 @@ func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 		defer response.Body.Close()
 	}
 
-	return createResult.JoinError(err)
+	if joined := createResult.JoinError(err); joined != nil {
+		logger.Warn("cloudflare: create dns record failed", zap.Error(joined))
+		return joined
+	}
+	return nil
 }
 
 func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID string,
 	content UpdateDNSRecordRequest,
 ) error {
+	logger := actionLogger(ctx, "update_dns_record").
+		With(zap.String("zone_id", zoneID), zap.String("record_id", recordID))
+	logger.Debug("cloudflare: api call start")
 	r := c.NewRequestConfig(http.MethodPatch)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", recordID)
 	r.Body = content
@@ -73,10 +93,17 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 		defer response.Body.Close()
 	}
 
-	return createResult.JoinError(err)
+	if joined := createResult.JoinError(err); joined != nil {
+		logger.Warn("cloudflare: update dns record failed", zap.Error(joined))
+		return joined
+	}
+	return nil
 }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID string) error {
+	logger := actionLogger(ctx, "delete_dns_record").
+		With(zap.String("zone_id", zoneID), zap.String("record_id", dnsRecordID))
+	logger.Debug("cloudflare: api call start")
 	r := c.NewRequestConfig(http.MethodDelete)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", dnsRecordID)
 	httpReq, err := r.ToRequestContext(ctx)
@@ -89,9 +116,11 @@ func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID
 		defer resp.Body.Close()
 	}
 	if err != nil {
+		logger.Warn("cloudflare: delete request failed", zap.Error(err))
 		return &httpx.BaseResponseError{Err: err, Method: r.Method}
 	}
 	if resp != nil && resp.StatusCode != http.StatusOK {
+		logger.Warn("cloudflare: delete bad status", zap.Int("status", resp.StatusCode))
 		return &httpx.BadStatusCodeError{
 			Got: resp.StatusCode,
 		}

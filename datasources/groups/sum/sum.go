@@ -7,7 +7,6 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/services"
@@ -25,7 +24,7 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.Datasource, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroupSumOption) (adapter.Datasource, error) {
 	if len(option.Datasources) == 0 {
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
@@ -46,8 +45,8 @@ func New(ctx context.Context, option options.DatasourceGroupSumOption) (adapter.
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		datasources:         datasources,
 		fastFail:            option.FastFail,
+		logger:              logger,
 	}
-	sum.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), sum)
 	return sum, nil
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool/control"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -27,15 +26,15 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.NetlinkDatasourceOption) (adapter.Datasource, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.NetlinkDatasourceOption) (adapter.Datasource, error) {
 	n := &Netlink{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		interfaceFinder:     control.NewDefaultInterfaceFinder(),
 		interfaceName:       option.IfName,
 		interfaceIndex:      option.IfIndex,
 		allowPrivate:        option.AllowPrivate,
+		logger:              logger,
 	}
-	n.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), n)
 	return n, nil
 }
 

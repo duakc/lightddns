@@ -11,14 +11,9 @@ import (
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/internal"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
-	"github.com/duakc/lightddns/infra/zaplog"
-
-	"go.uber.org/zap"
 )
 
 type ResolveDialer struct {
-	logger *zap.Logger
-
 	dialer    dialerx.Dialer
 	transport transports.Transport
 
@@ -76,11 +71,10 @@ func (r *ResolveDialer) DialContext(ctx context.Context, network string, address
 		internal.DefaultHappyEyeballFallbackDelay)
 }
 
-func NewDialer(ctx context.Context,
+func NewDialer(
 	dialer dialerx.Dialer,
 	transport transports.Transport,
 	resolver ResolveClient,
 ) *ResolveDialer {
-	logger := zaplog.FromContext(ctx)
-	return &ResolveDialer{logger: logger, dialer: dialer, transport: transport, resolver: resolver}
+	return &ResolveDialer{dialer: dialer, transport: transport, resolver: resolver}
 }

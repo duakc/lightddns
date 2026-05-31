@@ -60,7 +60,7 @@ type TencentCloud struct {
 	adapter.AbstractManagedType
 
 	logger *zap.Logger
-	c      *internal.Client
+	client *internal.Client
 
 	requestTotal    metrics.CounterVec
 	requestFailures metrics.CounterVec
@@ -72,10 +72,14 @@ type TencentCloud struct {
 	domainMutex sync.Mutex
 }
 
-func New(ctx context.Context, option options.TencentCloudProviderOption) (adapter.Provider, error) {
-	if option.SecretId == "" || option.SecretKey == "" {
-		return nil, fmt.Errorf("tencentcloud(%s): %w", option.Name, adapter.ErrRequireToken)
+func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudProviderOption) (adapter.Provider, error) {
+	if option.SecretId == "" {
+		return nil, fmt.Errorf("tencentcloud(%s): secretId is empty", option.Name)
 	}
+	if option.SecretKey == "" {
+		return nil, fmt.Errorf("tencentcloud(%s): secretKey is empty", option.Name)
+	}
+
 	dialerOptions, err := option.ConnectOption.Options()
 	if err != nil {
 		return nil, err
@@ -88,15 +92,15 @@ func New(ctx context.Context, option options.TencentCloudProviderOption) (adapte
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	clientOptions = append(clientOptions,
 		httpx.ClientOptionWithDialer(
-			resolvectl.NewDialer(ctx, connectDialer,
+			resolvectl.NewDialer(connectDialer,
 				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
 
 	tc := &TencentCloud{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		c:                   internal.NewClient(httpx.NewClient(clientOptions...), option.SecretId, option.SecretKey),
+		client:              internal.NewClient(httpx.NewClient(clientOptions...), option.SecretId, option.SecretKey),
 		domainCache:         new(generic.SyncMap[string, internal.DomainInfo]),
+		logger:              logger,
 	}
-	tc.logger = adapter.CreatProviderLogger(zaplog.FromContext(ctx), tc)
 	return tc, nil
 }
 
@@ -145,7 +149,7 @@ func (t *TencentCloud) resolveDomain(ctx context.Context, fqdn string) (internal
 	}
 
 	start := time.Now()
-	di, err := t.c.DomainInfo(ctx, fqdn)
+	di, err := t.client.DomainInfo(ctx, fqdn)
 	t.recordAPICall(opDescribeDomains, start, err)
 	if err != nil {
 		return internal.DomainInfo{}, fmt.Errorf("DomainInfo: %w", err)
@@ -167,6 +171,9 @@ func subDomain(fqdn, zone string) string {
 }
 
 func (t *TencentCloud) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
+	zaplog.WithContext(ctx, t.logger.With(zap.String("domain", domain)))
+	defer zaplog.KickContext(ctx)
+
 	diffs, err := t.diff(ctx, domain, addr)
 	if err != nil {
 		return false, err
@@ -181,7 +188,7 @@ func (t *TencentCloud) diff(ctx context.Context, domain string, addr []netip.Add
 	}
 	sub := subDomain(domain, di.Name)
 
-	return ddnsx.Build(ctx, domain, addr, func(ctx context.Context, _, dnsType string) ([]ddnsx.Existing[internal.Record], error) {
+	return ddnsx.BuildDiffs(ctx, domain, addr, func(ctx context.Context, _, dnsType string) ([]ddnsx.Existing[internal.Record], error) {
 		return t.listExisting(ctx, di.Name, sub, dnsType)
 	})
 }
@@ -190,7 +197,7 @@ func (t *TencentCloud) listExisting(ctx context.Context, zone, sub, dnsType stri
 	start := time.Now()
 	defer func() { t.recordAPICall(opListRecords, start, err) }()
 
-	records, err := t.c.DescribeRecordList(ctx, zone, sub, dnsType)
+	records, err := t.client.DescribeRecordList(ctx, zone, sub, dnsType)
 	if err != nil {
 		return nil, fmt.Errorf("DescribeRecordList: %w", err)
 	}
@@ -215,6 +222,9 @@ func (t *TencentCloud) listExisting(ctx context.Context, zone, sub, dnsType stri
 
 func (t *TencentCloud) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
 	logger := t.logger.With(zap.String("domain", domain))
+	zaplog.WithContext(ctx, logger)
+	defer zaplog.KickContext(ctx)
+
 	logger.Debug("new update request", zap.Stringers("addresses", addr))
 
 	di, err := t.resolveDomain(ctx, domain)
@@ -245,9 +255,13 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 ) error {
 	logFields := []zap.Field{
 		zap.String("domain", d.Domain),
-		zap.Stringer("source", d.Source),
-		zap.Stringer("target", d.Target),
 		zap.Stringer("action", d.Action),
+	}
+	if d.Target.IsValid() {
+		logFields = append(logFields, zap.Stringer("target", d.Target))
+	}
+	if d.Source.IsValid() {
+		logFields = append(logFields, zap.Stringer("source", d.Source))
 	}
 	logger = logger.WithLazy(logFields...)
 	start := time.Now()
@@ -255,7 +269,7 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 	switch d.Action {
 	case ddnsx.DDNSActionCreate:
 		logger.Info("create")
-		err = t.c.CreateRecord(ctx, internal.CreateRecordRequest{
+		err = t.client.CreateRecord(ctx, internal.CreateRecordRequest{
 			Domain:     zone,
 			SubDomain:  sub,
 			RecordType: recordTypeOf(d.Target),
@@ -266,7 +280,7 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 		t.recordAPICall(opCreateRecord, start, err)
 	case ddnsx.DDNSActionUpdate:
 		logger.Info("update")
-		err = t.c.ModifyRecord(ctx, internal.ModifyRecordRequest{
+		err = t.client.ModifyRecord(ctx, internal.ModifyRecordRequest{
 			Domain:     zone,
 			RecordId:   d.Record.RecordId,
 			SubDomain:  sub,
@@ -278,7 +292,7 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 		t.recordAPICall(opModifyRecord, start, err)
 	case ddnsx.DDNSActionDelete:
 		logger.Info("delete")
-		err = t.c.DeleteRecord(ctx, zone, d.Record.RecordId)
+		err = t.client.DeleteRecord(ctx, zone, d.Record.RecordId)
 		t.recordAPICall(opDeleteRecord, start, err)
 	}
 	return err

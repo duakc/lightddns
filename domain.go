@@ -12,7 +12,6 @@ import (
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -63,7 +62,7 @@ type Domain struct {
 	ipv6           bool
 }
 
-func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
+func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption) (*Domain, error) {
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, nil
 	}
@@ -72,8 +71,6 @@ func NewDomain(ctx context.Context, opt options.DomainOption) (*Domain, error) {
 		opt.IPv6 = true
 	}
 
-	logger := zaplog.FromContext(ctx).With(
-		zap.String("domain", string(opt.Domain)))
 	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
 	providerManager := services.Lookup[adapter.ProviderManager](ctx)
 

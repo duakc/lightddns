@@ -1,41 +1,54 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/duakc/mt/common/validator"
 )
 
+// APIError is the Error envelope Tencent Cloud returns inside the Response
+// body when an action fails. It uses HTTP 200 even on error, so this is the
+// authoritative failure signal.
+type APIError struct {
+	Code      string `json:"Code"`
+	Message   string `json:"Message"`
+	RequestID string `json:"-"`
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("tencentcloud api error: code=%s message=%s request_id=%s",
+		e.Code, e.Message, e.RequestID)
+}
+
 type Common struct {
 	// https://cloud.tencent.com/document/api/1427/56188
-	Action string
+	// Action string
 	// generate by call Headers
 	// Timestamp string
-	Version string
+	// Version string
 
 	// optional
 	Token     string
 	Language  string
 	Region    string
 	Timestamp int64
+
+	Host string
 }
 
 func (c *Common) Headers() (http.Header, error) {
-	if err := errors.Join(
-		validator.NonEmpty(c.Action, "Action"),
-		validator.NonEmpty(c.Version, "Version"),
-		validator.GreaterThan(c.Timestamp, 0, "Timestamp"),
-	); err != nil {
+	if err := validator.GreaterThan(c.Timestamp, 0, "Timestamp"); err != nil {
 		return nil, err
 	}
 
 	h := make(http.Header)
-	h.Set("Host", tencentCloudEndpoint.Host)
+	host := c.Host
+	if host == "" {
+		host = tencentCloudEndpoint.Host
+	}
+	h.Set("Host", host)
 
-	h.Set("X-TC-Action", c.Action)
-	h.Set("X-TC-Version", c.Version)
 	h.Set("X-TC-Timestamp", fmt.Sprintf("%d", c.Timestamp))
 
 	if len(c.Token) > 0 {

@@ -8,8 +8,9 @@ import (
 )
 
 type Response[T any] struct {
-	Data      T      `json:"inline"`
-	RequestID string `json:"RequestId"`
+	Data      T         `json:"inline"`
+	Error     *APIError `json:"Error,omitempty"`
+	RequestID string    `json:"RequestId"`
 }
 
 func (r *Response[T]) UnmarshalJSON(data []byte) error {

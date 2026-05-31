@@ -17,17 +17,17 @@ func Register[T ManagedType, O any](R Registry[T], typ string, constructor Gener
 	managerLogger.Debug("new type registered", zap.String("type", typ))
 	R.registry(typ, func() any {
 		return new(O)
-	}, func(ctx context.Context, option any) (T, error) {
+	}, func(ctx context.Context, logger *zap.Logger, option any) (T, error) {
 		var opt *O
 		if option != nil {
 			opt = option.(*O)
 		}
-		return constructor(ctx, mt.PtrValueOrDefault(opt))
+		return constructor(ctx, logger, mt.PtrValueOrDefault(opt))
 	})
 }
 
 type Registry[T ManagedType] interface {
-	Create(ctx context.Context, typ string, option any) (T, error)
+	Create(ctx context.Context, logger *zap.Logger, typ string, option any) (T, error)
 	CreateOption(typ string) (any, error)
 	Types() []string
 
@@ -35,10 +35,10 @@ type Registry[T ManagedType] interface {
 }
 
 type (
-	GenericObjectConstructor[T ManagedType, O any] func(ctx context.Context, option O) (T, error)
+	GenericObjectConstructor[T ManagedType, O any] func(ctx context.Context, logger *zap.Logger, option O) (T, error)
 
 	optionConstructor                func() any
-	objectConstructor[T ManagedType] func(ctx context.Context, option any) (T, error)
+	objectConstructor[T ManagedType] func(ctx context.Context, logger *zap.Logger, option any) (T, error)
 )
 
 func NewRegister[T ManagedType]() Registry[T] {
@@ -55,7 +55,7 @@ type defaultRegistry[T ManagedType] struct {
 	typeToObject map[string]objectConstructor[T]
 }
 
-func (R *defaultRegistry[T]) Create(ctx context.Context, typ string, option any) (T, error) {
+func (R *defaultRegistry[T]) Create(ctx context.Context, logger *zap.Logger, typ string, option any) (T, error) {
 	R.access.Lock()
 	defer R.access.Unlock()
 
@@ -64,7 +64,7 @@ func (R *defaultRegistry[T]) Create(ctx context.Context, typ string, option any)
 		return mt.Zero[T](), fmt.Errorf("unregistered type: %s", typ)
 	}
 
-	returned, err := create(ctx, option)
+	returned, err := create(ctx, logger, option)
 	if err != nil {
 		return mt.Zero[T](), err
 	}

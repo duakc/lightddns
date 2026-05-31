@@ -13,7 +13,6 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -37,7 +36,7 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.Datasource, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasourceOption) (adapter.Datasource, error) {
 	command := sh.New()
 	command.Envs(option.Env.Values)
 
@@ -51,10 +50,8 @@ func New(ctx context.Context, option options.CommandDatasourceOption) (adapter.D
 		stdin:  option.Stdin,
 		stdout: option.Stdout,
 		stderr: option.Stderr,
+		logger: logger,
 	}
-
-	logger := adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), cc)
-	cc.logger = logger
 
 	if option.Shell == "none" {
 		cc.noShell = true

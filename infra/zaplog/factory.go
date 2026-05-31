@@ -3,67 +3,87 @@ package zaplog
 import (
 	"context"
 
-	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/container"
 
 	"go.uber.org/zap"
 )
 
-type Factory interface {
-	services.ContextInjector
+const ContainerLoggerName = "zaplog.logger.stack"
 
-	Logger(ctx context.Context) *zap.Logger
-	Pass(ctx context.Context, logger *zap.Logger)
+type loggerStack struct {
+	st []*zap.Logger
 }
 
-const ContainerLoggerName = "zaplog.logger"
-
-var _ Factory = (*DefaultFactory)(nil)
-
-type DefaultFactory struct {
-	logger *zap.Logger
+func From(c container.Container) *zap.Logger {
+	stack, ok := container.LoadPtr[loggerStack](c, ContainerLoggerName)
+	if !ok || stack == nil || len(stack.st) == 0 {
+		return defaultLogger
+	}
+	return stack.st[len(stack.st)-1]
 }
 
-func NewFactory(logger *zap.Logger) *DefaultFactory {
-	return &DefaultFactory{logger: DoNotPanic(logger)}
+func With(c container.Container, logger *zap.Logger) {
+	stack, ok := container.LoadPtr[loggerStack](c, ContainerLoggerName)
+	if !ok {
+		stack = &loggerStack{}
+	}
+	stack.st = append(stack.st, logger)
+	container.StorePtr[loggerStack](c, ContainerLoggerName, stack)
+}
+
+func Kick(c container.Container) {
+	stack, ok := container.LoadPtr[loggerStack](c, ContainerLoggerName)
+	if !ok || stack == nil || len(stack.st) == 0 {
+		return
+	}
+	stack.st[len(stack.st)-1] = nil
+	stack.st = stack.st[:len(stack.st)-1]
+	container.StorePtr[loggerStack](c, ContainerLoggerName, stack)
 }
 
 func FromContext(ctx context.Context) *zap.Logger {
-	fa := services.Lookup[Factory](ctx)
-	if fa == nil {
-		return NOP
+	stack, ok := container.LoadPtrContext[loggerStack](ctx, ContainerLoggerName)
+	if !ok || stack == nil || len(stack.st) == 0 {
+		return defaultLogger
 	}
-	return fa.Logger(ctx)
+	return stack.st[len(stack.st)-1]
 }
 
 func WithContext(ctx context.Context, logger *zap.Logger) {
-	fa := services.Lookup[Factory](ctx)
-	if fa == nil {
+	stack, ok := container.LoadPtrContext[loggerStack](ctx, ContainerLoggerName)
+	if !ok {
+		stack = &loggerStack{}
+	}
+	stack.st = append(stack.st, logger)
+	container.StorePtrContext[loggerStack](ctx, ContainerLoggerName, stack)
+}
+
+func KickContext(ctx context.Context) {
+	stack, ok := container.LoadPtrContext[loggerStack](ctx, ContainerLoggerName)
+	if !ok || stack == nil || len(stack.st) == 0 {
 		return
 	}
-	fa.Pass(ctx, logger)
+	stack.st[len(stack.st)-1] = nil
+	stack.st = stack.st[:len(stack.st)-1]
+	container.StorePtrContext[loggerStack](ctx, ContainerLoggerName, stack)
 }
 
-func (f *DefaultFactory) Logger(ctx context.Context) *zap.Logger {
-	if f == nil {
-		return NOP
+func FromOrPackage(ctx context.Context, pkg ...string) *zap.Logger {
+	if c, ok := container.FromContext(ctx); ok {
+		if stack, sok := container.LoadPtr[loggerStack](c, ContainerLoggerName); sok &&
+			stack != nil && len(stack.st) > 0 {
+			return stack.st[len(stack.st)-1]
+		}
 	}
-	parentLogger, ok := container.LoadPtrContext[zap.Logger](ctx, ContainerLoggerName)
-	if ok {
-		return parentLogger
-	}
-
-	return f.logger
+	return NewPackage(pkg...)
 }
 
-func (f *DefaultFactory) Pass(ctx context.Context, logger *zap.Logger) {
-	if logger == nil || ctx == nil || f == nil {
-		return
+func FromOrDefault(ctx context.Context, dft *zap.Logger) *zap.Logger {
+	if c, ok := container.FromContext(ctx); ok {
+		if stack, sok := container.LoadPtr[loggerStack](c, ContainerLoggerName); sok &&
+			stack != nil && len(stack.st) > 0 {
+			return stack.st[len(stack.st)-1]
+		}
 	}
-
-	container.StorePtrContext[zap.Logger](ctx, ContainerLoggerName, logger)
-}
-
-func (f *DefaultFactory) ContextInject(ctx context.Context) context.Context {
-	return services.InjectMe[Factory](ctx, f)
+	return dft
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -29,7 +28,7 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (adapter.Datasource, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroupFailoverOption) (adapter.Datasource, error) {
 	if len(option.Datasources) == 0 {
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
@@ -48,8 +47,8 @@ func New(ctx context.Context, option options.DatasourceGroupFailoverOption) (ada
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		datasources:         datasources,
 		lastSuccess:         0,
+		logger:              logger,
 	}
-	failover.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), failover)
 	return failover, nil
 }
 

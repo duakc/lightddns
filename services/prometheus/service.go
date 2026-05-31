@@ -13,7 +13,6 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/services"
@@ -49,7 +48,7 @@ type Prometheus struct {
 	serveErrC chan error
 }
 
-func New(ctx context.Context, option options.PrometheusServiceOption) (adapter.Service, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.PrometheusServiceOption) (adapter.Service, error) {
 	if !option.Enabled {
 		return nil, adapter.ErrManagedItemNotEnabled
 	}
@@ -66,8 +65,8 @@ func New(ctx context.Context, option options.PrometheusServiceOption) (adapter.S
 		AbstractManagedType: adapter.NewManagedType(ServiceType, option.Name),
 		addr:                net.JoinHostPort(option.Listen, strconv.FormatUint(uint64(port), 10)),
 		path:                path.Clean(httpPath),
+		logger:              logger,
 	}
-	prometheus.logger = adapter.CreateServiceLogger(zaplog.FromContext(ctx), prometheus)
 	return prometheus, nil
 }
 

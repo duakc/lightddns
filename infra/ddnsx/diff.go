@@ -102,7 +102,7 @@ func Compare[R any](domain string, existing []Existing[R], target []netip.Addr) 
 
 type FetchFunc[R any] func(ctx context.Context, domain string, dnsType string) ([]Existing[R], error)
 
-func Build[R any](ctx context.Context, domain string, target []netip.Addr, fetch FetchFunc[R]) ([]Diff[R], error) {
+func BuildDiffs[R any](ctx context.Context, domain string, target []netip.Addr, fetch FetchFunc[R]) ([]Diff[R], error) {
 	ipv4, ipv6 := netool.SplitIPv4AndIPv6(target)
 
 	var diffs []Diff[R]

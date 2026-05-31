@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-
-	"go.uber.org/zap"
 )
 
 type Provider interface {
@@ -26,11 +24,4 @@ type ProviderNotFoundError struct {
 
 func (e *ProviderNotFoundError) Error() string {
 	return fmt.Sprintf("provider: %s", e.ManagedNotFoundError.Error())
-}
-
-func CreatProviderLogger(logger *zap.Logger, provider Provider) *zap.Logger {
-	return logger.With(
-		zap.String("provider", provider.Name()),
-		zap.String("provider_type", provider.Type())).
-		Named("provider")
 }

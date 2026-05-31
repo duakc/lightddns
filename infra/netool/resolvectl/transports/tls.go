@@ -38,7 +38,7 @@ type TLSTransport struct {
 }
 
 func NewTLS(ctx context.Context, dialer dialerx.Dialer, server string, tlsConfig *tls.Config) (*TLSTransport, error) {
-	logger := zaplog.FromContext(ctx)
+	logger := zaplog.FromOrPackage(ctx, "netool", "resolvectl", "transports")
 	return &TLSTransport{
 		logger:      logger.With(zap.String("dns_transport_type", "tls")),
 		dialer:      dialer,

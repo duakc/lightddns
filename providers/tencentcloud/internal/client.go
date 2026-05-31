@@ -1,21 +1,21 @@
 package internal
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	urlpkg "net/url"
-	"strconv"
-	"time"
 
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -37,43 +37,95 @@ const (
 	DNSPodActionDeleteRecord             = "DeleteRecord"
 
 	DNSPodDefaultVersion = "2021-03-23"
+
+	// DNSPodErrCodeNoDataOfRecord is returned by DescribeRecordList when the
+	// domain exists but has no records matching the filter. For DDNS this is
+	// the normal "first run" state, not an error — callers should treat it
+	// as an empty list.
+	DNSPodErrCodeNoDataOfRecord = "ResourceNotFound.NoDataOfRecord"
 )
 
 var tencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
 
 type Client struct {
 	do httpx.HTTPRequester
-
-	secretId, secretKey string
 }
 
 func NewClient(do httpx.HTTPRequester, secretId, secretKey string) *Client {
 	return &Client{
-		do: do, secretId: secretId, secretKey: secretKey,
+		do: &TencentSignClient{
+			HTTPRequester: do,
+			SecretId:      secretId,
+			SecretKey:     secretKey,
+			Service:       DNSPodServiceName,
+		},
 	}
+}
+
+func (c *Client) newRequest(method, action string) httpx.ReqConfig {
+	req := httpx.NewReqConfig(method, tencentCloudEndpoint)
+	req.ExtendHeader.Set("X-TC-Action", action)
+	req.ExtendHeader.Set("X-TC-Version", DNSPodDefaultVersion)
+	return req
 }
 
 func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (T, error) {
 	var zero T
-	req := c.newRequest(http.MethodPost)
+	logger := zaplog.FromOrPackage(ctx, "tencentcloud", "internal").
+		With(zap.String("action", action))
+	logger.Debug("tencentcloud: api call start")
+
+	req := c.newRequest(http.MethodPost, action)
 	req.ExtendHeader.Set("Content-Type", ContentTypeJson)
 	req.Body = body
 
-	resp, err := sendRequest(ctx, c.do, req, action, c.secretId, c.secretKey)
+	httpReq, err := req.ToRequestContext(ctx)
+	if err != nil {
+		return zero, fmt.Errorf("build request %s: %w", action, err)
+	}
+	resp, err := c.do.Do(httpReq)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return zero, fmt.Errorf("sendRequest %s: %w", action, err)
+		logger.Warn("tencentcloud: send request failed",
+			zap.Error(err))
+		return zero, fmt.Errorf("send %s: %w", action, err)
 	}
+
+	if resp == nil {
+		panic("empty response with error")
+	}
+
 	if resp.StatusCode >= 400 {
+		logger.Warn("tencentcloud: bad status code",
+			zap.Int("status", resp.StatusCode))
 		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
 	}
 
+	// Read the raw body so we can log it on decode failure or API error.
+	// Bodies are small (a single Response envelope) so this is cheap.
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return zero, fmt.Errorf("read body %s: %w", action, err)
+	}
+
 	var out Response[T]
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.Unmarshal(rawBody, &out); err != nil {
+		logger.Warn("tencentcloud: decode response failed",
+			zap.ByteString("body", rawBody),
+			zap.Error(err))
 		return zero, fmt.Errorf("decode %s: %w", action, err)
 	}
+	if out.Error != nil {
+		logger.Warn("tencentcloud: api returned error",
+			zap.String("error_code", out.Error.Code),
+			zap.String("error_message", out.Error.Message),
+			zap.String("request_id", out.RequestID))
+		return zero, out.Error
+	}
+	logger.Debug("tencentcloud: api call ok",
+		zap.String("request_id", out.RequestID))
 	return out.Data, nil
 }
 
@@ -108,6 +160,15 @@ func (c *Client) DescribeRecordList(ctx context.Context, domain, subDomain, reco
 		}
 		page, err := jsonAction[_describeRecordListResponse](ctx, c, action, body)
 		if err != nil {
+			// Tencent returns NoDataOfRecord when the domain has no matching
+			// records. For initial DDNS setup that's the expected state, not
+			// a failure — surface it as an empty list so the caller proceeds
+			// to CreateRecord instead of bailing.
+			if apiErr, ok := errors.AsType[*APIError](err); ok &&
+				apiErr.Code == DNSPodErrCodeNoDataOfRecord {
+
+				return all, nil
+			}
 			return nil, err
 		}
 		all = append(all, page.RecordList...)
@@ -199,12 +260,7 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 		pageSize = 100
 	)
 
-	// fetchPage: one HTTP round-trip. Wrapped in a closure so resp.Body is
-	// closed via defer before returning, which keeps the paging loop free of
-	// the defer-in-loop trap.
 	fetchPage := func(keyword string, offset int) (_domainInfoResponse, error) {
-		req := c.newRequest(http.MethodPost)
-		req.ExtendHeader.Set("Content-Type", ContentTypeJson)
 		body := map[string]any{
 			"Type":   "ALL",
 			"Limit":  pageSize,
@@ -213,24 +269,7 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 		if keyword != "" {
 			body["Keyword"] = keyword
 		}
-		req.Body = body
-
-		resp, err := sendRequest(ctx, c.do, req, action, c.secretId, c.secretKey)
-		if resp != nil {
-			defer resp.Body.Close()
-		}
-		if err != nil {
-			return _domainInfoResponse{}, fmt.Errorf("sendRequest %s: %w", action, err)
-		}
-		if resp.StatusCode >= 400 {
-			return _domainInfoResponse{}, &httpx.BadStatusCodeError{Got: resp.StatusCode}
-		}
-
-		var out Response[_domainInfoResponse]
-		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-			return _domainInfoResponse{}, fmt.Errorf("decode %s: %w", action, err)
-		}
-		return out.Data, nil
+		return jsonAction[_domainInfoResponse](ctx, c, action, body)
 	}
 
 	// tryKeyword: walk all pages for one keyword; short-circuit on exact match.
@@ -262,59 +301,4 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 		}
 	}
 	return DomainInfo{}, fmt.Errorf("domain not found: %s", search)
-}
-
-func (c *Client) newRequest(method string) httpx.ReqConfig {
-	req := httpx.NewReqConfig(method, tencentCloudEndpoint)
-	return req
-}
-
-func sendRequest(ctx context.Context, do httpx.HTTPRequester, req httpx.ReqConfig, action,
-	secretId, secretKey string,
-) (*http.Response, error) {
-	headers := maps.Clone(req.ExtendHeader)
-	body, err := httpx.BuildBodyReader(req.Body, headers)
-	if err != nil {
-		return nil, fmt.Errorf("httpx.BuildBodyReader: %w", err)
-	}
-
-	common := Common{
-		Action:    action,
-		Version:   DNSPodDefaultVersion,
-		Timestamp: time.Now().UTC().Unix(),
-	}
-
-	commonHeaders := mt.Must(common.Headers())
-	httpx.ExtendHeadersOverride(headers, commonHeaders)
-
-	readAllData, err := io.ReadAll(body)
-	if err != nil {
-		return nil, fmt.Errorf("read all data need to signature: %w", err)
-	}
-
-	if headers.Get("Content-Length") == "" {
-		headers.Set("Content-Length", strconv.Itoa(len(readAllData)))
-	}
-
-	sigContext := SigContext{
-		Method:  req.Method,
-		Headers: headers,
-
-		Body:      readAllData,
-		Timestamp: common.Timestamp,
-		SecretId:  secretId,
-		SecretKey: secretKey,
-		Service:   DNSPodServiceName,
-	}
-
-	headers.Set("Authorization", mt.Must(sigContext.Authorization()))
-
-	req.ExtendHeader = headers
-	req.Body = bytes.NewBuffer(readAllData)
-
-	httpRequest, err := req.ToRequestContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("build http request: %w", err)
-	}
-	return do.Do(httpRequest)
 }

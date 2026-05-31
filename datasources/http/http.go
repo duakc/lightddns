@@ -20,7 +20,6 @@ import (
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -39,7 +38,7 @@ func init() {
 	)
 }
 
-func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Datasource, error) {
+func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceOption) (adapter.Datasource, error) {
 	if option.Method == "" {
 		option.Method = http.MethodGet
 	}
@@ -78,7 +77,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	if needDNS {
-		connectDialer = resolvectl.NewDialer(ctx, connectDialer,
+		connectDialer = resolvectl.NewDialer(connectDialer,
 			mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)
 	}
 
@@ -104,10 +103,11 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 	}
 	httpds := &Httpds{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		v4:                  v4,
-		v6:                  v6,
+
+		logger: logger,
+		v4:     v4,
+		v6:     v6,
 	}
-	httpds.logger = adapter.CreateDatasourceLogger(zaplog.FromContext(ctx), httpds)
 	return httpds, nil
 }
 
