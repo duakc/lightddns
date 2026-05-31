@@ -27,3 +27,14 @@ func FilterAddress(ips []netip.Addr, ipv4, ipv6 bool) []netip.Addr {
 			((ipv4 && IsIPv4(v)) || (ipv6 && IsIPv6(v))))
 	})
 }
+
+func SplitIPv4AndIPv6(ips []netip.Addr) (ipv4, ipv6 []netip.Addr) {
+	for _, v := range ips {
+		if IsIPv4(v) {
+			ipv4 = append(ipv4, v)
+		} else if IsIPv6(v) {
+			ipv6 = append(ipv6, v)
+		}
+	}
+	return
+}

@@ -17,6 +17,7 @@ import (
 	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -49,7 +50,7 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 
 	// If a URL host is a literal IP, force its stack and disable the other.
 	for stack, url := range map[string]*badyaml.URL{"ipv4": &v4URL, "ipv6": &v6URL} {
-		if url.Raw == "" || netool.IsDomainName(url.URL.Host) {
+		if url.Raw == "" || domains.IsDomainName(url.URL.Host) {
 			continue
 		}
 		addr, err := netip.ParseAddr(url.URL.Host)
@@ -61,8 +62,8 @@ func New(ctx context.Context, option options.HTTPDatasourceOption) (adapter.Data
 		}
 	}
 
-	needDNS := (v4URL.Raw != "" && netool.IsDomainName(v4URL.URL.Host)) ||
-		(v6URL.Raw != "" && netool.IsDomainName(v6URL.URL.Host))
+	needDNS := (v4URL.Raw != "" && domains.IsDomainName(v4URL.URL.Host)) ||
+		(v6URL.Raw != "" && domains.IsDomainName(v6URL.URL.Host))
 
 	dialerOptions, err := option.ConnectOption.Options()
 	if err != nil {

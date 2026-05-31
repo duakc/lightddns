@@ -32,6 +32,8 @@ func (c *Common) Headers() (http.Header, error) {
 	}
 
 	h := make(http.Header)
+	h.Set("Host", tencentCloudEndpoint.Host)
+
 	h.Set("X-TC-Action", c.Action)
 	h.Set("X-TC-Version", c.Version)
 	h.Set("X-TC-Timestamp", fmt.Sprintf("%d", c.Timestamp))
@@ -47,6 +49,57 @@ func (c *Common) Headers() (http.Header, error) {
 	}
 
 	return h, nil
+}
+
+// Record is one DNS record returned by DescribeRecordList.
+//
+// https://cloud.tencent.com/document/api/1427/56166
+type Record struct {
+	RecordId      uint64 `json:"RecordId"`
+	Name          string `json:"Name"`   // subdomain (host part), e.g. "www"; "@" means apex
+	Type          string `json:"Type"`   // A, AAAA, CNAME...
+	Line          string `json:"Line"`   // line name (Chinese), e.g. "默认"
+	LineId        string `json:"LineId"` // line id, e.g. "0"
+	Value         string `json:"Value"`  // record content
+	TTL           uint32 `json:"TTL"`
+	MX            uint32 `json:"MX"`
+	Status        string `json:"Status"`
+	Weight        *int   `json:"Weight,omitempty"`
+	MonitorStatus string `json:"MonitorStatus"`
+	Remark        string `json:"Remark"`
+	UpdatedOn     string `json:"UpdatedOn"`
+	DomainId      uint64 `json:"DomainId"`
+}
+
+// DefaultRecordLine is the line used for DDNS records: 默认 (default).
+//
+// Tencent's API expects the line name in Chinese; this is the documented
+// value for the catch-all line.
+const DefaultRecordLine = "默认"
+
+// CreateRecordRequest is the request body for CreateRecord.
+//
+// https://cloud.tencent.com/document/api/1427/56180
+type CreateRecordRequest struct {
+	Domain     string `json:"Domain"`
+	SubDomain  string `json:"SubDomain"`
+	RecordType string `json:"RecordType"`
+	RecordLine string `json:"RecordLine"`
+	Value      string `json:"Value"`
+	TTL        uint32 `json:"TTL,omitempty"`
+}
+
+// ModifyRecordRequest is the request body for ModifyRecord.
+//
+// https://cloud.tencent.com/document/api/1427/56157
+type ModifyRecordRequest struct {
+	Domain     string `json:"Domain"`
+	RecordId   uint64 `json:"RecordId"`
+	SubDomain  string `json:"SubDomain"`
+	RecordType string `json:"RecordType"`
+	RecordLine string `json:"RecordLine"`
+	Value      string `json:"Value"`
+	TTL        uint32 `json:"TTL,omitempty"`
 }
 
 type DomainInfo struct {

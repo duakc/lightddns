@@ -6,7 +6,7 @@ import (
 	urlpkg "net/url"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netool/domains"
 )
 
 type HTTPMethod string
@@ -82,7 +82,7 @@ func (d *DomainName) UnmarshalYAML(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if !netool.IsDomainName(s) {
+	if !domains.IsDomainName(s) {
 		return fmt.Errorf("invalid domain name: %s", s)
 	}
 	*d = DomainName(s)

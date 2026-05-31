@@ -13,8 +13,8 @@ import (
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
-	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -45,10 +45,12 @@ const (
 	opDeleteDNS      = "delete_dns_record"
 )
 
+const ProviderType = constpkg.ProviderTypeCloudflare
+
 func init() {
 	adapter.Register(
 		adapter.ProviderRegister,
-		constpkg.ProviderTypeCloudflare,
+		ProviderType,
 		New,
 	)
 }
@@ -74,10 +76,10 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
 
 	cf := &Cloudflare{
-		client: internal.NewClient(ctx, httpx.NewClient(clientOptions...)),
-		zones:  new(generic.SyncMap[string, string]),
+		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
+		client:              internal.NewClient(ctx, httpx.NewClient(clientOptions...)),
+		zones:               new(generic.SyncMap[string, string]),
 
-		name:    option.Name,
 		proxied: option.Proxy,
 	}
 
@@ -87,6 +89,8 @@ func New(ctx context.Context, option options.CloudflareProviderOption) (adapter.
 }
 
 type Cloudflare struct {
+	adapter.AbstractManagedType
+
 	logger *zap.Logger
 	client *internal.Client
 
@@ -94,7 +98,6 @@ type Cloudflare struct {
 	requestFailures metrics.CounterVec
 	requestDuration metrics.HistogramVec
 
-	name      string
 	zones     *generic.SyncMap[string, string]
 	zoneMutex sync.Mutex
 
@@ -122,26 +125,16 @@ func (c *Cloudflare) Start(ctx context.Context, stage services.Stage) error {
 
 func (c *Cloudflare) Close() error { return nil }
 
-// recordAPICall is the per-impl bookkeeping helper: takes captured start time
-// and the call's error by value (no pointers).
 func (c *Cloudflare) recordAPICall(op string, start time.Time, err error) {
-	c.requestTotal.With(c.name, op).Inc()
-	c.requestDuration.With(c.name, op).Observe(time.Since(start).Seconds())
+	c.requestTotal.With(c.Name(), op).Inc()
+	c.requestDuration.With(c.Name(), op).Observe(time.Since(start).Seconds())
 	if err != nil {
-		c.requestFailures.With(c.name, op).Inc()
+		c.requestFailures.With(c.Name(), op).Inc()
 	}
 }
 
-func (c *Cloudflare) Type() string {
-	return constpkg.ProviderTypeCloudflare
-}
-
-func (c *Cloudflare) Name() string {
-	return c.name
-}
-
 func (c *Cloudflare) getZoneID(ctx context.Context, domain string) (string, error) {
-	if !netool.IsDomainName(domain) {
+	if !domains.IsDomainName(domain) {
 		return "", fmt.Errorf("bad domain name")
 	}
 	if existedZoneID := c.fullMatchDomainZoneID(domain); existedZoneID != "" {
@@ -170,17 +163,17 @@ func (c *Cloudflare) updateZoneID(ctx context.Context, domain string) (zoneID st
 		}
 		for i := 0; i < len(page); i++ {
 			zone := page[i]
-			if !netool.IsDomainName(zone.Name) {
-				logger.Warn("upstream return a bad domain",
-					zap.String("domain", domain),
-					zap.String("zone_name", zone.Name))
+			logger := logger.WithLazy(
+				zap.String("domain", domain),
+				zap.String("zone_name", zone.Name),
+			)
 
+			if !domains.IsDomainName(zone.Name) {
+				logger.Warn("upstream return a bad domain")
 				continue
 			}
 
-			logger.Info("found zone id",
-				zap.String("domain", domain),
-				zap.String("zone_name", zone.Name))
+			logger.Info("found zone id")
 			if zone.Name == domain {
 				zoneID = zone.ID
 				c.zones.Store(domain, zone.ID)

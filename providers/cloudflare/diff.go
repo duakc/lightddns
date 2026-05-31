@@ -7,115 +7,51 @@ import (
 	"net/netip"
 	"time"
 
-	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
-
-	"github.com/duakc/mt"
 )
 
-type dnsUpdateRequest struct {
-	internal.DNSRecord
-
-	address  netip.Addr
-	toDelete bool
-	toCreate bool
-	toUpdate bool
-}
-
 func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
-	return isDiff(c.diff(ctx, domain, addr))
+	diffs, err := c.diff(ctx, domain, addr)
+	if err != nil {
+		return false, err
+	}
+	return len(diffs) > 0, nil
 }
 
-func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr) ([]dnsUpdateRequest, error) {
+func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr) ([]ddnsx.Diff[internal.DNSRecord], error) {
 	zoneID, err := c.getZoneID(ctx, domain)
 	if err != nil {
 		return nil, fmt.Errorf("getZoneID: %w", err)
 	}
-	var differentRecords []dnsUpdateRequest
-	if ipv4Address := mt.Filter(addr, netool.IsIPv4); len(ipv4Address) > 0 || len(addr) == 0 {
-		diffType, err := c.diffType(ctx, domain, zoneID, ipv4Address, constpkg.DNSTypeA)
-		if err != nil {
-			return nil, err
-		}
-		differentRecords = append(differentRecords, diffType...)
-	}
-	if ipv6Address := mt.Filter(addr, netool.IsIPv6); len(ipv6Address) > 0 || len(addr) == 0 {
-		diffType, err := c.diffType(ctx, domain, zoneID, ipv6Address, constpkg.DNSTypeAAAA)
-		if err != nil {
-			return nil, err
-		}
-		differentRecords = append(differentRecords, diffType...)
-	}
-
-	return differentRecords, nil
+	return ddnsx.Build(ctx, domain, addr, func(ctx context.Context, _, dnsType string) ([]ddnsx.Existing[internal.DNSRecord], error) {
+		return c.listExisting(ctx, domain, zoneID, dnsType)
+	})
 }
 
-func (c *Cloudflare) diffType(ctx context.Context, domain, zoneID string, addr []netip.Addr, typ string) (result []dnsUpdateRequest, err error) {
+func (c *Cloudflare) listExisting(ctx context.Context, domain, zoneID, dnsType string) (existing []ddnsx.Existing[internal.DNSRecord], err error) {
 	start := time.Now()
 	defer func() { c.recordAPICall(opListDNSRecords, start, err) }()
-	records, err := c.client.ListDNSRecords(domain, zoneID, typ)
+
+	pager, err := c.client.ListDNSRecords(domain, zoneID, dnsType)
 	if err != nil {
 		return nil, fmt.Errorf("ListDNSRecords: %w", err)
 	}
-	return compareRecords(ctx, addr, records)
-}
-
-func compareRecords(ctx context.Context, addresses []netip.Addr, records *internal.PageConfig[internal.DNSRecord]) ([]dnsUpdateRequest, error) {
-	var (
-		diffRecords  []dnsUpdateRequest
-		addressesMap = mt.Set(addresses)
-	)
-
-	for page, err := records.Next(ctx); err != io.EOF; page, err = records.Next(ctx) {
-		if err != nil {
-			return nil, err
+	for page, perr := pager.Next(ctx); perr != io.EOF; page, perr = pager.Next(ctx) {
+		if perr != nil {
+			return nil, perr
 		}
 		for i := 0; i < len(page); i++ {
 			record := page[i]
-			addr, err := netip.ParseAddr(record.Content)
+			ip, err := netip.ParseAddr(record.Content)
 			if err != nil {
-				return nil, fmt.Errorf("not a address: %s: %w", record.Content, err)
+				return nil, fmt.Errorf("not an address: %s: %w", record.Content, err)
 			}
-
-			if addressesMap[addr] {
-				delete(addressesMap, addr)
-				continue
-			} else if r := newUpdateRequest(record, addr); len(addressesMap) == 0 {
-				r.toDelete = true
-				diffRecords = append(diffRecords, r)
-			} else {
-				r.toUpdate = true
-				diffRecords = append(diffRecords, r)
-			}
+			existing = append(existing, ddnsx.Existing[internal.DNSRecord]{
+				Addr:   ip,
+				Record: record,
+			})
 		}
 	}
-	for i := 0; i < len(diffRecords); i++ {
-		if diffRecords[i].toUpdate {
-			for addr := range addressesMap {
-				// pick one and delete
-				diffRecords[i].address = addr
-				delete(addressesMap, addr)
-				break
-			}
-		}
-	}
-
-	for addr := range addressesMap {
-		r := newUpdateRequest(internal.DNSRecord{}, addr)
-		r.toCreate = true
-		diffRecords = append(diffRecords, r)
-	}
-	return diffRecords, nil
-}
-
-func newUpdateRequest(r internal.DNSRecord, addr netip.Addr) dnsUpdateRequest {
-	return dnsUpdateRequest{
-		DNSRecord: r,
-		address:   addr,
-	}
-}
-
-func isDiff(elements []dnsUpdateRequest, err error) (bool, error) {
-	return err == nil && len(elements) > 0, err
+	return existing, nil
 }

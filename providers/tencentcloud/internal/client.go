@@ -30,7 +30,11 @@ const (
 const (
 	DNSPodServiceName = "dnspod"
 
-	DNSPodActionDescribeRecordList = "DescribeRecordList"
+	DNSPodActionDescribeDomainFilterList = "DescribeDomainFilterList"
+	DNSPodActionDescribeRecordList       = "DescribeRecordList"
+	DNSPodActionCreateRecord             = "CreateRecord"
+	DNSPodActionModifyRecord             = "ModifyRecord"
+	DNSPodActionDeleteRecord             = "DeleteRecord"
 
 	DNSPodDefaultVersion = "2021-03-23"
 )
@@ -47,6 +51,127 @@ func NewClient(do httpx.HTTPRequester, secretId, secretKey string) *Client {
 	return &Client{
 		do: do, secretId: secretId, secretKey: secretKey,
 	}
+}
+
+func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (T, error) {
+	var zero T
+	req := c.newRequest(http.MethodPost)
+	req.ExtendHeader.Set("Content-Type", ContentTypeJson)
+	req.Body = body
+
+	resp, err := sendRequest(ctx, c.do, req, action, c.secretId, c.secretKey)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		return zero, fmt.Errorf("sendRequest %s: %w", action, err)
+	}
+	if resp.StatusCode >= 400 {
+		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
+	}
+
+	var out Response[T]
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return zero, fmt.Errorf("decode %s: %w", action, err)
+	}
+	return out.Data, nil
+}
+
+// DescribeRecordList https://cloud.tencent.com/document/api/1427/56166
+func (c *Client) DescribeRecordList(ctx context.Context, domain, subDomain, recordType string) ([]Record, error) {
+	type _describeRecordListResponse struct {
+		RecordCountInfo struct {
+			SubdomainCount int `json:"SubdomainCount"`
+			ListCount      int `json:"ListCount"`
+			TotalCount     int `json:"TotalCount"`
+		} `json:"RecordCountInfo"`
+		RecordList []Record `json:"RecordList"`
+	}
+
+	const (
+		action   = DNSPodActionDescribeRecordList
+		pageSize = 100
+	)
+
+	var all []Record
+	for offset := 0; ; {
+		body := map[string]any{
+			"Domain": domain,
+			"Limit":  pageSize,
+			"Offset": offset,
+		}
+		if subDomain != "" {
+			body["Subdomain"] = subDomain
+		}
+		if recordType != "" {
+			body["RecordType"] = recordType
+		}
+		page, err := jsonAction[_describeRecordListResponse](ctx, c, action, body)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, page.RecordList...)
+		offset += len(page.RecordList)
+		if len(page.RecordList) == 0 || offset >= page.RecordCountInfo.TotalCount {
+			return all, nil
+		}
+	}
+}
+
+// CreateRecord creates one DNS record.
+//
+// https://cloud.tencent.com/document/api/1427/56180
+func (c *Client) CreateRecord(ctx context.Context, req CreateRecordRequest) error {
+	body := map[string]any{
+		"Domain":     req.Domain,
+		"SubDomain":  req.SubDomain,
+		"RecordType": req.RecordType,
+		"RecordLine": req.RecordLine,
+		"Value":      req.Value,
+	}
+	if req.TTL > 0 {
+		body["TTL"] = req.TTL
+	}
+	type _createRecordResponse struct {
+		RecordId uint64 `json:"RecordId"`
+	}
+	_, err := jsonAction[_createRecordResponse](ctx, c, DNSPodActionCreateRecord, body)
+	return err
+}
+
+// ModifyRecord updates one DNS record.
+//
+// https://cloud.tencent.com/document/api/1427/56157
+func (c *Client) ModifyRecord(ctx context.Context, req ModifyRecordRequest) error {
+	body := map[string]any{
+		"Domain":     req.Domain,
+		"RecordId":   req.RecordId,
+		"SubDomain":  req.SubDomain,
+		"RecordType": req.RecordType,
+		"RecordLine": req.RecordLine,
+		"Value":      req.Value,
+	}
+	if req.TTL > 0 {
+		body["TTL"] = req.TTL
+	}
+	type _modifyRecordResponse struct {
+		RecordId uint64 `json:"RecordId"`
+	}
+	_, err := jsonAction[_modifyRecordResponse](ctx, c, DNSPodActionModifyRecord, body)
+	return err
+}
+
+// DeleteRecord deletes one DNS record by id.
+//
+// https://cloud.tencent.com/document/api/1427/56176
+func (c *Client) DeleteRecord(ctx context.Context, domain string, recordId uint64) error {
+	body := map[string]any{
+		"Domain":   domain,
+		"RecordId": recordId,
+	}
+	type _deleteRecordResponse struct{}
+	_, err := jsonAction[_deleteRecordResponse](ctx, c, DNSPodActionDeleteRecord, body)
+	return err
 }
 
 func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, error) {
@@ -70,7 +195,7 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 	}
 
 	const (
-		action   = "DescribeDomainFilterList"
+		action   = DNSPodActionDescribeDomainFilterList
 		pageSize = 100
 	)
 
@@ -116,7 +241,7 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 				return DomainInfo{}, false, err
 			}
 			for _, di := range page.DomainList {
-				if di.Name == search {
+				if domains.IsSubDomain(search, di.Name) {
 					return di, true, nil
 				}
 			}
