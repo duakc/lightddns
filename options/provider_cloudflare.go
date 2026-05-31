@@ -9,7 +9,7 @@ type CloudflareProviderOption struct {
 	ConnectOption          `yaml:",inline"`
 	HTTPOption             `yaml:",inline"`
 
-	Token string `json:"token"           yaml:"token"`
+	Token string `json:"token" yaml:"token"`
 
 	Proxy bool `json:"proxy,omitempty" yaml:"proxy,omitempty"`
 }
