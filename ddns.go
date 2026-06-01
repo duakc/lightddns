@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
+	runtimeDebug "runtime/debug"
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
@@ -191,6 +193,7 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 
 		setupPrometheus(ld.metricsRegistry)
 	}
+
 	var err error
 	for i := 0; i < len(ld.services); i++ {
 		err = errors.Join(err, services.Start(ctx, stage, ld.services[i]))
@@ -199,6 +202,12 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 		domain := ld.domains[i]
 		err = errors.Join(err, domain.Start(ctx, stage))
 	}
+
+	if stage == services.StagePostStart {
+		runtimeDebug.FreeOSMemory()
+		runtime.GC()
+	}
+
 	return err
 }
 

@@ -38,3 +38,13 @@ func SplitIPv4AndIPv6(ips []netip.Addr) (ipv4, ipv6 []netip.Addr) {
 	}
 	return
 }
+
+func IsBogon(ip netip.Addr) bool {
+	return ip.IsUnspecified() ||
+		ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsMulticast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsInterfaceLocalMulticast()
+}

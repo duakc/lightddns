@@ -34,6 +34,10 @@ linters:
               json: snake
           - pkg: "providers/tencentcloud/internal"
             ignore: true
+          - pkg: "services/ipserver"
+            rules:
+              json: snake
+              yaml: snake
 
     depguard:
       rules:

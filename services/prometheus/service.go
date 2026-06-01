@@ -24,8 +24,8 @@ import (
 const ServiceType = constpkg.ServiceTypePrometheus
 
 const (
-	defaultPort = 9090
-	defaultPath = "/metrics"
+	DefaultPort = 9090
+	DefaultPath = "/metrics"
 )
 
 func init() {
@@ -54,11 +54,11 @@ func New(ctx context.Context, logger *zap.Logger, option options.PrometheusServi
 	}
 	port := option.Port
 	if port == 0 {
-		port = defaultPort
+		port = DefaultPort
 	}
 	httpPath := option.Path
 	if httpPath == "" {
-		httpPath = defaultPath
+		httpPath = DefaultPath
 	}
 
 	prometheus := &Prometheus{
