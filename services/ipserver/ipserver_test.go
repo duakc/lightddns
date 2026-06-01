@@ -223,3 +223,21 @@ func TestServeHTTP_MultiValueXFFTakesFirst(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "198.51.100.1", rec.Body.String())
 }
+
+func TestServeHTTP_OnlyAllowGETMethod(t *testing.T) {
+	s := newTestIPServer(false)
+	for _, method := range []string{
+		http.MethodPost, http.MethodPut, http.MethodConnect,
+		http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPatch,
+		http.MethodDelete,
+		"BREW", "PROPFIND", "WHEN",
+	} {
+		req := httptest.NewRequest(method, "/", nil)
+		rec := httptest.NewRecorder()
+
+		s.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+		assert.Equal(t, "GET", rec.Header().Get("Allow"))
+	}
+}

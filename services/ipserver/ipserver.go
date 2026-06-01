@@ -103,13 +103,6 @@ func (s *IPServer) Start(ctx context.Context, stage services.Stage) error {
 func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	logger := s.logger
 
-	ipFromHeader, err := httpx.ExtractIPFromRequest(req)
-	if err != nil {
-		resp.WriteHeader(http.StatusBadRequest)
-		_, _ = resp.Write([]byte(err.Error()))
-		return
-	}
-
 	if s.dump {
 		loggingResponse := &loggingResponseWriter{
 			ResponseWriter: resp,
@@ -121,6 +114,19 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 		defer func() { _ = loggingResponse.logger.Sync() }()
 		defer loggingResponse.logging(logger.Check(zap.InfoLevel, "dump"))
+	}
+
+	if req.Method != http.MethodGet {
+		resp.WriteHeader(http.StatusMethodNotAllowed)
+		resp.Header().Set("Allow", http.MethodGet)
+		return
+	}
+
+	ipFromHeader, err := httpx.ExtractIPFromRequest(req)
+	if err != nil {
+		resp.WriteHeader(http.StatusBadRequest)
+		_, _ = resp.Write([]byte(err.Error()))
+		return
 	}
 
 	if len(ipFromHeader) == 0 {
