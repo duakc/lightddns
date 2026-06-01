@@ -31,9 +31,9 @@ import (
 )
 
 const (
-	metricRequestTotal           = "request_total"
-	metricRequestFailureTotal    = "request_failure_total"
-	metricRequestDurationSeconds = "request_duration_seconds"
+	metricRequestTotal           = constpkg.MetricProviderRequestTotal
+	metricRequestFailureTotal    = constpkg.MetricProviderRequestFailureTotal
+	metricRequestDurationSeconds = constpkg.MetricProviderRequestDurationSeconds
 )
 
 const (

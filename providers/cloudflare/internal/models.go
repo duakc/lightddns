@@ -20,7 +20,6 @@ type MessageError struct {
 	BaseError
 
 	DocumentationUrl string `json:"documentation_url"`
-	// other doesn't needed fields are ignored
 }
 
 type ResultInfo struct {
@@ -61,19 +60,38 @@ type ResponseWithPage[T any] struct {
 	ResultInfo ResultInfo `json:"result_info"`
 }
 
+// Zone is one zone returned by ListZones.
 type Zone struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 
-	// other doesn't needed fields are ignored
+	// uncomment when needed.
+	// Status              string   `json:"status"`
+	// Paused              bool     `json:"paused"`
+	// Type                string   `json:"type"`
+	// NameServers         []string `json:"name_servers"`
+	// OriginalNameServers []string `json:"original_name_servers"`
+	// CreatedOn           string   `json:"created_on"`
+	// ModifiedOn          string   `json:"modified_on"`
+	// ActivatedOn         string   `json:"activated_on"`
 }
 
+// DNSRecord is one DNS record returned by ListDNSRecords.
 type DNSRecord struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Content string `json:"content"`
 	ID      string `json:"id"`
-	TTL     int    `json:"ttl"`
+	Content string `json:"content"`
+
+	// uncomment when needed.
+	// Name       string `json:"name"`
+	// Type       string `json:"type"`
+	// TTL        int    `json:"ttl"`
+	// Proxied    bool   `json:"proxied"`
+	// Proxiable  bool   `json:"proxiable"`
+	// ZoneID     string `json:"zone_id"`
+	// ZoneName   string `json:"zone_name"`
+	// Comment    string `json:"comment"`
+	// CreatedOn  string `json:"created_on"`
+	// ModifiedOn string `json:"modified_on"`
 }
 
 type UpdateDNSRecordRequest struct {

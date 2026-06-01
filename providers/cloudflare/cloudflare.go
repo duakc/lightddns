@@ -26,15 +26,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Metric leaf names. Final names get the "ddns_provider_" prefix from the
-// ProviderFactory in PreStart.
 const (
-	metricRequestTotal           = "request_total"
-	metricRequestFailureTotal    = "request_failure_total"
-	metricRequestDurationSeconds = "request_duration_seconds"
+	metricRequestTotal           = constpkg.MetricProviderRequestTotal
+	metricRequestFailureTotal    = constpkg.MetricProviderRequestFailureTotal
+	metricRequestDurationSeconds = constpkg.MetricProviderRequestDurationSeconds
 )
 
-// operation label values for the request counters / histogram.
 const (
 	opListZones      = "list_zones"
 	opListDNSRecords = "list_dns_records"

@@ -61,6 +61,7 @@ func (fn FuncHTTPClientOption) Apply(c *Client) {
 	fn(c)
 }
 
+// Deprecated: use TokenClient directly
 func ClientOptionWithToken(token string) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
 		c.HTTPRequester = &TokenClient{

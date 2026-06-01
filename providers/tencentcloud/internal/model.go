@@ -68,20 +68,22 @@ func (c *Common) Headers() (http.Header, error) {
 //
 // https://cloud.tencent.com/document/api/1427/56166
 type Record struct {
-	RecordId      uint64 `json:"RecordId"`
-	Name          string `json:"Name"`   // subdomain (host part), e.g. "www"; "@" means apex
-	Type          string `json:"Type"`   // A, AAAA, CNAME...
-	Line          string `json:"Line"`   // line name (Chinese), e.g. "默认"
-	LineId        string `json:"LineId"` // line id, e.g. "0"
-	Value         string `json:"Value"`  // record content
-	TTL           uint32 `json:"TTL"`
-	MX            uint32 `json:"MX"`
-	Status        string `json:"Status"`
-	Weight        *int   `json:"Weight,omitempty"`
-	MonitorStatus string `json:"MonitorStatus"`
-	Remark        string `json:"Remark"`
-	UpdatedOn     string `json:"UpdatedOn"`
-	DomainId      uint64 `json:"DomainId"`
+	RecordId uint64 `json:"RecordId"`
+	Type     string `json:"Type"`
+	Line     string `json:"Line"`
+	Value    string `json:"Value"`
+
+	// uncomment when needed.
+	// Name          string `json:"Name"`          // "@" means apex
+	// LineId        string `json:"LineId"`
+	// TTL           uint32 `json:"TTL"`
+	// MX            uint32 `json:"MX"`
+	// Status        string `json:"Status"`
+	// Weight        *int   `json:"Weight,omitempty"`
+	// MonitorStatus string `json:"MonitorStatus"`
+	// Remark        string `json:"Remark"`
+	// UpdatedOn     string `json:"UpdatedOn"`
+	// DomainId      uint64 `json:"DomainId"`
 }
 
 // DefaultRecordLine is the line used for DDNS records: 默认 (default).
@@ -115,28 +117,31 @@ type ModifyRecordRequest struct {
 	TTL        uint32 `json:"TTL,omitempty"`
 }
 
+// DomainInfo is one domain returned by DescribeDomainFilterList / DomainInfo.
 type DomainInfo struct {
-	CNAMESpeedup     string   `json:"CNAMESpeedup"`
-	CreatedOn        string   `json:"CreatedOn"`
-	DNSStatus        string   `json:"DNSStatus"`
-	DomainId         int      `json:"DomainId"`
-	EffectiveDNS     []string `json:"EffectiveDNS"`
-	Grade            string   `json:"Grade"`
-	GradeLevel       int      `json:"GradeLevel"`
-	GradeTitle       string   `json:"GradeTitle"`
-	GroupId          int      `json:"GroupId"`
-	IsVip            string   `json:"IsVip"`
-	Name             string   `json:"Name"`
-	Owner            string   `json:"Owner"`
-	Punycode         string   `json:"Punycode"`
-	RecordCount      int      `json:"RecordCount"`
-	Remark           string   `json:"Remark"`
-	SearchEnginePush string   `json:"SearchEnginePush"`
-	Status           string   `json:"Status"`
-	TTL              int      `json:"TTL"`
-	TagList          []string `json:"TagList"`
-	UpdatedOn        string   `json:"UpdatedOn"`
-	VipAutoRenew     string   `json:"VipAutoRenew"`
-	VipEndAt         string   `json:"VipEndAt"`
-	VipStartAt       string   `json:"VipStartAt"`
+	Name string `json:"Name"`
+
+	// uncomment when needed.
+	// CNAMESpeedup     string   `json:"CNAMESpeedup"`
+	// CreatedOn        string   `json:"CreatedOn"`
+	// DNSStatus        string   `json:"DNSStatus"`
+	// DomainId         int      `json:"DomainId"`
+	// EffectiveDNS     []string `json:"EffectiveDNS"`
+	// Grade            string   `json:"Grade"`
+	// GradeLevel       int      `json:"GradeLevel"`
+	// GradeTitle       string   `json:"GradeTitle"`
+	// GroupId          int      `json:"GroupId"`
+	// IsVip            string   `json:"IsVip"`
+	// Owner            string   `json:"Owner"`
+	// Punycode         string   `json:"Punycode"`
+	// RecordCount      int      `json:"RecordCount"`
+	// Remark           string   `json:"Remark"`
+	// SearchEnginePush string   `json:"SearchEnginePush"`
+	// Status           string   `json:"Status"`
+	// TTL              int      `json:"TTL"`
+	// TagList          []string `json:"TagList"`
+	// UpdatedOn        string   `json:"UpdatedOn"`
+	// VipAutoRenew     string   `json:"VipAutoRenew"`
+	// VipEndAt         string   `json:"VipEndAt"`
+	// VipStartAt       string   `json:"VipStartAt"`
 }
