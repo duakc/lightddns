@@ -106,13 +106,11 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if s.dump {
 		loggingResponse := &loggingResponseWriter{
 			ResponseWriter: resp,
-			logger:         logger,
 			req:            req,
 			body:           &bytes.Buffer{},
 		}
 		resp = loggingResponse
 
-		defer func() { _ = loggingResponse.logger.Sync() }()
 		defer loggingResponse.logging(logger.Check(zap.InfoLevel, "dump"))
 	}
 
@@ -219,12 +217,8 @@ func New(ctx context.Context, logger *zap.Logger, option options.IPServerService
 type loggingResponseWriter struct {
 	http.ResponseWriter
 
-	logger *zap.Logger
-
 	code int
-
-	req *http.Request
-
+	req  *http.Request
 	body *bytes.Buffer
 }
 

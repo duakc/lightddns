@@ -8,6 +8,7 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/control"
 	"github.com/duakc/lightddns/options"
 
@@ -32,7 +33,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.NetlinkDatasour
 		interfaceFinder:     control.NewDefaultInterfaceFinder(),
 		interfaceName:       option.IfName,
 		interfaceIndex:      option.IfIndex,
-		allowPrivate:        option.AllowPrivate,
+		allowBogon:          option.AllowBogon,
 		logger:              logger,
 	}
 	return n, nil
@@ -46,7 +47,7 @@ type Netlink struct {
 	interfaceFinder control.InterfaceFinder
 	interfaceName   string
 	interfaceIndex  int
-	allowPrivate    bool
+	allowBogon      bool
 
 	finderAccess sync.Mutex
 }
@@ -57,7 +58,7 @@ func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 		return nil, err
 	}
 	return mt.Filter(ip, func(addr netip.Addr) bool {
-		return n.allowPrivate || addr.IsGlobalUnicast()
+		return n.allowBogon || !netool.IsBogon(addr)
 	}), nil
 }
 
