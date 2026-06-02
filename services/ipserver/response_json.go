@@ -6,24 +6,31 @@ import (
 	"bytes"
 )
 
-func (resp Response) writeJSON(buffer *bytes.Buffer) {
-	buffer.Grow(80) // estimated size: keys + avg value cost
-	buffer.WriteByte('{')
-	buffer.WriteString(`"ip":`)
-	buffer.WriteByte('"')
-	buffer.WriteString(resp.IP)
-	buffer.WriteByte('"')
-	buffer.WriteByte(',')
-	buffer.WriteString(`"is_bogon":`)
+func (resp Response) writeJSON(buf *bytes.Buffer) int {
+	buf.Grow(26 + len(resp.IP)) // exact: constants + len(strings) + worst-case bool
+	n := 0
+	buf.WriteByte('{')
+	n++
+	buf.WriteString(`"ip":`)
+	n += 5
+	buf.WriteByte('"')
+	n++
+	buf.WriteString(resp.IP)
+	n += len(resp.IP)
+	buf.WriteByte('"')
+	n++
+	buf.WriteByte(',')
+	n++
+	buf.WriteString(`"is_bogon":`)
+	n += 11
 	if resp.IsBogon {
-		buffer.WriteString("true")
+		buf.WriteString("true")
+		n += 4
 	} else {
-		buffer.WriteString("false")
+		buf.WriteString("false")
+		n += 5
 	}
-	buffer.WriteByte(',')
-	buffer.WriteString(`"time":`)
-	buffer.WriteByte('"')
-	buffer.WriteString(resp.Time)
-	buffer.WriteByte('"')
-	buffer.WriteByte('}')
+	buf.WriteByte('}')
+	n++
+	return n
 }

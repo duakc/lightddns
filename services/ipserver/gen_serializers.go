@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -83,58 +84,68 @@ func tagKey(raw, fieldName string) string {
 	return name
 }
 
-const (
-	avgStringValue = 24 // "<~22 chars>"
-	avgBoolValue   = 5  // "false"
-	avgOtherValue  = 18 // "<~16 chars>" via fmt.Sprint
-)
+const boolMaxLen = 5
 
-func estimateJSONSize(fields []Field) int {
-	size := 2 // braces
+type sizeExpr struct {
+	constant int
+	vars     []string
+}
+
+func (s *sizeExpr) addConst(n int)     { s.constant += n }
+func (s *sizeExpr) addVar(expr string) { s.vars = append(s.vars, expr) }
+
+func (s sizeExpr) String() string {
+	parts := []string{strconv.Itoa(s.constant)}
+	parts = append(parts, s.vars...)
+	return strings.Join(parts, " + ")
+}
+
+func (s *sizeExpr) addValue(field Field) {
+	switch field.Type {
+	case "string":
+		s.addConst(2) // surrounding quotes
+		s.addVar(fmt.Sprintf("len(resp.%s)", field.Name))
+	case "bool":
+		s.addConst(boolMaxLen)
+	}
+}
+
+func computeJSONSize(fields []Field) sizeExpr {
+	var s sizeExpr
+	s.addConst(2) // braces
 	n := 0
 	for _, f := range fields {
 		if f.JSONKey == "" {
 			continue
 		}
 		n++
-		size += len(f.JSONKey) + 3 // "key":
-		size += valueCost(f.Type)
+		s.addConst(len(f.JSONKey) + 3) // "key":
+		s.addValue(f)
 	}
 	if n > 1 {
-		size += n - 1 // commas
+		s.addConst(n - 1) // commas
 	}
-	return size
+	return s
 }
 
-func estimateYAMLSize(fields []Field) int {
-	size := 0
+func computeYAMLSize(fields []Field) sizeExpr {
+	var s sizeExpr
 	for _, f := range fields {
 		if f.YAMLKey == "" {
 			continue
 		}
-		size += len(f.YAMLKey) + 2 // "key: "
-		size += valueCost(f.Type)
-		size++ // newline
+		s.addConst(len(f.YAMLKey) + 2) // "key: "
+		s.addValue(f)
+		s.addConst(1) // newline
 	}
-	return size
-}
-
-func valueCost(typ string) int {
-	switch typ {
-	case "string":
-		return avgStringValue
-	case "bool":
-		return avgBoolValue
-	default:
-		return avgOtherValue
-	}
+	return s
 }
 
 type codeBuf struct {
 	bytes.Buffer
 }
 
-func (b *codeBuf) line(format string, args ...any) {
+func (b *codeBuf) linef(format string, args ...any) {
 	b.WriteByte('\t')
 	if len(args) == 0 {
 		b.WriteString(format)
@@ -146,37 +157,46 @@ func (b *codeBuf) line(format string, args ...any) {
 
 func (b *codeBuf) raw(s string) { b.WriteString(s) }
 
+func (b *codeBuf) emitByte(charLit string) {
+	b.linef("buf.WriteByte(%s)", charLit)
+	b.linef("n++")
+}
+
+func (b *codeBuf) emitLit(rawText string) {
+	b.linef("buf.WriteString(`%s`)", rawText)
+	b.linef("n += %d", len(rawText))
+}
+
 func emitStringField(b *codeBuf, fieldName string) {
-	b.line(`buffer.WriteByte('"')`)
-	b.line("buffer.WriteString(resp.%s)", fieldName)
-	b.line(`buffer.WriteByte('"')`)
+	b.emitByte(`'"'`)
+	b.linef("buf.WriteString(resp.%s)", fieldName)
+	b.linef("n += len(resp.%s)", fieldName)
+	b.emitByte(`'"'`)
 }
 
 func emitBoolField(b *codeBuf, fieldName string) {
-	b.line("if resp.%s {", fieldName)
-	b.line("\tbuffer.WriteString(\"true\")")
-	b.line("} else {")
-	b.line("\tbuffer.WriteString(\"false\")")
-	b.line("}")
+	b.linef("if resp.%s {", fieldName)
+	b.linef(`	buf.WriteString("true")`)
+	b.linef("\tn += 4")
+	b.linef("} else {")
+	b.linef(`	buf.WriteString("false")`)
+	b.linef("\tn += 5")
+	b.linef("}")
 }
 
-func emitFmtField(b *codeBuf, fieldName string, quoted bool) {
-	if quoted {
-		b.line(`buffer.WriteByte('"')`)
-	}
-	b.line("_, _ = fmt.Fprint(buffer, resp.%s)", fieldName)
-	if quoted {
-		b.line(`buffer.WriteByte('"')`)
-	}
+func rejectField(structName string, f Field) {
+	log.Fatalf("gen_serializers: %s.%s has unsupported type %q "+
+		"(only string/bool are handled); extend the generator before adding this field",
+		structName, f.Name, f.Type)
 }
 
 func writeJSONFile(structName string, fields []Field) {
 	var body codeBuf
-	needsFmt := false
 
-	_, _ = fmt.Fprintf(&body, "func (resp %s) writeJSON(buffer *bytes.Buffer) {\n", structName)
-	body.line("buffer.Grow(%d) // estimated size: keys + avg value cost", estimateJSONSize(fields))
-	body.line(`buffer.WriteByte('{')`)
+	_, _ = fmt.Fprintf(&body, "func (resp %s) writeJSON(buf *bytes.Buffer) int {\n", structName)
+	body.linef("buf.Grow(%s) // exact: constants + len(strings) + worst-case bool", computeJSONSize(fields))
+	body.linef("n := 0")
+	body.emitByte(`'{'`)
 
 	first := true
 	for _, field := range fields {
@@ -184,11 +204,11 @@ func writeJSONFile(structName string, fields []Field) {
 			continue
 		}
 		if !first {
-			body.line(`buffer.WriteByte(',')`)
+			body.emitByte(`','`)
 		}
 		first = false
 
-		body.line("buffer.WriteString(`\"%s\":`)", field.JSONKey)
+		body.emitLit(fmt.Sprintf(`"%s":`, field.JSONKey))
 
 		switch field.Type {
 		case "string":
@@ -196,29 +216,29 @@ func writeJSONFile(structName string, fields []Field) {
 		case "bool":
 			emitBoolField(&body, field.Name)
 		default:
-			needsFmt = true
-			emitFmtField(&body, field.Name, true)
+			rejectField(structName, field)
 		}
 	}
 
-	body.line(`buffer.WriteByte('}')`)
+	body.emitByte(`'}'`)
+	body.linef("return n")
 	body.raw("}\n")
 
-	writeGenFile(strings.ToLower(structName)+"_json.go", needsFmt, body.Bytes())
+	writeGenFile(strings.ToLower(structName)+"_json.go", body.Bytes())
 }
 
 func writeYAMLFile(structName string, fields []Field) {
 	var body codeBuf
-	needsFmt := false
 
-	_, _ = fmt.Fprintf(&body, "func (resp %s) writeYAML(buffer *bytes.Buffer) {\n", structName)
-	body.line("buffer.Grow(%d) // estimated size: keys + avg value cost", estimateYAMLSize(fields))
+	_, _ = fmt.Fprintf(&body, "func (resp %s) writeYAML(buf *bytes.Buffer) int {\n", structName)
+	body.linef("buf.Grow(%s) // exact: constants + len(strings) + worst-case bool", computeYAMLSize(fields))
+	body.linef("n := 0")
 
 	for _, field := range fields {
 		if field.YAMLKey == "" {
 			continue
 		}
-		body.line("buffer.WriteString(`%s: `)", field.YAMLKey)
+		body.emitLit(fmt.Sprintf("%s: ", field.YAMLKey))
 
 		switch field.Type {
 		case "string":
@@ -226,27 +246,23 @@ func writeYAMLFile(structName string, fields []Field) {
 		case "bool":
 			emitBoolField(&body, field.Name)
 		default:
-			needsFmt = true
-			emitFmtField(&body, field.Name, false)
+			rejectField(structName, field)
 		}
 
-		body.line(`buffer.WriteByte('\n')`)
+		body.emitByte(`'\n'`)
 	}
 
+	body.linef("return n")
 	body.raw("}\n")
 
-	writeGenFile(strings.ToLower(structName)+"_yaml.go", needsFmt, body.Bytes())
+	writeGenFile(strings.ToLower(structName)+"_yaml.go", body.Bytes())
 }
 
-func writeGenFile(fileName string, needsFmt bool, body []byte) {
+func writeGenFile(fileName string, body []byte) {
 	var code bytes.Buffer
 	code.WriteString("// Code generated by gen_serializers.go; DO NOT EDIT.\n\n")
 	code.WriteString("package ipserver\n\n")
-	code.WriteString("import (\n\t\"bytes\"\n")
-	if needsFmt {
-		code.WriteString("\t\"fmt\"\n")
-	}
-	code.WriteString(")\n\n")
+	code.WriteString("import (\n\t\"bytes\"\n)\n\n")
 	code.Write(body)
 
 	if err := os.WriteFile(fileName, code.Bytes(), 0o644); err != nil {

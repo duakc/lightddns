@@ -6,23 +6,29 @@ import (
 	"bytes"
 )
 
-func (resp Response) writeYAML(buffer *bytes.Buffer) {
-	buffer.Grow(76) // estimated size: keys + avg value cost
-	buffer.WriteString(`ip: `)
-	buffer.WriteByte('"')
-	buffer.WriteString(resp.IP)
-	buffer.WriteByte('"')
-	buffer.WriteByte('\n')
-	buffer.WriteString(`is_bogon: `)
+func (resp Response) writeYAML(buf *bytes.Buffer) int {
+	buf.Grow(23 + len(resp.IP)) // exact: constants + len(strings) + worst-case bool
+	n := 0
+	buf.WriteString(`ip: `)
+	n += 4
+	buf.WriteByte('"')
+	n++
+	buf.WriteString(resp.IP)
+	n += len(resp.IP)
+	buf.WriteByte('"')
+	n++
+	buf.WriteByte('\n')
+	n++
+	buf.WriteString(`is_bogon: `)
+	n += 10
 	if resp.IsBogon {
-		buffer.WriteString("true")
+		buf.WriteString("true")
+		n += 4
 	} else {
-		buffer.WriteString("false")
+		buf.WriteString("false")
+		n += 5
 	}
-	buffer.WriteByte('\n')
-	buffer.WriteString(`time: `)
-	buffer.WriteByte('"')
-	buffer.WriteString(resp.Time)
-	buffer.WriteByte('"')
-	buffer.WriteByte('\n')
+	buf.WriteByte('\n')
+	n++
+	return n
 }

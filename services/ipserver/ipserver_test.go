@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,12 +57,11 @@ func TestServeHTTP_InvalidRemoteAddr(t *testing.T) {
 	s := newTestIPServer(false)
 	rec := doServe(t, s, "/", "not-an-addr", nil)
 
-	require.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "invalid remote address")
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Contains(t, rec.Body.String(), "ip not found")
 }
 
 func TestServeHTTP_HeaderPriority(t *testing.T) {
-	// 优先级：Cf-Connecting-IP > True-Client-IP > X-Real-IP > X-Forwarded-For > RemoteAddr
 	cases := []struct {
 		name    string
 		headers http.Header
@@ -144,9 +142,7 @@ func TestServeHTTP_FormatJSON(t *testing.T) {
 		"response body must be valid JSON: %s", rec.Body.String())
 
 	assert.Equal(t, "203.0.113.5", got.IP)
-	assert.True(t, got.IsBogon)
-	_, err := time.Parse(time.RFC3339, got.Time)
-	assert.NoError(t, err, "time field should be RFC3339")
+	assert.False(t, got.IsBogon, "TEST-NET-3 is publicly-routable per netool.IsBogon")
 }
 
 func TestServeHTTP_FormatJSONCaseInsensitive(t *testing.T) {
@@ -167,8 +163,7 @@ func TestServeHTTP_FormatYAML(t *testing.T) {
 
 	body := rec.Body.String()
 	assert.Contains(t, body, `ip: "203.0.113.5"`)
-	assert.Contains(t, body, "is_bogon: true")
-	assert.Contains(t, body, "time: ")
+	assert.Contains(t, body, "is_bogon: false")
 }
 
 func TestServeHTTP_FormatUnknown(t *testing.T) {

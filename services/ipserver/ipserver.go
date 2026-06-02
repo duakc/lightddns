@@ -11,12 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
 
+	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
@@ -103,7 +105,7 @@ func (s *IPServer) Start(ctx context.Context, stage services.Stage) error {
 func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	logger := s.logger
 
-	if s.dump {
+	if ce := logger.Check(zap.DebugLevel, "dump"); s.dump && ce != nil {
 		loggingResponse := &loggingResponseWriter{
 			ResponseWriter: resp,
 			req:            req,
@@ -111,7 +113,7 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}
 		resp = loggingResponse
 
-		defer loggingResponse.logging(logger.Check(zap.InfoLevel, "dump"))
+		defer loggingResponse.logging(ce)
 	}
 
 	if req.Method != http.MethodGet {
@@ -120,30 +122,25 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ipFromHeader, err := httpx.ExtractIPFromRequest(req)
-	if err != nil {
-		resp.WriteHeader(http.StatusBadRequest)
-		_, _ = resp.Write([]byte(err.Error()))
+	realIPStr, _, netipAddr := extractIP(req)
+	if len(realIPStr) == 0 {
+		resp.WriteHeader(http.StatusInternalServerError)
+		_, _ = resp.Write([]byte("ip not found in request"))
 		return
 	}
 
-	if len(ipFromHeader) == 0 {
-		resp.WriteHeader(http.StatusBadRequest)
-		_, _ = resp.Write([]byte("ip is empty"))
-		return
-	}
-
+	var err error
 	urlQueryFormat := strings.ToLower(req.URL.Query().Get("format"))
 	switch urlQueryFormat {
 	case string(FormatEmpty):
 		resp.WriteHeader(http.StatusOK)
-		_, err = resp.Write([]byte(ipFromHeader[0].String()))
+		_, err = resp.Write(unsafe.Slice(unsafe.StringData(realIPStr), len(realIPStr)))
 	case string(FormatJson):
 		resp.WriteHeader(http.StatusOK)
-		err = s.serverHTTPJson(resp, req, ipFromHeader)
+		err = s.serverHTTPJson(resp, req, realIPStr, netipAddr)
 	case string(FormatYaml):
 		resp.WriteHeader(http.StatusOK)
-		err = s.serverHTTPYaml(resp, req, ipFromHeader)
+		err = s.serverHTTPYaml(resp, req, realIPStr, netipAddr)
 	default:
 		resp.WriteHeader(http.StatusBadRequest)
 		_, _ = fmt.Fprintf(resp, "unknown format: %s", urlQueryFormat)
@@ -155,32 +152,70 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, ip []netip.Addr) error {
-	realIp := ip[0]
-	now := time.Now()
-	jsonBody := &bytes.Buffer{}
+func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
+	bufferData := freebuf.NewSimple(len(ip) + len("false") + 128)
+	defer bufferData.FreeMe()
 	respObj := Response{
-		IP:      realIp.String(),
-		IsBogon: true,
-		Time:    now.Format(time.RFC3339),
+		IP:      ip,
+		IsBogon: netool.IsBogon(netipAddr),
 	}
-	respObj.writeJSON(jsonBody)
-	_, err := resp.Write(jsonBody.Bytes())
+	buffer := bytes.NewBuffer(bufferData[:0])
+	n := respObj.writeJSON(buffer)
+	_, err := resp.Write(bufferData[:n])
 	return err
 }
 
-func (s *IPServer) serverHTTPYaml(resp http.ResponseWriter, req *http.Request, ip []netip.Addr) error {
-	realIp := ip[0]
-	now := time.Now()
-	jsonBody := &bytes.Buffer{}
+func (s *IPServer) serverHTTPYaml(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
+	bufferData := freebuf.NewSimple(len(ip) + len("false") + 128)
+	defer bufferData.FreeMe()
 	respObj := Response{
-		IP:      realIp.String(),
-		IsBogon: true,
-		Time:    now.Format(time.RFC3339),
+		IP:      ip,
+		IsBogon: netool.IsBogon(netipAddr),
 	}
-	respObj.writeYAML(jsonBody)
-	_, err := resp.Write(jsonBody.Bytes())
+	buffer := bytes.NewBuffer(bufferData[:0])
+	n := respObj.writeYAML(buffer)
+	_, err := resp.Write(bufferData[:n])
 	return err
+}
+
+// reimplement of httpx.ExtractIPFromRequest
+func extractIP(req *http.Request) (string, string, netip.Addr) {
+	for _, header := range []string{
+		"Cf-Connecting-IP",
+		"True-Client-IP",
+		"X-Real-IP",
+		"X-Forwarded-For",
+	} {
+		currentHeader := req.Header.Get(header)
+		if currentHeader == "" {
+			continue
+		}
+		cutHeader, _, found := strings.Cut(currentHeader, ",")
+		if !found {
+			cutHeader = currentHeader
+		}
+		ipStr := strings.TrimSpace(cutHeader)
+		if ipStr == "" {
+			continue
+		}
+		if addr, err := netip.ParseAddr(ipStr); err == nil {
+			return ipStr, currentHeader, addr
+		}
+	}
+
+	// see bench_test.go
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return "", "", netip.Addr{}
+	}
+
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return "", "", netip.Addr{}
+	}
+	//
+
+	return host, "", addr
 }
 
 func (s *IPServer) Close() error {

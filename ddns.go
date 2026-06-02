@@ -182,6 +182,10 @@ func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
 
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 	if stage == services.StagePreStart {
+		if len(ld.datasources) == 0 && len(ld.services) == 0 {
+			return fmt.Errorf("noting to need to start")
+		}
+
 		var cont container.Container
 		containerProvider := services.Lookup[container.Provider](ctx)
 		ctx, cont = containerProvider.New(ctx)

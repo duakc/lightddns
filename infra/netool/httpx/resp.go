@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -31,12 +32,18 @@ func (rp RespPolicy) acceptCodes(code int) bool {
 }
 
 func ExtractIPFromRequest(req *http.Request) ([]netip.Addr, error) {
-	extract := func(s string) []netip.Addr {
-		if s == "" {
-			return nil
+	for _, header := range []string{
+		"Cf-Connecting-IP",
+		"True-Client-IP",
+		"X-Real-IP",
+		"X-Forwarded-For",
+	} {
+		currentHeader := req.Header.Get(header)
+		if len(currentHeader) == 0 {
+			continue
 		}
 		var ips []netip.Addr
-		for _, part := range strings.Split(s, ",") {
+		for _, part := range strings.Split(currentHeader, ",") {
 			ipStr := strings.TrimSpace(part)
 			if ipStr == "" {
 				continue
@@ -45,25 +52,21 @@ func ExtractIPFromRequest(req *http.Request) ([]netip.Addr, error) {
 				ips = append(ips, addr)
 			}
 		}
-		return ips
-	}
-
-	for _, header := range []string{
-		"Cf-Connecting-IP",
-		"True-Client-IP",
-		"X-Real-IP",
-		"X-Forwarded-For",
-	} {
-		if ips := extract(req.Header.Get(header)); len(ips) > 0 {
+		if len(ips) != 0 {
 			return ips, nil
 		}
 	}
 
-	addrPort, err := netip.ParseAddrPort(req.RemoteAddr)
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("split address: %s: %w", req.RemoteAddr, err)
+	}
+	addr, err := netip.ParseAddr(host)
 	if err != nil {
 		return nil, fmt.Errorf("invalid remote address: %s: %w", req.RemoteAddr, err)
 	}
-	return []netip.Addr{addrPort.Addr()}, nil
+
+	return []netip.Addr{addr}, nil
 }
 
 type StatusCodeResponseWriter struct {
