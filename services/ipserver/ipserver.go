@@ -153,28 +153,26 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 }
 
 func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
-	bufferData := freebuf.NewSimple(len(ip) + 26)
-	defer bufferData.FreeMe()
-	respObj := Response{
+	respObj := &Response{
 		IP:      ip,
 		IsBogon: netool.IsBogon(netipAddr),
 	}
-	buffer := bytes.NewBuffer(bufferData[:0])
-	n := respObj.writeJSON(buffer)
-	_, err := resp.Write(buffer.Bytes()[:n])
+	buffer := freebuf.NewSerial()
+	respObj.writeJSON(buffer)
+	_, err := buffer.WriteTo(resp)
+	buffer.FreeMe()
 	return err
 }
 
 func (s *IPServer) serverHTTPYaml(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
-	bufferData := freebuf.NewSimple(len(ip) + 23)
-	defer bufferData.FreeMe()
-	respObj := Response{
+	respObj := &Response{
 		IP:      ip,
 		IsBogon: netool.IsBogon(netipAddr),
 	}
-	buffer := bytes.NewBuffer(bufferData[:0])
-	n := respObj.writeYAML(buffer)
-	_, err := resp.Write(buffer.Bytes()[:n])
+	buffer := freebuf.NewSerial()
+	respObj.writeYAML(buffer)
+	_, err := buffer.WriteTo(resp)
+	buffer.FreeMe()
 	return err
 }
 

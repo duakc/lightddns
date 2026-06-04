@@ -3,10 +3,10 @@
 package ipserver
 
 import (
-	"bytes"
+	"github.com/duakc/mt/freebuf"
 )
 
-func (resp Response) writeJSON(buf *bytes.Buffer) int {
+func (resp *Response) writeJSON(buf freebuf.Buffer) int {
 	buf.Grow(26 + len(resp.IP)) // exact: constants + len(strings) + worst-case bool
 	n := 0
 	buf.WriteByte('{')

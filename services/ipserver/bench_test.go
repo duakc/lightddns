@@ -6,17 +6,6 @@ import (
 	"testing"
 )
 
-// goos: darwin
-// goarch: arm64
-// pkg: github.com/duakc/lightddns/services/ipserver
-// cpu: Apple M5
-// BenchmarkParseAddr
-// BenchmarkParseAddr/SplitFirst
-// BenchmarkParseAddr/SplitFirst-10         	90424994	        12.72 ns/op
-// BenchmarkParseAddr/ParseAddrPort
-// BenchmarkParseAddr/ParseAddrPort-10      	48085351	        24.51 ns/op
-// BenchmarkParseAddr/ParseAddrPortNoHost
-// BenchmarkParseAddr/ParseAddrPortNoHost-10         	78858734	        14.87 ns/op
 func BenchmarkParseAddr(b *testing.B) {
 	testData := "1.1.1.1:443"
 

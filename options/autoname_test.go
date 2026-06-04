@@ -62,18 +62,18 @@ func checkInnerNames(t *testing.T, opt *options.Options) {
 	require.NotEmpty(t, opt.Datasources[0].Name, "ds outer Name empty")
 	dsInner, ok := opt.Datasources[0].Option.(*options.HTTPDatasourceOption)
 	require.True(t, ok)
-	t.Logf("ds outer=%q inner=%q", opt.Datasources[0].Name, dsInner.Name)
+	// t.Logf("ds outer=%q inner=%q", opt.Datasources[0].Name, dsInner.Name)
 	require.Equal(t, opt.Datasources[0].Name, dsInner.Name, "ds inner Name should match outer")
 
 	require.NotEmpty(t, opt.Providers[0].Name, "provider outer Name empty")
 	pInner, ok := opt.Providers[0].Option.(*options.CloudflareProviderOption)
 	require.True(t, ok)
-	t.Logf("provider outer=%q inner=%q", opt.Providers[0].Name, pInner.Name)
+	// t.Logf("provider outer=%q inner=%q", opt.Providers[0].Name, pInner.Name)
 	require.Equal(t, opt.Providers[0].Name, pInner.Name, "provider inner Name should match outer")
 
 	require.NotEmpty(t, opt.Services[0].Name, "service outer Name empty")
 	sInner, ok := opt.Services[0].Option.(*options.PrometheusServiceOption)
 	require.True(t, ok)
-	t.Logf("service outer=%q inner=%q", opt.Services[0].Name, sInner.Name)
+	// t.Logf("service outer=%q inner=%q", opt.Services[0].Name, sInner.Name)
 	require.Equal(t, opt.Services[0].Name, sInner.Name, "service inner Name should match outer")
 }

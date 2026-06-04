@@ -3,10 +3,10 @@
 package ipserver
 
 import (
-	"bytes"
+	"github.com/duakc/mt/freebuf"
 )
 
-func (resp Response) writeYAML(buf *bytes.Buffer) int {
+func (resp *Response) writeYAML(buf freebuf.Buffer) int {
 	buf.Grow(23 + len(resp.IP)) // exact: constants + len(strings) + worst-case bool
 	n := 0
 	buf.WriteString(`ip: `)
