@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/infra/netool/httpx"
+
+	"github.com/duakc/mt/freebuf"
 )
 
 // TencentSignClient signs outgoing requests with TC3-HMAC-SHA256 before
@@ -32,22 +34,23 @@ func (tc *TencentSignClient) Do(r *http.Request) (*http.Response, error) {
 	common := Common{
 		Timestamp: time.Now().UTC().Unix(),
 	}
-	commonHeaders, err := common.Headers()
-	if err != nil {
-		return nil, fmt.Errorf("tencentcloud sign: common headers: %w", err)
-	}
-	httpx.ExtendHeadersOverride(r.Header, commonHeaders)
 
-	var bodyBytes []byte
+	httpx.ExtendHeadersOverride(r.Header, common.Headers())
+
+	buffer := freebuf.NewSerial()
+	defer buffer.FreeMe()
+
 	if r.Body != nil {
-		bodyBytes, err = io.ReadAll(r.Body)
+		_, err := buffer.ReadFrom(r.Body)
 		if err != nil {
 			return nil, fmt.Errorf("tencentcloud sign: read body: %w", err)
 		}
 		_ = r.Body.Close()
 	}
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	r.ContentLength = int64(len(bodyBytes))
+	bodyBytes := buffer.Bytes()
+
+	r.Body = io.NopCloser(buffer)
+	r.ContentLength = int64(buffer.Len())
 	r.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}

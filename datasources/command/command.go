@@ -157,7 +157,7 @@ func runCommand(ctx context.Context, logger *zap.Logger,
 	cmd *sh.Cmd, command xtypes.Joined[string], exitCode int, noShell bool,
 	stdinData []byte,
 ) ([]netip.Addr, error) {
-	const maxOutputBufferSize = 1 << 16
+	const maxOutputBufferSize = 1<<16 - 1
 
 	if command.Join == "" {
 		return []netip.Addr{}, nil
@@ -166,7 +166,7 @@ func runCommand(ctx context.Context, logger *zap.Logger,
 		ctx = context.Background()
 	}
 	logger = logger.WithLazy(zap.String("command", command.Join))
-	buf := freebuf.New(maxOutputBufferSize)
+	buf := freebuf.NewSerialLimited(maxOutputBufferSize)
 	defer buf.FreeMe()
 
 	runCmd := *cmd

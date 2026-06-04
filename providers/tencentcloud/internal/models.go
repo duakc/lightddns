@@ -3,8 +3,7 @@ package internal
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/duakc/mt/common/validator"
+	"time"
 )
 
 // APIError is the Error envelope Tencent Cloud returns inside the Response
@@ -33,35 +32,28 @@ type Common struct {
 	Language  string
 	Region    string
 	Timestamp int64
-
-	Host string
 }
 
-func (c *Common) Headers() (http.Header, error) {
-	if err := validator.GreaterThan(c.Timestamp, 0, "Timestamp"); err != nil {
-		return nil, err
+func (c *Common) Headers() http.Header {
+	if c.Timestamp == 0 {
+		c.Timestamp = time.Now().UTC().Unix()
 	}
 
 	h := make(http.Header)
-	host := c.Host
-	if host == "" {
-		host = tencentCloudEndpoint.Host
-	}
-	h.Set("Host", host)
 
-	h.Set("X-TC-Timestamp", fmt.Sprintf("%d", c.Timestamp))
+	h.Set(HeaderTimestamp, fmt.Sprintf("%d", c.Timestamp))
 
 	if len(c.Token) > 0 {
-		h.Set("X-TC-Token", c.Token)
+		h.Set(HeaderToken, c.Token)
 	}
 	if len(c.Language) > 0 {
-		h.Set("X-TC-Language", c.Language)
+		h.Set(HeaderLanguage, c.Language)
 	}
 	if len(c.Region) > 0 {
-		h.Set("X-TC-Region", c.Region)
+		h.Set(HeaderRegion, c.Region)
 	}
 
-	return h, nil
+	return h
 }
 
 // Record is one DNS record returned by DescribeRecordList.

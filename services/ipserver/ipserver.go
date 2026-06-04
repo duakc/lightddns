@@ -153,7 +153,7 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 }
 
 func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
-	bufferData := freebuf.NewSimple(len(ip) + len("false") + 128)
+	bufferData := freebuf.NewSimple(len(ip) + 26)
 	defer bufferData.FreeMe()
 	respObj := Response{
 		IP:      ip,
@@ -161,12 +161,12 @@ func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, i
 	}
 	buffer := bytes.NewBuffer(bufferData[:0])
 	n := respObj.writeJSON(buffer)
-	_, err := resp.Write(bufferData[:n])
+	_, err := resp.Write(buffer.Bytes()[:n])
 	return err
 }
 
 func (s *IPServer) serverHTTPYaml(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
-	bufferData := freebuf.NewSimple(len(ip) + len("false") + 128)
+	bufferData := freebuf.NewSimple(len(ip) + 23)
 	defer bufferData.FreeMe()
 	respObj := Response{
 		IP:      ip,
@@ -174,7 +174,7 @@ func (s *IPServer) serverHTTPYaml(resp http.ResponseWriter, req *http.Request, i
 	}
 	buffer := bytes.NewBuffer(bufferData[:0])
 	n := respObj.writeYAML(buffer)
-	_, err := resp.Write(bufferData[:n])
+	_, err := resp.Write(buffer.Bytes()[:n])
 	return err
 }
 
@@ -232,6 +232,10 @@ func (s *IPServer) Close() error {
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.IPServerServiceOption) (adapter.Service, error) {
+	if !option.Enabled {
+		return nil, adapter.ErrManagedItemNotEnabled
+	}
+
 	if option.Port == 0 {
 		return nil, fmt.Errorf("missing port")
 	}

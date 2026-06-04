@@ -18,8 +18,12 @@ import (
 
 const sigAlgo = "TC3-HMAC-SHA256"
 
-func sha256hex(s string) string {
-	b := sha256.Sum256([]byte(s))
+func sha256hex(s []byte) string {
+	if len(s) == 0 {
+		// a fast path to reduce calc
+		return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	}
+	b := sha256.Sum256(s)
 	return hex.EncodeToString(b[:])
 }
 
@@ -58,28 +62,28 @@ type SigContext struct {
 	Service string
 }
 
-func (ctx SigContext) CanonicalRequest() (string, string, error) {
+func (sig SigContext) CanonicalRequest() (string, string, error) {
 	var (
-		method      = strings.ToUpper(ctx.Method)
+		method      = strings.ToUpper(sig.Method)
 		queryStr    string
 		payloadHash string
 	)
 	switch method {
 	case http.MethodGet:
-		encoder := xtypes.RFC3986Query{Values: ctx.Query}
+		encoder := xtypes.RFC3986Query{Values: sig.Query}
 		queryStr = encoder.Encode()
-		payloadHash = sha256hex("")
+		payloadHash = sha256hex(nil)
 	case http.MethodPost:
-		body := ctx.Body
+		body := sig.Body
 		if body == nil {
 			body = []byte{}
 		}
-		payloadHash = sha256hex(string(body))
+		payloadHash = sha256hex(body)
 	default:
 		return "", "", fmt.Errorf("unsupported method: %s", method)
 	}
 
-	canonicalHeaders, signedHeaders, err := buildHeaders(ctx.Headers)
+	canonicalHeaders, signedHeaders, err := buildHeaders(sig.Headers)
 	if err != nil {
 		return "", "", err
 	}
@@ -100,11 +104,11 @@ func (ctx SigContext) CanonicalRequest() (string, string, error) {
 	return b.String(), signedHeaders, nil
 }
 
-func (ctx SigContext) StringToSign(canonicalReq string) (stringToSign string, credentialScope string) {
-	ts := ctx.Timestamp
+func (sig SigContext) StringToSign(canonicalReq string) (stringToSign string, credentialScope string) {
+	ts := sig.Timestamp
 	date := time.Unix(ts, 0).UTC().Format("2006-01-02")
-	credentialScope = date + "/" + ctx.Service + "/tc3_request"
-	hashedReq := sha256hex(canonicalReq)
+	credentialScope = date + "/" + sig.Service + "/tc3_request"
+	hashedReq := sha256hex([]byte(canonicalReq))
 
 	var b strings.Builder
 	b.WriteString(sigAlgo)
@@ -122,11 +126,11 @@ func (ctx SigContext) StringToSign(canonicalReq string) (stringToSign string, cr
 //   - stringToSign  StringToSign()
 //   - credentialScope  StringToSign()
 //   - signedHeaders  CanonicalRequest()
-func (ctx SigContext) BuildAuthorization(stringToSign, credentialScope, signedHeaders string) string {
-	date := time.Unix(ctx.Timestamp, 0).UTC().Format("2006-01-02")
+func (sig SigContext) BuildAuthorization(stringToSign, credentialScope, signedHeaders string) string {
+	date := time.Unix(sig.Timestamp, 0).UTC().Format("2006-01-02")
 
-	secretDate := hmacsha256(date, "TC3"+ctx.SecretKey)
-	secretService := hmacsha256(ctx.Service, secretDate)
+	secretDate := hmacsha256(date, "TC3"+sig.SecretKey)
+	secretService := hmacsha256(sig.Service, secretDate)
 	secretSigning := hmacsha256("tc3_request", secretService)
 	signatureBytes := hmacsha256(stringToSign, secretSigning)
 	signature := hex.EncodeToString([]byte(signatureBytes))
@@ -134,7 +138,7 @@ func (ctx SigContext) BuildAuthorization(stringToSign, credentialScope, signedHe
 	var b strings.Builder
 	b.WriteString(sigAlgo)
 	b.WriteString(" Credential=")
-	b.WriteString(ctx.SecretId)
+	b.WriteString(sig.SecretId)
 	b.WriteByte('/')
 	b.WriteString(credentialScope)
 	b.WriteString(", SignedHeaders=")
@@ -145,15 +149,15 @@ func (ctx SigContext) BuildAuthorization(stringToSign, credentialScope, signedHe
 	return b.String()
 }
 
-func (ctx SigContext) Authorization() (string, error) {
-	canonicalReq, signedHeaders, err := ctx.CanonicalRequest()
+func (sig SigContext) Authorization() (string, error) {
+	canonicalReq, signedHeaders, err := sig.CanonicalRequest()
 	if err != nil {
 		return "", err
 	}
 
-	stringToSign, credentialScope := ctx.StringToSign(canonicalReq)
+	stringToSign, credentialScope := sig.StringToSign(canonicalReq)
 
-	v := ctx.BuildAuthorization(stringToSign, credentialScope, signedHeaders)
+	v := sig.BuildAuthorization(stringToSign, credentialScope, signedHeaders)
 	return v, nil
 }
 
@@ -168,10 +172,7 @@ func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, 
 		if !allowed[lower] {
 			continue
 		}
-		val := strings.TrimSpace(strings.Join(vals, ","))
-		if lower == "x-tc-action" {
-			val = strings.ToLower(val)
-		}
+		val := strings.ToLower(strings.TrimSpace(strings.Join(vals, ",")))
 		headerSorted = append(headerSorted, lower)
 		signed[lower] = val
 	}

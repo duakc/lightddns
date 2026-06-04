@@ -133,13 +133,8 @@ func marshalForContentType(body any, ct string) (io.Reader, error) {
 	var data []byte
 	switch mediaType {
 	case "application/json", "text/json":
-		if jm, ok := body.(json.Marshaler); ok {
-			data, err = jm.MarshalJSON()
-		} else {
-			data, err = json.Marshal(body)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("marshal JSON: %w", err)
+		if data, err = json.Marshal(body); err != nil {
+			return nil, fmt.Errorf("marshal json: %w", err)
 		}
 	case "application/octet-stream":
 		bm, ok := body.(encoding.BinaryMarshaler)
@@ -167,7 +162,7 @@ func marshalForContentType(body any, ct string) (io.Reader, error) {
 		return nil, fmt.Errorf(
 			"cannot marshal body %T for Content-Type %s; provide an io.Reader", body, ct)
 	}
-	return bytes.NewBuffer(data), nil
+	return bytes.NewReader(data), nil
 }
 
 func marshalAndInferContentType(body any, header http.Header) (io.Reader, error) {

@@ -45,7 +45,17 @@ const (
 	DNSPodErrCodeNoDataOfRecord = "ResourceNotFound.NoDataOfRecord"
 )
 
-var tencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
+const (
+	HeaderAction  = "X-TC-Action"
+	HeaderVersion = "X-TC-Version"
+
+	HeaderTimestamp = "X-TC-Timestamp"
+	HeaderToken     = "X-TC-Token"
+	HeaderLanguage  = "X-TC-Language"
+	HeaderRegion    = "X-TC-Region"
+)
+
+var TencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
 
 type Client struct {
 	do httpx.HTTPRequester
@@ -63,70 +73,10 @@ func NewClient(do httpx.HTTPRequester, secretId, secretKey string) *Client {
 }
 
 func (c *Client) newRequest(method, action string) httpx.ReqConfig {
-	req := httpx.NewReqConfig(method, tencentCloudEndpoint)
-	req.ExtendHeader.Set("X-TC-Action", action)
-	req.ExtendHeader.Set("X-TC-Version", DNSPodDefaultVersion)
+	req := httpx.NewReqConfig(method, TencentCloudEndpoint)
+	req.ExtendHeader.Set(HeaderAction, action)
+	req.ExtendHeader.Set(HeaderVersion, DNSPodDefaultVersion)
 	return req
-}
-
-func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (T, error) {
-	var zero T
-	logger := zaplog.FromOrPackage(ctx, "tencentcloud", "internal").
-		With(zap.String("action", action))
-	logger.Debug("tencentcloud: api call start")
-
-	req := c.newRequest(http.MethodPost, action)
-	req.ExtendHeader.Set("Content-Type", ContentTypeJson)
-	req.Body = body
-
-	httpReq, err := req.ToRequestContext(ctx)
-	if err != nil {
-		return zero, fmt.Errorf("build request %s: %w", action, err)
-	}
-	resp, err := c.do.Do(httpReq)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
-	if err != nil {
-		logger.Warn("tencentcloud: send request failed",
-			zap.Error(err))
-		return zero, fmt.Errorf("send %s: %w", action, err)
-	}
-
-	if resp == nil {
-		panic("empty response with error")
-	}
-
-	if resp.StatusCode >= 400 {
-		logger.Warn("tencentcloud: bad status code",
-			zap.Int("status", resp.StatusCode))
-		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
-	}
-
-	// Read the raw body so we can log it on decode failure or API error.
-	// Bodies are small (a single Response envelope) so this is cheap.
-	rawBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return zero, fmt.Errorf("read body %s: %w", action, err)
-	}
-
-	var out Response[T]
-	if err := json.Unmarshal(rawBody, &out); err != nil {
-		logger.Warn("tencentcloud: decode response failed",
-			zap.ByteString("body", rawBody),
-			zap.Error(err))
-		return zero, fmt.Errorf("decode %s: %w", action, err)
-	}
-	if out.Error != nil {
-		logger.Warn("tencentcloud: api returned error",
-			zap.String("error_code", out.Error.Code),
-			zap.String("error_message", out.Error.Message),
-			zap.String("request_id", out.RequestID))
-		return zero, out.Error
-	}
-	logger.Debug("tencentcloud: api call ok",
-		zap.String("request_id", out.RequestID))
-	return out.Data, nil
 }
 
 // DescribeRecordList https://cloud.tencent.com/document/api/1427/56166
@@ -301,4 +251,64 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 		}
 	}
 	return DomainInfo{}, fmt.Errorf("domain not found: %s", search)
+}
+
+func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (T, error) {
+	var zero T
+	logger := zaplog.FromOrPackage(ctx, "tencentcloud", "internal").
+		With(zap.String("action", action))
+	logger.Debug("tencentcloud: api call start")
+
+	req := c.newRequest(http.MethodPost, action)
+	req.ExtendHeader.Set("Content-Type", ContentTypeJson)
+	req.Body = body
+
+	httpReq, err := req.ToRequestContext(ctx)
+	if err != nil {
+		return zero, fmt.Errorf("build request %s: %w", action, err)
+	}
+	resp, err := c.do.Do(httpReq)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		logger.Warn("tencentcloud: send request failed",
+			zap.Error(err))
+		return zero, fmt.Errorf("send %s: %w", action, err)
+	}
+
+	if resp == nil {
+		panic("empty response with error")
+	}
+
+	if resp.StatusCode >= 400 {
+		logger.Warn("tencentcloud: bad status code",
+			zap.Int("status", resp.StatusCode))
+		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
+	}
+
+	// Read the raw body so we can log it on decode failure or API error.
+	// Bodies are small (a single Response envelope) so this is cheap.
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return zero, fmt.Errorf("read body %s: %w", action, err)
+	}
+
+	var out Response[T]
+	if err := json.Unmarshal(rawBody, &out); err != nil {
+		logger.Warn("tencentcloud: decode response failed",
+			zap.ByteString("body", rawBody),
+			zap.Error(err))
+		return zero, fmt.Errorf("decode %s: %w", action, err)
+	}
+	if out.Error != nil {
+		logger.Warn("tencentcloud: api returned error",
+			zap.String("error_code", out.Error.Code),
+			zap.String("error_message", out.Error.Message),
+			zap.String("request_id", out.RequestID))
+		return zero, out.Error
+	}
+	logger.Debug("tencentcloud: api call ok",
+		zap.String("request_id", out.RequestID))
+	return out.Data, nil
 }

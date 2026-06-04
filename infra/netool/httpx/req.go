@@ -8,18 +8,6 @@ type HTTPRequester interface {
 	Do(r *http.Request) (*http.Response, error)
 }
 
-type ValidClient struct {
-	HTTPRequester
-}
-
-func (vc *ValidClient) Do(r *http.Request) (*http.Response, error) {
-	rr, e := vc.HTTPRequester.Do(r)
-	if e == nil && rr == nil {
-		panic("bad implementation of HTTPRequester")
-	}
-	return rr, e
-}
-
 type TokenClient struct {
 	HTTPRequester
 

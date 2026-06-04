@@ -3,9 +3,10 @@ module github.com/duakc/lightddns
 go 1.26.2
 
 require (
-	github.com/duakc/mt v0.0.0-20260530085901-16d02828cb1b
+	github.com/duakc/mt v0.0.0-20260604125623-19b51589e572
 	github.com/elastic/go-freelru v0.16.0
 	github.com/goccy/go-yaml v1.19.2
+	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.19
 	github.com/joho/godotenv v1.5.1
 	github.com/miekg/dns v1.1.72

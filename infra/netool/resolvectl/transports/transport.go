@@ -134,8 +134,9 @@ func WriteMessage(w io.Writer, messageID uint16, message *mDns.Msg) error {
 	exMessage.Id = messageID
 	exMessage.Compress = true
 	exMessageLen := exMessage.Len()
-	buf := freebuf.New(3 + exMessage.Len())
+	buf := freebuf.NewSerial()
 	defer buf.FreeMe()
+	buf.Grow(exMessage.Len())
 	if err := binary.Write(buf, binary.BigEndian, uint16(exMessageLen)); err != nil {
 		return err
 	}
@@ -159,17 +160,15 @@ func ReadMessage(r io.Reader) (*mDns.Msg, error) {
 	if responseLen < 10 {
 		return nil, mDns.ErrShortRead
 	}
-	buffer := freebuf.New(int(responseLen))
+	buffer := freebuf.NewSerial()
 	defer buffer.FreeMe()
-	var nn int
-	nn, err = io.ReadFull(r, buffer.FreeBytes())
+	buffer.Grow(int(responseLen))
+
+	_, err = freebuf.ReadFull(r, buffer, int(responseLen))
 	if err != nil {
 		return nil, err
 	}
-	if nn < int(responseLen) {
-		return nil, io.ErrUnexpectedEOF
-	}
-	buffer.Truncated(nn)
+
 	var message mDns.Msg
 	err = message.Unpack(buffer.Bytes())
 	return &message, err
