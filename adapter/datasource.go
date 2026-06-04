@@ -9,8 +9,6 @@ import (
 	"slices"
 
 	"github.com/duakc/lightddns/infra/netool"
-
-	"github.com/duakc/mt/services"
 )
 
 type Datasource interface {
@@ -26,9 +24,31 @@ type DatasourceDualStack interface {
 
 type DatasourceGroup interface {
 	Datasource
-	services.LifeCycle
 
-	Grouped() []Datasource
+	WithManager(manager DatasourceManager) error
+}
+
+func NewDatasourceGroupBuild(list []string) DatasourceGroupBuilder {
+	return DatasourceGroupBuilder{datasourcesList: list}
+}
+
+type DatasourceGroupBuilder struct {
+	datasourcesList []string
+}
+
+func (b DatasourceGroupBuilder) Build(manager DatasourceManager) ([]Datasource, error) {
+	var datasources []Datasource
+	for i := 0; i < len(b.datasourcesList); i++ {
+		name := b.datasourcesList[i]
+		if baseDatasource, found := manager.Lookup(name); found {
+			datasources = append(datasources, baseDatasource)
+		} else {
+			return nil, &DatasourceNotFoundError{
+				NewManagedNotFoundError(name),
+			}
+		}
+	}
+	return datasources, nil
 }
 
 type (

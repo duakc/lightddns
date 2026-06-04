@@ -26,7 +26,10 @@ type AbstractManagedType struct {
 }
 
 func NewManagedType(typ, name string) AbstractManagedType {
-	return AbstractManagedType{name, typ}
+	return AbstractManagedType{
+		name: name,
+		typ:  typ,
+	}
 }
 
 func (a AbstractManagedType) Type() string {
@@ -117,14 +120,14 @@ func (M *DefaultManager[T]) LookupDefault(name string) (T, bool) {
 	return mt.Zero[T](), false
 }
 
-func CollectManagedItem[T ManagedType](M Manager[T], names []string) ([]T, error) {
-	var items []T
-	for _, name := range names {
-		item, ok := M.Lookup(name)
-		if !ok {
-			return nil, &ManagedNotFoundError{name}
-		}
-		items = append(items, item)
-	}
-	return items, nil
-}
+//func CollectManagedItem[T ManagedType](M Manager[T], names []string) ([]T, error) {
+//	var items []T
+//	for _, name := range names {
+//		item, ok := M.Lookup(name)
+//		if !ok {
+//			return nil, &ManagedNotFoundError{name}
+//		}
+//		items = append(items, item)
+//	}
+//	return items, nil
+//}

@@ -18,7 +18,6 @@ import (
 
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"
-	"github.com/duakc/mt/services/container"
 	"github.com/duakc/mt/services/filehelper"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,6 +54,15 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	metricsRegistry := metrics.New(prometheusEnabled(opt.Services))
 	services.Store[metrics.Registry](ctx, metricsRegistry)
 
+	datasourceMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
+		ddnsmetric.Namespace, ddnsmetric.SubsystemDatasource)
+	providerMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
+		ddnsmetric.Namespace, ddnsmetric.SubsystemProvider)
+	serviceMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
+		ddnsmetric.Namespace, ddnsmetric.SubsystemService)
+	domainMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
+		ddnsmetric.Namespace, ddnsmetric.SubsystemDomain)
+
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
 	services.Store[adapter.ProviderManager](ctx, providerManager)
 	datasourceManager := adapter.NewManager[adapter.Datasource](adapter.DatasourceRegister)
@@ -87,10 +95,20 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 				datasourceOption.Name, datasourceOption.Type, err)
 		}
 
+		if groupDatasource, isGroup := datasource.(adapter.DatasourceGroup); isGroup {
+			if err = groupDatasource.WithManager(datasourceManager); err != nil {
+				return nil, fmt.Errorf("init datasource group `%s,type=%s` failed: %w",
+					datasourceOption.Name, datasourceOption.Type, err)
+			}
+		}
+
+		ddnsmetric.RegisterMetrics(datasource, datasourceMetricsFactory)
+
 		datasources = append(datasources, datasource)
 		initLogger.Info("new datasource created",
-			zap.String("type", datasourceOption.Type),
-			zap.String("name", datasourceOption.Name))
+			zap.String("datasource_type", datasourceOption.Type),
+			zap.String("datasource_name", datasourceOption.Name),
+		)
 	}
 
 	for i := 0; i < len(opt.Providers); i++ {
@@ -98,16 +116,21 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 			provider adapter.Provider
 			err      error
 		)
+
 		providerOption := opt.Providers[i]
 		if provider, err = providerManager.Create(ctx, creatProviderLogger(logger, providerOption),
 			providerOption.Type, providerOption.Option); err != nil {
 			return nil, fmt.Errorf("create provider `%s,type=%s` failed: %w",
 				providerOption.Name, providerOption.Type, err)
 		}
+
+		ddnsmetric.RegisterMetrics(provider, providerMetricsFactory)
+
 		providers = append(providers, provider)
 		initLogger.Info("new provider created",
-			zap.String("type", providerOption.Type),
-			zap.String("name", providerOption.Name))
+			zap.String("provider_type", providerOption.Type),
+			zap.String("provider_name", providerOption.Name),
+		)
 	}
 
 	for i := 0; i < len(opt.Services); i++ {
@@ -119,35 +142,46 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		serviceOption := opt.Services[i]
 		if service, err = serviceManager.Create(ctx, createServiceLogger(logger, serviceOption),
 			serviceOption.Type, serviceOption.Option); err != nil {
+
 			if errors.Is(err, adapter.ErrManagedItemNotEnabled) {
 				initLogger.Warn("service not enabled",
-					zap.String("type", serviceOption.Type),
-					zap.String("name", serviceOption.Name))
+					zap.String("service_type", serviceOption.Type),
+					zap.String("service_name", serviceOption.Name),
+				)
 				continue
 			}
+
 			return nil, fmt.Errorf("create service `%s,type=%s` failed: %w",
 				serviceOption.Name, serviceOption.Type, err)
 		}
+
+		ddnsmetric.RegisterMetrics(service, serviceMetricsFactory)
+
 		services = append(services, service)
 		initLogger.Info("new service created",
-			zap.String("type", serviceOption.Type),
-			zap.String("name", serviceOption.Name))
+			zap.String("service_type", serviceOption.Type),
+			zap.String("service_name", serviceOption.Name),
+		)
 	}
 
 	var domains []*Domain
 
 	for i := 0; i < len(opt.Domains); i++ {
 		domainOption := opt.Domains[i]
-		domain, err := NewDomain(ctx,
-			logger.With(zap.String("domain", string(domainOption.Domain))), domainOption)
+		domain, err := NewDomain(ctx, createDomainLogger(logger, domainOption), domainOption)
+
 		if domain == nil && err == nil {
 			// not enabled
 			initLogger.Warn("domain not enabled", zap.String("domain", string(domainOption.Domain)))
 			continue
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("create domain `%s`: %w", domainOption.Domain, err)
 		}
+
+		ddnsmetric.RegisterMetrics(domain, domainMetricsFactory)
+
 		domains = append(domains, domain)
 	}
 
@@ -163,6 +197,8 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		providers:   providers,
 		services:    services,
 	}
+
+	ld.setupPrometheus(ld.metricsRegistry)
 
 	return ld, nil
 }
@@ -181,21 +217,8 @@ func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
 }
 
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
-	if stage == services.StagePreStart {
-		if len(ld.datasources) == 0 && len(ld.services) == 0 {
-			return fmt.Errorf("noting to need to start")
-		}
-
-		var cont container.Container
-		containerProvider := services.Lookup[container.Provider](ctx)
-		ctx, cont = containerProvider.New(ctx)
-		defer containerProvider.Release(cont)
-		cont.IncRef()
-		defer cont.DecRef()
-
-		ddnsmetric.Pass(ctx, ld.metricsRegistry)
-
-		setupPrometheus(ld.metricsRegistry)
+	if stage == services.StagePreStart && len(ld.datasources) == 0 && len(ld.services) == 0 {
+		return fmt.Errorf("noting to need to start")
 	}
 
 	var err error
@@ -208,17 +231,14 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 	}
 
 	if stage == services.StagePostStart {
-		runtimeDebug.FreeOSMemory()
 		runtime.GC()
+		runtimeDebug.FreeOSMemory()
 	}
 
 	return err
 }
 
-// setupPrometheus registers root-level metrics (those without a per-variant
-// subsystem). Called once from Start(PreStart) — kept out of New() so the
-// check command's bare-New path doesn't touch prometheus state.
-func setupPrometheus(reg metrics.Registry) {
+func (ld *LightDDNS) setupPrometheus(reg metrics.Registry) {
 	reg.GaugeVec(
 		prometheus.BuildFQName(ddnsmetric.Namespace, "", metricBuildInfo),
 		"Build information. Value is always 1.",
@@ -354,21 +374,27 @@ func prometheusEnabled(svcs []options.ServiceOption) bool {
 
 func createServiceLogger(logger *zap.Logger, srv options.ServiceOption) *zap.Logger {
 	return logger.With(
-		zap.String("service", srv.Name),
+		zap.String("service_name", srv.Name),
 		zap.String("service_type", srv.Type)).
 		Named("service")
 }
 
 func creatProviderLogger(logger *zap.Logger, provider options.ProviderOption) *zap.Logger {
 	return logger.With(
-		zap.String("provider", provider.Name),
+		zap.String("provider_name", provider.Name),
 		zap.String("provider_type", provider.Type)).
 		Named("provider")
 }
 
 func createDatasourceLogger(logger *zap.Logger, datasource options.DatasourceOption) *zap.Logger {
 	return logger.With(
-		zap.String("datasource", datasource.Name),
+		zap.String("datasource_name", datasource.Name),
 		zap.String("datasource_type", datasource.Type)).
 		Named("datasource")
+}
+
+func createDomainLogger(logger *zap.Logger, domain options.DomainOption) *zap.Logger {
+	return logger.With(
+		zap.String("domain_name", string(domain.Domain))).
+		Named("domain")
 }

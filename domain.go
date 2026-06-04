@@ -11,7 +11,6 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -109,30 +108,28 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 }
 
 func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
-	switch stage {
-	case services.StagePreStart:
-		reg := services.Lookup[metrics.Registry](ctx)
-		o.registerMetrics(ddnsmetric.NewFactory(reg, ddnsmetric.Namespace, ddnsmetric.SubsystemDomain))
-		if err := services.Start(ctx, stage, o.provider); err != nil {
-			return err
-		}
-		return services.Start(ctx, stage, o.datasource)
-	case services.StageStart:
+	var err error
+	if stage == services.StageStart {
 		o.taskCtx, o.taskCancel = context.WithCancel(ctx)
 		o.closed = make(chan struct{})
-		err := o.Update(o.taskCtx)
+		err = o.Update(o.taskCtx)
 		if err != nil {
 			return err
 		}
-		return o.updateLoop()
-	case services.StagePostStart:
-		if err := services.Start(ctx, stage, o.provider); err != nil {
+		err = o.updateLoop()
+		if err != nil {
 			return err
 		}
-		return services.Start(ctx, stage, o.datasource)
-	default:
-		panic("unknown stage: " + stage.String())
 	}
+
+	if err = services.Start(ctx, stage, o.provider); err != nil {
+		return err
+	}
+
+	if err = services.Start(ctx, stage, o.datasource); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *Domain) Close() error {
@@ -247,7 +244,7 @@ func (o *Domain) updateLoop() error {
 	return nil
 }
 
-func (o *Domain) registerMetrics(factory ddnsmetric.Factory) {
+func (o *Domain) RegisterMetrics(factory ddnsmetric.Factory) {
 	labels := []string{constpkg.MetricLabelDomain}
 	o.activationCounter = factory.CounterVec(metricActivationTotal,
 		"Total number of times a domain update was triggered.", labels).With(o.domainName)

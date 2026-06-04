@@ -45,11 +45,11 @@ func (sig SigContext) CanonicalRequest() (
 
 	method := strings.ToUpper(sig.Method)
 	switch method {
-	case http.MethodGet, http.MethodDelete:
+	case http.MethodGet:
 		hashedRequestPayload = sha256Hex(nil)
 		encoder := xtypes.RFC3986Query{Values: sig.Query}
 		canonicalQueryString = encoder.Encode()
-	case http.MethodPost, http.MethodPut, http.MethodPatch:
+	case http.MethodPost:
 		hashedRequestPayload = sha256Hex(sig.Body)
 		canonicalQueryString = sha256Hex(nil)
 	}

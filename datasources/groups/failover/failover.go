@@ -18,6 +18,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var _ adapter.DatasourceGroup = (*FailOver)(nil)
+
 const DatasourceType = constpkg.DatasourceGroupTypeFailover
 
 func init() {
@@ -32,35 +34,32 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 	if len(option.Datasources) == 0 {
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
-	var datasources []adapter.Datasource
-	manager := services.Lookup[adapter.DatasourceManager](ctx)
-	for i := 0; i < len(option.Datasources); i++ {
-		name := option.Datasources[i]
-		if baseDatasource, found := manager.Lookup(name); found {
-			datasources = append(datasources, baseDatasource)
-		} else {
-			return nil, &adapter.ManagedNotFoundError{Name: name}
-		}
-	}
 
 	failover := &FailOver{
-		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		datasources:         datasources,
-		lastSuccess:         0,
-		logger:              logger,
+		AbstractManagedType:    adapter.NewManagedType(DatasourceType, option.Name),
+		DatasourceGroupBuilder: adapter.NewDatasourceGroupBuild(option.Datasources),
+
+		logger: logger,
 	}
+
 	return failover, nil
 }
 
-var _ adapter.DatasourceGroup = (*FailOver)(nil)
-
 type FailOver struct {
 	adapter.AbstractManagedType
+	adapter.DatasourceGroupBuilder
 
 	logger      *zap.Logger
 	datasources []adapter.Datasource
+
 	lastSuccess int
 	access      sync.Mutex
+}
+
+func (f *FailOver) WithManager(manager adapter.DatasourceManager) error {
+	var err error
+	f.datasources, err = f.DatasourceGroupBuilder.Build(manager)
+	return err
 }
 
 func (f *FailOver) Start(ctx context.Context, stage services.Stage) error {
@@ -80,10 +79,6 @@ func (f *FailOver) Close() error {
 		err = errors.Join(err, services.CloseService(f.datasources))
 	}
 	return err
-}
-
-func (f *FailOver) Grouped() []adapter.Datasource {
-	return f.datasources
 }
 
 func (f *FailOver) IP(ctx context.Context) ([]netip.Addr, error) {

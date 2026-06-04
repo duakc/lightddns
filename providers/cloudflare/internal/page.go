@@ -4,16 +4,17 @@ import (
 	"context"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/duakc/lightddns/infra/netool/httpx"
-	"github.com/duakc/lightddns/infra/zaplog"
 
 	"go.uber.org/zap"
 )
 
 type PageConfig[T any] struct {
+	owner     *Client
+	op        string
 	reqConfig httpx.ReqConfig
-	requester httpx.HTTPRequester
 
 	// internal
 	page    int
@@ -24,35 +25,39 @@ type PageConfig[T any] struct {
 	resultInfo ResultInfo
 }
 
-func NewPaging[T any](req httpx.ReqConfig, do httpx.HTTPRequester) *PageConfig[T] {
-	if do == nil {
-		panic("nil requester")
+func NewPaging[T any](owner *Client, op string, req httpx.ReqConfig) *PageConfig[T] {
+	if owner == nil {
+		panic("nil client")
 	}
 	return &PageConfig[T]{
+		owner:     owner,
+		op:        op,
 		reqConfig: req,
-		requester: do,
 		perPage:   50,
 	}
 }
 
-func (pc *PageConfig[T]) Next(ctx context.Context) ([]T, error) {
+func (pc *PageConfig[T]) Next(ctx context.Context) (_ []T, err error) {
 	if pc.done {
 		return nil, io.EOF
 	}
-	logger := zaplog.FromOrPackage(ctx, "cloudflare", "internal").
-		With(zap.String("action", "list_page"), zap.Int("page", pc.page+1))
+	start := time.Now()
+	defer func() { pc.owner.recordAPICall(pc.op, start, err) }()
+
+	logger := pc.owner.actionLogger(pc.op).With(zap.Int("page", pc.page+1))
 	logger.Debug("cloudflare: api call start")
 	pc.page++
 	pc.reqConfig.Query.Set("page", strconv.Itoa(pc.page))
 	pc.reqConfig.Query.Set("per_page", strconv.Itoa(pc.perPage))
-	result, response, err := httpx.JSONRequest[ResponseWithPage[T]](ctx,
-		pc.requester, pc.reqConfig, httpx.RespPolicy{})
+	result, response, perr := httpx.JSONRequest[ResponseWithPage[T]](ctx,
+		pc.owner.do, pc.reqConfig, httpx.RespPolicy{})
 	if response != nil {
 		defer response.Body.Close()
 	}
-	if E := result.JoinError(err); E != nil {
+	if E := result.JoinError(perr); E != nil {
 		logger.Warn("cloudflare: list page failed", zap.Error(E))
-		return nil, E
+		err = E
+		return nil, err
 	}
 
 	pc.resultInfo = result.ResultInfo

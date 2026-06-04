@@ -8,10 +8,14 @@ import (
 	"io"
 	"net/http"
 	urlpkg "net/url"
+	"time"
 
+	"github.com/duakc/lightddns/adapter/ddnsmetric"
+	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/ddnsx"
+	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
-	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
 
@@ -45,6 +49,26 @@ const (
 	DNSPodErrCodeNoDataOfRecord = "ResourceNotFound.NoDataOfRecord"
 )
 
+// Operation labels recorded against the provider API metrics vec. One label
+// per HTTP request.
+const (
+	opDescribeDomains = "describe_domains"
+	opListRecords     = "list_records"
+	opCreateRecord    = "create_record"
+	opModifyRecord    = "modify_record"
+	opDeleteRecord    = "delete_record"
+)
+
+// metricOpByAction maps the Tencent DNSPod action name to the metric label
+// recorded for that call.
+var metricOpByAction = map[string]string{
+	DNSPodActionDescribeDomainFilterList: opDescribeDomains,
+	DNSPodActionDescribeRecordList:       opListRecords,
+	DNSPodActionCreateRecord:             opCreateRecord,
+	DNSPodActionModifyRecord:             opModifyRecord,
+	DNSPodActionDeleteRecord:             opDeleteRecord,
+}
+
 const (
 	HeaderAction  = "X-TC-Action"
 	HeaderVersion = "X-TC-Version"
@@ -57,18 +81,51 @@ const (
 
 var TencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
 
+var _ ddnsx.DomainIdFetcher = (*Client)(nil)
+
 type Client struct {
-	do httpx.HTTPRequester
+	logger       *zap.Logger
+	providerName string
+	do           httpx.HTTPRequester
+
+	requestTotal    metrics.CounterVec
+	requestFailures metrics.CounterVec
+	requestDuration metrics.HistogramVec
 }
 
-func NewClient(do httpx.HTTPRequester, secretId, secretKey string) *Client {
+func NewClient(logger *zap.Logger, providerName string,
+	do httpx.HTTPRequester, secretId, secretKey string,
+) *Client {
 	return &Client{
+		logger:       logger,
+		providerName: providerName,
 		do: &TencentSignClient{
 			HTTPRequester: do,
 			SecretId:      secretId,
 			SecretKey:     secretKey,
 			Service:       DNSPodServiceName,
 		},
+	}
+}
+
+// RegisterMetrics wires the client into the provider metric registry. Must be
+// called once during the owning provider's PreStart, before any API method
+// fires — otherwise recordAPICall hits nil vecs.
+func (c *Client) RegisterMetrics(factory ddnsmetric.Factory) {
+	labels := []string{constpkg.MetricLabelName, constpkg.MetricLabelOperation}
+	c.requestTotal = factory.CounterVec(constpkg.MetricProviderRequestTotal,
+		"Total provider API requests.", labels)
+	c.requestFailures = factory.CounterVec(constpkg.MetricProviderRequestFailureTotal,
+		"Failed provider API requests.", labels)
+	c.requestDuration = factory.HistogramVec(constpkg.MetricProviderRequestDurationSeconds,
+		"Provider API request duration.", labels, nil)
+}
+
+func (c *Client) recordAPICall(op string, start time.Time, err error) {
+	c.requestTotal.With(c.providerName, op).Inc()
+	c.requestDuration.With(c.providerName, op).Observe(time.Since(start).Seconds())
+	if err != nil {
+		c.requestFailures.With(c.providerName, op).Inc()
 	}
 }
 
@@ -185,7 +242,21 @@ func (c *Client) DeleteRecord(ctx context.Context, domain string, recordId uint6
 	return err
 }
 
-func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, error) {
+// FetchDomainId implements [ddnsx.DomainIdFetcher]. Tencent's DNSPod APIs key
+// records by the parent zone Name rather than a numeric id, so the returned
+// map stores Name -> Name. [ddnsx.DomainIdCache] selects the longest suffix
+// match for the queried FQDN and remembers any other domains seen along the
+// way for future lookups. Each underlying page request is recorded against
+// the API metric via jsonAction — no top-level metric is emitted.
+//
+// To minimise API calls the search walks suffixes of `search` (longest-first)
+// and short-circuits as soon as one keyword turns up a domain that's a parent
+// of `search`. Returns nil on transport / API failure so the cache treats it
+// as "no result".
+func (c *Client) FetchDomainId(ctx context.Context, search string) map[string]string {
+	if mt.Done(ctx) || len(search) == 0 {
+		return nil
+	}
 	type _domainInfoResponse struct {
 		DomainCountInfo struct {
 			AllTotal      int `json:"AllTotal"`
@@ -210,6 +281,9 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 		pageSize = 100
 	)
 
+	logger := c.actionLogger(action).With(zap.String("search", search))
+	logger.Info("search domain id from upstream")
+
 	fetchPage := func(keyword string, offset int) (_domainInfoResponse, error) {
 		body := map[string]any{
 			"Type":   "ALL",
@@ -222,59 +296,67 @@ func (c *Client) DomainInfo(ctx context.Context, search string) (DomainInfo, err
 		return jsonAction[_domainInfoResponse](ctx, c, action, body)
 	}
 
-	// tryKeyword: walk all pages for one keyword; short-circuit on exact match.
-	tryKeyword := func(keyword string) (DomainInfo, bool, error) {
+	result := make(map[string]string)
+	for _, keyword := range append(domains.CutFromHead(search), "") {
+		matched := false
 		for offset := 0; ; {
 			page, err := fetchPage(keyword, offset)
 			if err != nil {
-				return DomainInfo{}, false, err
+				logger.Warn("tencentcloud: list domains failed",
+					zap.String("keyword", keyword), zap.Error(err))
+				return nil
 			}
 			for _, di := range page.DomainList {
+				if !domains.IsDomainName(di.Name) {
+					continue
+				}
+				result[di.Name] = di.Name
 				if domains.IsSubDomain(search, di.Name) {
-					return di, true, nil
+					matched = true
 				}
 			}
 			offset += len(page.DomainList)
 			if len(page.DomainList) == 0 || offset >= page.DomainCountInfo.DomainTotal {
-				return DomainInfo{}, false, nil
+				break
 			}
 		}
-	}
-
-	for _, keyword := range append(domains.CutFromHead(search), "") {
-		di, found, err := tryKeyword(keyword)
-		if err != nil {
-			return DomainInfo{}, err
-		}
-		if found {
-			return di, nil
+		if matched {
+			return result
 		}
 	}
-	return DomainInfo{}, fmt.Errorf("domain not found: %s", search)
+	return result
 }
 
-func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (T, error) {
+func (c *Client) actionLogger(action string) *zap.Logger {
+	return c.logger.With(zap.String("action", action))
+}
+
+func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (_ T, err error) {
 	var zero T
-	logger := zaplog.FromOrPackage(ctx, "tencentcloud", "internal").
-		With(zap.String("action", action))
+	start := time.Now()
+	defer func() { c.recordAPICall(metricOpByAction[action], start, err) }()
+
+	logger := c.actionLogger(action)
 	logger.Debug("tencentcloud: api call start")
 
 	req := c.newRequest(http.MethodPost, action)
 	req.ExtendHeader.Set("Content-Type", ContentTypeJson)
 	req.Body = body
 
-	httpReq, err := req.ToRequestContext(ctx)
-	if err != nil {
-		return zero, fmt.Errorf("build request %s: %w", action, err)
+	httpReq, perr := req.ToRequestContext(ctx)
+	if perr != nil {
+		err = fmt.Errorf("build request %s: %w", action, perr)
+		return zero, err
 	}
-	resp, err := c.do.Do(httpReq)
+	resp, perr := c.do.Do(httpReq)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
-	if err != nil {
+	if perr != nil {
 		logger.Warn("tencentcloud: send request failed",
-			zap.Error(err))
-		return zero, fmt.Errorf("send %s: %w", action, err)
+			zap.Error(perr))
+		err = fmt.Errorf("send %s: %w", action, perr)
+		return zero, err
 	}
 
 	if resp == nil {
@@ -284,29 +366,33 @@ func jsonAction[T any](ctx context.Context, c *Client, action string, body map[s
 	if resp.StatusCode >= 400 {
 		logger.Warn("tencentcloud: bad status code",
 			zap.Int("status", resp.StatusCode))
-		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
+		err = &httpx.BadStatusCodeError{Got: resp.StatusCode}
+		return zero, err
 	}
 
 	// Read the raw body so we can log it on decode failure or API error.
 	// Bodies are small (a single Response envelope) so this is cheap.
-	rawBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return zero, fmt.Errorf("read body %s: %w", action, err)
+	rawBody, perr := io.ReadAll(resp.Body)
+	if perr != nil {
+		err = fmt.Errorf("read body %s: %w", action, perr)
+		return zero, err
 	}
 
 	var out Response[T]
-	if err := json.Unmarshal(rawBody, &out); err != nil {
+	if perr := json.Unmarshal(rawBody, &out); perr != nil {
 		logger.Warn("tencentcloud: decode response failed",
 			zap.ByteString("body", rawBody),
-			zap.Error(err))
-		return zero, fmt.Errorf("decode %s: %w", action, err)
+			zap.Error(perr))
+		err = fmt.Errorf("decode %s: %w", action, perr)
+		return zero, err
 	}
 	if out.Error != nil {
 		logger.Warn("tencentcloud: api returned error",
 			zap.String("error_code", out.Error.Code),
 			zap.String("error_message", out.Error.Message),
 			zap.String("request_id", out.RequestID))
-		return zero, out.Error
+		err = out.Error
+		return zero, err
 	}
 	logger.Debug("tencentcloud: api call ok",
 		zap.String("request_id", out.RequestID))

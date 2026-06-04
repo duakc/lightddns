@@ -1,15 +1,20 @@
 package ddnsmetric
 
 import (
-	"context"
-
-	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/infra/metrics"
-
-	"github.com/duakc/mt/services/container"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+type MetricsRegister interface {
+	RegisterMetrics(registry Factory)
+}
+
+func RegisterMetrics(obj any, factory Factory) {
+	if r, isRegistered := obj.(MetricsRegister); isRegistered {
+		r.RegisterMetrics(factory)
+	}
+}
 
 type Factory interface {
 	CounterVec(name, help string, labels []string) metrics.CounterVec
@@ -23,6 +28,9 @@ type Factory interface {
 
 	SummaryVec(name, help string, labels []string, objectives map[float64]float64) metrics.SummaryVec
 	SummaryVecVerbose(opt prometheus.SummaryOpts, labels []string) metrics.SummaryVec
+
+	// IsMetricsFactory make the metrics.Registry won't implement this interface
+	IsMetricsFactory()
 }
 
 func NewFactory(reg metrics.Registry, namespace, subsystem string) Factory {
@@ -34,6 +42,8 @@ type factory struct {
 	namespace string
 	subsystem string
 }
+
+func (*factory) IsMetricsFactory() {}
 
 func (o *factory) CounterVec(name, help string, labels []string) metrics.CounterVec {
 	return o.CounterVecVerbose(prometheus.CounterOpts{Name: name, Help: help}, labels)
@@ -75,33 +85,33 @@ func (o *factory) SummaryVecVerbose(opt prometheus.SummaryOpts, labels []string)
 	return o.registry.SummaryVecVerbose(opt, labels)
 }
 
-const (
-	containerKeyProvider   = "ddnsmetric.factory.provider"
-	containerKeyDatasource = "ddnsmetric.factory.datasource"
-	containerKeyService    = "ddnsmetric.factory.service"
-)
-
-func Pass(ctx context.Context, reg metrics.Registry) {
-	container.StoreContext[Factory](ctx, containerKeyProvider,
-		NewFactory(reg, Namespace, SubsystemProvider))
-	container.StoreContext[Factory](ctx, containerKeyDatasource,
-		NewFactory(reg, Namespace, SubsystemDatasource))
-	container.StoreContext[Factory](ctx, containerKeyService,
-		NewFactory(reg, Namespace, SubsystemService))
-}
-
-func FromContext(ctx context.Context, owner adapter.ManagedType) Factory {
-	var key string
-	switch owner.(type) {
-	case adapter.Provider:
-		key = containerKeyProvider
-	case adapter.Datasource:
-		key = containerKeyDatasource
-	case adapter.Service:
-		key = containerKeyService
-	default:
-		panic("unknown adapter type")
-	}
-	f, _ := container.LoadContext[Factory](ctx, key)
-	return f
-}
+//const (
+//	containerKeyProvider   = "ddnsmetric.factory.provider"
+//	containerKeyDatasource = "ddnsmetric.factory.datasource"
+//	containerKeyService    = "ddnsmetric.factory.service"
+//)
+//
+//func WithContext(ctx context.Context, reg metrics.Registry) {
+//	container.StoreContext[Factory](ctx, containerKeyProvider,
+//		NewFactory(reg, Namespace, SubsystemProvider))
+//	container.StoreContext[Factory](ctx, containerKeyDatasource,
+//		NewFactory(reg, Namespace, SubsystemDatasource))
+//	container.StoreContext[Factory](ctx, containerKeyService,
+//		NewFactory(reg, Namespace, SubsystemService))
+//}
+//
+//func FromContext(ctx context.Context, owner adapter.ManagedType) Factory {
+//	var key string
+//	switch owner.(type) {
+//	case adapter.Provider:
+//		key = containerKeyProvider
+//	case adapter.Datasource:
+//		key = containerKeyDatasource
+//	case adapter.Service:
+//		key = containerKeyService
+//	default:
+//		panic("unknown adapter type")
+//	}
+//	f, _ := container.LoadContext[Factory](ctx, key)
+//	return f
+//}

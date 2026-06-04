@@ -29,24 +29,14 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
-	var datasources []adapter.Datasource
-
-	for i := 0; i < len(option.Datasources); i++ {
-		name := option.Datasources[i]
-		if datasource, found := datasourceManager.Lookup(name); found {
-			datasources = append(datasources, datasource)
-		} else {
-			return nil, &adapter.ManagedNotFoundError{Name: name}
-		}
-	}
-
 	sum := &Sum{
-		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
-		datasources:         datasources,
-		fastFail:            option.FastFail,
-		logger:              logger,
+		AbstractManagedType:    adapter.NewManagedType(DatasourceType, option.Name),
+		DatasourceGroupBuilder: adapter.NewDatasourceGroupBuild(option.Datasources),
+
+		fastFail: option.FastFail,
+		logger:   logger,
 	}
+
 	return sum, nil
 }
 
@@ -54,10 +44,17 @@ var _ adapter.DatasourceGroup = (*Sum)(nil)
 
 type Sum struct {
 	adapter.AbstractManagedType
+	adapter.DatasourceGroupBuilder
 
 	logger      *zap.Logger
 	fastFail    bool
 	datasources []adapter.Datasource
+}
+
+func (s *Sum) WithManager(manager adapter.DatasourceManager) error {
+	var err error
+	s.datasources, err = s.DatasourceGroupBuilder.Build(manager)
+	return err
 }
 
 func (s *Sum) Start(ctx context.Context, stage services.Stage) error {
@@ -76,10 +73,6 @@ func (s *Sum) Close() error {
 		err = errors.Join(err, services.CloseService(s.datasources[i]))
 	}
 	return err
-}
-
-func (s *Sum) Grouped() []adapter.Datasource {
-	return s.datasources
 }
 
 func (s *Sum) IP(ctx context.Context) ([]netip.Addr, error) {

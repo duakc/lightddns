@@ -5,19 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
-	"time"
 
 	"github.com/duakc/lightddns/infra/ddnsx"
-	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
-
-	"go.uber.org/zap"
 )
 
 func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
-	zaplog.WithContext(ctx, c.logger.With(zap.String("domain", domain)))
-	defer zaplog.KickContext(ctx)
-
 	diffs, err := c.diff(ctx, domain, addr)
 	if err != nil {
 		return false, err
@@ -36,9 +29,6 @@ func (c *Cloudflare) diff(ctx context.Context, domain string, addr []netip.Addr)
 }
 
 func (c *Cloudflare) listExisting(ctx context.Context, domain, zoneID, dnsType string) (existing []ddnsx.Existing[internal.DNSRecord], err error) {
-	start := time.Now()
-	defer func() { c.recordAPICall(opListDNSRecords, start, err) }()
-
 	pager, err := c.client.ListDNSRecords(domain, zoneID, dnsType)
 	if err != nil {
 		return nil, fmt.Errorf("ListDNSRecords: %w", err)
