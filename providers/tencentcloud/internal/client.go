@@ -8,12 +8,9 @@ import (
 	"io"
 	"net/http"
 	urlpkg "net/url"
-	"time"
 
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
-	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
-	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
@@ -88,9 +85,7 @@ type Client struct {
 	providerName string
 	do           httpx.HTTPRequester
 
-	requestTotal    metrics.CounterVec
-	requestFailures metrics.CounterVec
-	requestDuration metrics.HistogramVec
+	metricsRouter *ddnsmetric.ProviderAPIRouter
 }
 
 func NewClient(logger *zap.Logger, providerName string,
@@ -108,25 +103,17 @@ func NewClient(logger *zap.Logger, providerName string,
 	}
 }
 
-// RegisterMetrics wires the client into the provider metric registry. Must be
-// called once during the owning provider's PreStart, before any API method
-// fires — otherwise recordAPICall hits nil vecs.
+// RegisterMetrics builds the per-op metric router. Must be called once during
+// the owning provider's PreStart, before any API method fires — otherwise
+// jsonAction's defer dereferences a nil router.
 func (c *Client) RegisterMetrics(factory ddnsmetric.Factory) {
-	labels := []string{constpkg.MetricLabelName, constpkg.MetricLabelOperation}
-	c.requestTotal = factory.CounterVec(constpkg.MetricProviderRequestTotal,
-		"Total provider API requests.", labels)
-	c.requestFailures = factory.CounterVec(constpkg.MetricProviderRequestFailureTotal,
-		"Failed provider API requests.", labels)
-	c.requestDuration = factory.HistogramVec(constpkg.MetricProviderRequestDurationSeconds,
-		"Provider API request duration.", labels, nil)
-}
-
-func (c *Client) recordAPICall(op string, start time.Time, err error) {
-	c.requestTotal.With(c.providerName, op).Inc()
-	c.requestDuration.With(c.providerName, op).Observe(time.Since(start).Seconds())
-	if err != nil {
-		c.requestFailures.With(c.providerName, op).Inc()
-	}
+	c.metricsRouter = ddnsmetric.ProviderLeaf.NewRouter(factory, c.providerName, []string{
+		opDescribeDomains,
+		opListRecords,
+		opCreateRecord,
+		opModifyRecord,
+		opDeleteRecord,
+	})
 }
 
 func (c *Client) newRequest(method, action string) httpx.ReqConfig {
@@ -281,7 +268,9 @@ func (c *Client) FetchDomainId(ctx context.Context, search string) map[string]st
 		pageSize = 100
 	)
 
-	logger := c.actionLogger(action).With(zap.String("search", search))
+	logger := c.actionLogger(action).
+		With(zap.String("search", search))
+
 	logger.Info("search domain id from upstream")
 
 	fetchPage := func(keyword string, offset int) (_domainInfoResponse, error) {
@@ -333,8 +322,7 @@ func (c *Client) actionLogger(action string) *zap.Logger {
 
 func jsonAction[T any](ctx context.Context, c *Client, action string, body map[string]any) (_ T, err error) {
 	var zero T
-	start := time.Now()
-	defer func() { c.recordAPICall(metricOpByAction[action], start, err) }()
+	defer c.metricsRouter.RecordAPI(metricOpByAction[action])(&err)
 
 	logger := c.actionLogger(action)
 	logger.Debug("tencentcloud: api call start")

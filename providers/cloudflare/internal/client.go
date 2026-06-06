@@ -6,12 +6,9 @@ import (
 	"io"
 	"net/http"
 	urlpkg "net/url"
-	"time"
 
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
-	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
-	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
@@ -20,14 +17,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Operation labels recorded against the provider API metrics vec. One label
-// per HTTP request — pager Next() calls record one each.
 const (
-	opListZones      = "list_zones"
-	opListDNSRecords = "list_dns_records"
-	opCreateDNS      = "create_dns_record"
-	opUpdateDNS      = "update_dns_record"
-	opDeleteDNS      = "delete_dns_record"
+	opDescribeDomains = "describe_domains"
+	opListDNSRecords  = "list_dns_records"
+	opCreateDNS       = "create_dns_record"
+	opUpdateDNS       = "update_dns_record"
+	opDeleteDNS       = "delete_dns_record"
 )
 
 var _ ddnsx.DomainIdFetcher = (*Client)(nil)
@@ -52,30 +47,20 @@ type Client struct {
 	providerName string
 	do           httpx.HTTPRequester
 
-	requestTotal    metrics.CounterVec
-	requestFailures metrics.CounterVec
-	requestDuration metrics.HistogramVec
+	apiRouter *ddnsmetric.ProviderAPIRouter
 }
 
-// RegisterMetrics wires the client into the provider metric registry. Must be
-// called once during the owning provider's PreStart, before any API method
-// fires — otherwise recordAPICall hits nil vecs.
+// RegisterMetrics builds the per-op metric router. Must be called once during
+// the owning provider's PreStart, before any API method (including paged
+// listings) fires.
 func (c *Client) RegisterMetrics(factory ddnsmetric.Factory) {
-	labels := []string{constpkg.MetricLabelName, constpkg.MetricLabelOperation}
-	c.requestTotal = factory.CounterVec(constpkg.MetricProviderRequestTotal,
-		"Total provider API requests.", labels)
-	c.requestFailures = factory.CounterVec(constpkg.MetricProviderRequestFailureTotal,
-		"Failed provider API requests.", labels)
-	c.requestDuration = factory.HistogramVec(constpkg.MetricProviderRequestDurationSeconds,
-		"Provider API request duration.", labels, nil)
-}
-
-func (c *Client) recordAPICall(op string, start time.Time, err error) {
-	c.requestTotal.With(c.providerName, op).Inc()
-	c.requestDuration.With(c.providerName, op).Observe(time.Since(start).Seconds())
-	if err != nil {
-		c.requestFailures.With(c.providerName, op).Inc()
-	}
+	c.apiRouter = ddnsmetric.ProviderLeaf.NewRouter(factory, c.providerName, []string{
+		opDescribeDomains,
+		opListDNSRecords,
+		opCreateDNS,
+		opUpdateDNS,
+		opDeleteDNS,
+	})
 }
 
 // FetchDomainId implements [ddnsx.DomainIdFetcher]. It pages through all zones
@@ -89,7 +74,7 @@ func (c *Client) FetchDomainId(ctx context.Context, domain string) map[string]st
 	if mt.Done(ctx) || len(domain) == 0 {
 		return nil
 	}
-	logger := c.actionLogger(opListZones).With(zap.String("domain", domain))
+	logger := c.actionLogger(opDescribeDomains).With(zap.String("domain", domain))
 	logger.Info("search zone id from upstream")
 
 	pager := c.ListZones()
@@ -119,14 +104,14 @@ func (c *Client) NewRequestConfig(method string) httpx.ReqConfig {
 func (c *Client) ListZones() *PageConfig[Zone] {
 	r := c.NewRequestConfig(http.MethodGet)
 	r.Query.Set("status", "active")
-	return NewPaging[Zone](c, opListZones, r)
+	return NewPaging[Zone](c, opDescribeDomains, r)
 }
 
 func (c *Client) ListZoneName(name string) *PageConfig[Zone] {
 	r := c.NewRequestConfig(http.MethodGet)
 	r.Query.Set("status", "active")
 	r.Query.Set("name", name)
-	return NewPaging[Zone](c, opListZones, r)
+	return NewPaging[Zone](c, opDescribeDomains, r)
 }
 
 func (c *Client) ListDNSRecords(name string, zoneID string, qtype string) (*PageConfig[DNSRecord], error) {
@@ -140,8 +125,7 @@ func (c *Client) ListDNSRecords(name string, zoneID string, qtype string) (*Page
 func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 	content UpdateDNSRecordRequest,
 ) (err error) {
-	start := time.Now()
-	defer func() { c.recordAPICall(opCreateDNS, start, err) }()
+	defer c.apiRouter.RecordAPI(opCreateDNS)(&err)
 
 	logger := c.actionLogger(opCreateDNS).With(zap.String("zone_id", zoneID))
 	logger.Debug("cloudflare: api call start")
@@ -164,8 +148,7 @@ func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID string,
 	content UpdateDNSRecordRequest,
 ) (err error) {
-	start := time.Now()
-	defer func() { c.recordAPICall(opUpdateDNS, start, err) }()
+	defer c.apiRouter.RecordAPI(opUpdateDNS)(&err)
 
 	logger := c.actionLogger(opUpdateDNS).With(
 		zap.String("zone_id", zoneID),
@@ -189,8 +172,7 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID string) (err error) {
-	start := time.Now()
-	defer func() { c.recordAPICall(opDeleteDNS, start, err) }()
+	defer c.apiRouter.RecordAPI(opDeleteDNS)(&err)
 
 	logger := c.actionLogger(opDeleteDNS).With(
 		zap.String("zone_id", zoneID),

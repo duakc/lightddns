@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"strconv"
-	"time"
 
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
@@ -41,8 +40,7 @@ func (pc *PageConfig[T]) Next(ctx context.Context) (_ []T, err error) {
 	if pc.done {
 		return nil, io.EOF
 	}
-	start := time.Now()
-	defer func() { pc.owner.recordAPICall(pc.op, start, err) }()
+	defer pc.owner.apiRouter.RecordAPI(pc.op)(&err)
 
 	logger := pc.owner.actionLogger(pc.op).With(zap.Int("page", pc.page+1))
 	logger.Debug("cloudflare: api call start")
