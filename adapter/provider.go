@@ -18,10 +18,22 @@ type (
 
 var ProviderRegister = NewRegister[Provider]()
 
+func LookupAllProvider(manager ProviderManager, names []string) ([]Provider, error) {
+	all, err := manager.LookupAll(names)
+	if err != nil {
+		return nil, &ProviderNotFoundError{err}
+	}
+	return all, nil
+}
+
 type ProviderNotFoundError struct {
-	*ManagedNotFoundError
+	Err error
 }
 
 func (e *ProviderNotFoundError) Error() string {
-	return fmt.Sprintf("provider: %s", e.ManagedNotFoundError.Error())
+	return fmt.Sprintf("provider not found: %s", e.Err.Error())
+}
+
+func (e *ProviderNotFoundError) Unwrap() error {
+	return e.Err
 }

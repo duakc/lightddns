@@ -1,6 +1,10 @@
 package ddnsmetric
 
 import (
+	"context"
+
+	"github.com/duakc/lightddns/infra/metrics"
+	"github.com/duakc/mt/services"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -8,35 +12,60 @@ const (
 	MetricProviderRequestTotal           = "request_total"
 	MetricProviderRequestFailureTotal    = "request_failure_total"
 	MetricProviderRequestDurationSeconds = "request_duration_seconds"
-
-	MetricProviderLabelName      = "name"
-	MetricProviderLabelOperation = "operation"
 )
 
-type providerLeaf struct {
-	leaf
+const (
+	LabelProviderName = "name"
+	LabelProviderOp   = "operation"
+)
+
+type ProviderFactory interface {
+	services.ContextInjector
+	metrics.Factory
+
+	RequestTotal(name, op string) prometheus.Counter
+	RequestFailure(name, op string) prometheus.Counter
+	RequestDuration(name, op string, buckets []float64) prometheus.Observer
 }
 
-var ProviderLeaf providerLeaf
+func NewProviderFactory(factory metrics.Factory) ProviderFactory {
+	if sf, isSf := factory.(ProviderFactory); isSf {
+		return sf
+	}
 
-func (providerLeaf) RequestTotal(f Factory, name, op string) prometheus.Counter {
-	return f.CounterVec(MetricProviderRequestTotal,
+	return &defaultProviderFactory{
+		Factory: factory,
+	}
+}
+
+var _ ProviderFactory = (*defaultProviderFactory)(nil)
+
+type defaultProviderFactory struct {
+	metrics.Factory
+}
+
+func (l *defaultProviderFactory) ContextInject(ctx context.Context) context.Context {
+	return services.InjectMe[ProviderFactory](ctx, l)
+}
+
+func (l *defaultProviderFactory) RequestTotal(name, op string) prometheus.Counter {
+	return l.CounterVec(MetricProviderRequestTotal,
 		"Total provider API requests.",
-		[]string{MetricProviderLabelName, MetricProviderLabelOperation}).
+		[]string{LabelProviderName, LabelProviderOp}).
 		With(name, op)
 }
 
-func (providerLeaf) RequestFailure(f Factory, name, op string) prometheus.Counter {
-	return f.CounterVec(MetricProviderRequestFailureTotal,
+func (l *defaultProviderFactory) RequestFailure(name, op string) prometheus.Counter {
+	return l.CounterVec(MetricProviderRequestFailureTotal,
 		"Failed provider API requests.",
-		[]string{MetricProviderLabelName, MetricProviderLabelOperation}).
+		[]string{LabelProviderName, LabelProviderOp}).
 		With(name, op)
 }
 
-func (providerLeaf) RequestDuration(f Factory, name, op string, buckets []float64) prometheus.Observer {
-	return f.HistogramVec(MetricProviderRequestDurationSeconds,
+func (l *defaultProviderFactory) RequestDuration(name, op string, buckets []float64) prometheus.Observer {
+	return l.HistogramVec(MetricProviderRequestDurationSeconds,
 		"Provider API request duration.",
-		[]string{MetricProviderLabelName, MetricProviderLabelOperation},
+		[]string{LabelProviderName, LabelProviderOp},
 		buckets).
 		With(name, op)
 }

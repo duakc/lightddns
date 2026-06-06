@@ -45,23 +45,18 @@ type LightDDNS struct {
 	metricsRegistry   metrics.Registry
 }
 
-func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
-	logger, err := newLoggerWithOptions(ctx, opt.Log)
+func New(ctx context.Context, option options.Options) (*LightDDNS, error) {
+	logger, err := createLogger(ctx, option.Log)
 	if err != nil {
-		return nil, fmt.Errorf("create logger: %w", err)
+		return nil, err
 	}
 
-	metricsRegistry := metrics.New(prometheusEnabled(opt.Services))
+	metricsRegistry := metrics.New(prometheusEnabled(option.Services))
 	services.Store[metrics.Registry](ctx, metricsRegistry)
 
-	datasourceMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
-		ddnsmetric.Namespace, ddnsmetric.SubsystemDatasource)
-	providerMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
-		ddnsmetric.Namespace, ddnsmetric.SubsystemProvider)
-	serviceMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
-		ddnsmetric.Namespace, ddnsmetric.SubsystemService)
-	domainMetricsFactory := ddnsmetric.NewFactory(metricsRegistry,
-		ddnsmetric.Namespace, ddnsmetric.SubsystemDomain)
+	services.Store[ddnsmetric.DataSourceFactory](ctx, ddnsmetric.NewDatasourceFactory(metricsRegistry))
+	services.Store[ddnsmetric.ProviderFactory](ctx, ddnsmetric.NewProviderFactory(metricsRegistry))
+	services.Store[ddnsmetric.ServiceFactory](ctx, ddnsmetric.NewServiceFactory(metricsRegistry))
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
 	services.Store[adapter.ProviderManager](ctx, providerManager)
@@ -70,119 +65,25 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 	serviceManager := adapter.NewManager[adapter.Service](adapter.ServiceRegistry)
 	services.Store[adapter.ServiceManager](ctx, serviceManager)
 
-	initLogger := logger.Named("init")
-	resortedDatasources, err := resortDatasources(opt.Datasources)
-	if err != nil {
-		return nil, fmt.Errorf("resort: %w", err)
-	}
-
 	var (
-		datasources []adapter.Datasource
-		providers   []adapter.Provider
-		services    []adapter.Service
+		datasources       []adapter.Datasource
+		providers         []adapter.Provider
+		registeredService []adapter.Service
+		domains           []*Domain
 	)
 
-	for i := 0; i < len(resortedDatasources); i++ {
-		var (
-			datasource adapter.Datasource
-			err        error
-		)
-
-		datasourceOption := resortedDatasources[i]
-		if datasource, err = datasourceManager.Create(ctx, createDatasourceLogger(logger, datasourceOption),
-			datasourceOption.Type, datasourceOption.Option); err != nil {
-			return nil, fmt.Errorf("create datasource `%s,type=%s` failed: %w",
-				datasourceOption.Name, datasourceOption.Type, err)
-		}
-
-		if groupDatasource, isGroup := datasource.(adapter.DatasourceGroup); isGroup {
-			if err = groupDatasource.WithManager(datasourceManager); err != nil {
-				return nil, fmt.Errorf("init datasource group `%s,type=%s` failed: %w",
-					datasourceOption.Name, datasourceOption.Type, err)
-			}
-		}
-
-		ddnsmetric.RegisterMetrics(datasource, datasourceMetricsFactory)
-
-		datasources = append(datasources, datasource)
-		initLogger.Info("new datasource created",
-			zap.String("datasource_type", datasourceOption.Type),
-			zap.String("datasource_name", datasourceOption.Name),
-		)
+	if datasources, err = createDatasources(ctx, logger, datasourceManager, option.Datasources); err != nil {
+		return nil, err
+	}
+	if providers, err = createProviders(ctx, logger, providerManager, option.Providers); err != nil {
+		return nil, err
 	}
 
-	for i := 0; i < len(opt.Providers); i++ {
-		var (
-			provider adapter.Provider
-			err      error
-		)
-
-		providerOption := opt.Providers[i]
-		if provider, err = providerManager.Create(ctx, creatProviderLogger(logger, providerOption),
-			providerOption.Type, providerOption.Option); err != nil {
-			return nil, fmt.Errorf("create provider `%s,type=%s` failed: %w",
-				providerOption.Name, providerOption.Type, err)
-		}
-
-		ddnsmetric.RegisterMetrics(provider, providerMetricsFactory)
-
-		providers = append(providers, provider)
-		initLogger.Info("new provider created",
-			zap.String("provider_type", providerOption.Type),
-			zap.String("provider_name", providerOption.Name),
-		)
+	if registeredService, err = createServices(ctx, logger, serviceManager, option.Services); err != nil {
+		return nil, err
 	}
-
-	for i := 0; i < len(opt.Services); i++ {
-		var (
-			service adapter.Service
-			err     error
-		)
-
-		serviceOption := opt.Services[i]
-		if service, err = serviceManager.Create(ctx, createServiceLogger(logger, serviceOption),
-			serviceOption.Type, serviceOption.Option); err != nil {
-
-			if errors.Is(err, adapter.ErrManagedItemNotEnabled) {
-				initLogger.Warn("service not enabled",
-					zap.String("service_type", serviceOption.Type),
-					zap.String("service_name", serviceOption.Name),
-				)
-				continue
-			}
-
-			return nil, fmt.Errorf("create service `%s,type=%s` failed: %w",
-				serviceOption.Name, serviceOption.Type, err)
-		}
-
-		ddnsmetric.RegisterMetrics(service, serviceMetricsFactory)
-
-		services = append(services, service)
-		initLogger.Info("new service created",
-			zap.String("service_type", serviceOption.Type),
-			zap.String("service_name", serviceOption.Name),
-		)
-	}
-
-	var domains []*Domain
-
-	for i := 0; i < len(opt.Domains); i++ {
-		domainOption := opt.Domains[i]
-		domain, err := NewDomain(ctx, createDomainLogger(logger, domainOption), domainOption)
-
-		if domain == nil && err == nil {
-			// not enabled
-			initLogger.Warn("domain not enabled", zap.String("domain", string(domainOption.Domain)))
-			continue
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("create domain `%s`: %w", domainOption.Domain, err)
-		}
-
-		ddnsmetric.RegisterMetrics(domain, domainMetricsFactory)
-
-		domains = append(domains, domain)
+	if domains, err = creatDomains(ctx, logger, option.Domains); err != nil {
+		return nil, err
 	}
 
 	ld := &LightDDNS{
@@ -195,7 +96,7 @@ func New(ctx context.Context, opt options.Options) (*LightDDNS, error) {
 		domains:     domains,
 		datasources: datasources,
 		providers:   providers,
-		services:    services,
+		services:    registeredService,
 	}
 
 	ld.setupPrometheus(ld.metricsRegistry)
@@ -256,6 +157,213 @@ func (ld *LightDDNS) Close() error {
 		err = errors.Join(err, services.CloseService(ld.services[i]))
 	}
 	return err
+}
+
+func createLogger(ctx context.Context, opt options.LogOption) (*zap.Logger, error) {
+	if opt.Disabled {
+		return zaplog.NOP, nil
+	}
+	var (
+		fileHelper = services.Lookup[filehelper.Helper](ctx)
+		level      = zapcore.Level(opt.Level)
+		err        error
+	)
+	zaplog.DefaultLevel(level)
+	closeManager := services.Lookup[closeme.Manager](ctx)
+
+	var outputFD io.Writer
+	switch strings.ToLower(opt.Output) {
+	case "stdout", "":
+		outputFD = zaplog.Stdout
+	case "stderr":
+		outputFD = zaplog.Stderr
+	default:
+		outputFD, err = fileHelper.Create(opt.Output)
+		if err != nil {
+			return nil, fmt.Errorf("create logger: %w", err)
+		}
+	}
+
+	logger := zaplog.NewDefault(closeManager, outputFD, level, nil)
+	return logger, nil
+}
+
+func createServiceLogger(logger *zap.Logger, srv options.ServiceOption) *zap.Logger {
+	return logger.With(
+		zap.String("service_name", srv.Name),
+		zap.String("service_type", srv.Type)).
+		Named("service")
+}
+
+func creatProviderLogger(logger *zap.Logger, provider options.ProviderOption) *zap.Logger {
+	return logger.With(
+		zap.String("provider_name", provider.Name),
+		zap.String("provider_type", provider.Type)).
+		Named("provider")
+}
+
+func createDatasourceLogger(logger *zap.Logger, datasource options.DatasourceOption) *zap.Logger {
+	return logger.With(
+		zap.String("datasource_name", datasource.Name),
+		zap.String("datasource_type", datasource.Type)).
+		Named("datasource")
+}
+
+func createDomainLogger(logger *zap.Logger, domain options.DomainOption) *zap.Logger {
+	return logger.With(
+		zap.String("domain_name", string(domain.Domain))).
+		Named("domain")
+}
+
+func createDatasources(
+	ctx context.Context,
+	logger *zap.Logger,
+	datasourceManager adapter.DatasourceManager,
+	datasourceOptions []options.DatasourceOption,
+) ([]adapter.Datasource, error) {
+
+	resortedDatasource, err := resortDatasources(datasourceOptions)
+	if err != nil {
+		return nil, fmt.Errorf("resolve dependence for datasources: %w", err)
+	}
+
+	var datasources []adapter.Datasource
+
+	initLogger := logger.Named("init/datasource")
+
+	for i := 0; i < len(resortedDatasource); i++ {
+		var (
+			datasource adapter.Datasource
+			err        error
+		)
+
+		datasourceOption := resortedDatasource[i]
+		if datasource, err = datasourceManager.Create(ctx, createDatasourceLogger(logger, datasourceOption),
+			datasourceOption.Type, datasourceOption.Option); err != nil {
+			return nil, fmt.Errorf("create datasource name=%q type=%q failed: %w",
+				datasourceOption.Name, datasourceOption.Type, err)
+		}
+
+		datasources = append(datasources, datasource)
+		initLogger.Info("new datasource created",
+			zap.String("datasource_type", datasourceOption.Type),
+			zap.String("datasource_name", datasourceOption.Name),
+		)
+	}
+
+	return datasources, nil
+}
+
+func createProviders(
+	ctx context.Context,
+	logger *zap.Logger,
+	providerManager adapter.ProviderManager,
+	providerOptions []options.ProviderOption,
+) ([]adapter.Provider, error) {
+	var providers []adapter.Provider
+
+	initLogger := logger.Named("init/provider")
+
+	for i := 0; i < len(providerOptions); i++ {
+		var (
+			provider adapter.Provider
+			err      error
+		)
+
+		providerOption := providerOptions[i]
+		if provider, err = providerManager.Create(ctx, creatProviderLogger(logger, providerOption),
+			providerOption.Type, providerOption.Option); err != nil {
+			return nil, fmt.Errorf("create provider name=%q type=%q failed: %w",
+				providerOption.Name, providerOption.Type, err)
+		}
+
+		providers = append(providers, provider)
+		initLogger.Info("new provider created",
+			zap.String("provider_type", providerOption.Type),
+			zap.String("provider_name", providerOption.Name),
+		)
+	}
+	return providers, nil
+}
+
+func createServices(
+	ctx context.Context,
+	logger *zap.Logger,
+	serviceManager adapter.ServiceManager,
+	serviceOptions []options.ServiceOption,
+) ([]adapter.Service, error) {
+	var registerServices []adapter.Service
+
+	initLogger := logger.Named("init/service")
+
+	for i := 0; i < len(serviceOptions); i++ {
+		var (
+			service adapter.Service
+			err     error
+		)
+
+		serviceOption := serviceOptions[i]
+		if service, err = serviceManager.Create(ctx, createServiceLogger(logger, serviceOption),
+			serviceOption.Type, serviceOption.Option); err != nil {
+
+			if errors.Is(err, adapter.ErrManagedItemNotEnabled) {
+				initLogger.Warn("service not enabled",
+					zap.String("service_type", serviceOption.Type),
+					zap.String("service_name", serviceOption.Name),
+				)
+				continue
+			}
+
+			return nil, fmt.Errorf("create service name=%q type=%q failed: %w",
+				serviceOption.Name, serviceOption.Type, err)
+		}
+
+		registerServices = append(registerServices, service)
+		initLogger.Info("new service created",
+			zap.String("service_type", serviceOption.Type),
+			zap.String("service_name", serviceOption.Name),
+		)
+	}
+	return registerServices, nil
+}
+
+func creatDomains(
+	ctx context.Context,
+	logger *zap.Logger,
+	domainOptions []options.DomainOption) (
+	[]*Domain, error) {
+	var domains []*Domain
+	initLogger := logger.Named("init/domain")
+
+	for i := 0; i < len(domainOptions); i++ {
+		domainOption := domainOptions[i]
+		domain, err := NewDomain(ctx, createDomainLogger(logger, domainOption), domainOption)
+
+		if domain == nil && err == nil {
+			// not enabled
+			initLogger.Warn("domain not enabled", zap.String("domain", string(domainOption.Domain)))
+			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("create domain %q failed: %w", domainOption.Domain, err)
+		}
+
+		domains = append(domains, domain)
+	}
+	return domains, nil
+}
+
+func prometheusEnabled(svcs []options.ServiceOption) bool {
+	for i := 0; i < len(svcs); i++ {
+		if svcs[i].Type != constpkg.ServiceTypePrometheus {
+			continue
+		}
+		if po, ok := svcs[i].Option.(*options.PrometheusServiceOption); ok && po.Enabled {
+			return true
+		}
+	}
+	return false
 }
 
 // resortDatasources returns datasources in initialization order using Kahn's
@@ -329,72 +437,4 @@ func resortDatasources(ds []options.DatasourceOption) ([]options.DatasourceOptio
 	}
 
 	return result, nil
-}
-
-func newLoggerWithOptions(ctx context.Context, opt options.LogOption) (*zap.Logger, error) {
-	if opt.Disabled {
-		return zaplog.NOP, nil
-	}
-	var (
-		fileHelper = services.Lookup[filehelper.Helper](ctx)
-		level      = zapcore.Level(opt.Level)
-		err        error
-	)
-	zaplog.DefaultLevel(level)
-	closeManager := services.Lookup[closeme.Manager](ctx)
-
-	var outputFD io.Writer
-	switch strings.ToLower(opt.Output) {
-	case "stdout", "":
-		outputFD = zaplog.Stdout
-	case "stderr":
-		outputFD = zaplog.Stderr
-	default:
-		outputFD, err = fileHelper.Create(opt.Output)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	logger := zaplog.NewDefault(closeManager, outputFD, level, nil)
-	return logger, nil
-}
-
-func prometheusEnabled(svcs []options.ServiceOption) bool {
-	for i := 0; i < len(svcs); i++ {
-		if svcs[i].Type != constpkg.ServiceTypePrometheus {
-			continue
-		}
-		if po, ok := svcs[i].Option.(*options.PrometheusServiceOption); ok && po.Enabled {
-			return true
-		}
-	}
-	return false
-}
-
-func createServiceLogger(logger *zap.Logger, srv options.ServiceOption) *zap.Logger {
-	return logger.With(
-		zap.String("service_name", srv.Name),
-		zap.String("service_type", srv.Type)).
-		Named("service")
-}
-
-func creatProviderLogger(logger *zap.Logger, provider options.ProviderOption) *zap.Logger {
-	return logger.With(
-		zap.String("provider_name", provider.Name),
-		zap.String("provider_type", provider.Type)).
-		Named("provider")
-}
-
-func createDatasourceLogger(logger *zap.Logger, datasource options.DatasourceOption) *zap.Logger {
-	return logger.With(
-		zap.String("datasource_name", datasource.Name),
-		zap.String("datasource_type", datasource.Type)).
-		Named("datasource")
-}
-
-func createDomainLogger(logger *zap.Logger, domain options.DomainOption) *zap.Logger {
-	return logger.With(
-		zap.String("domain_name", string(domain.Domain))).
-		Named("domain")
 }

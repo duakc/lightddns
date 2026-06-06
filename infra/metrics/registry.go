@@ -8,22 +8,7 @@ import (
 
 type Registry interface {
 	services.ContextInjector
-
-	// Counter
-	CounterVec(name, help string, labels []string) CounterVec
-	CounterVecVerbose(opt prometheus.CounterOpts, labels []string) CounterVec
-
-	// Gauge
-	GaugeVec(name, help string, labels []string) GaugeVec
-	GaugeVecVerbose(opt prometheus.GaugeOpts, labels []string) GaugeVec
-
-	// Histogram
-	HistogramVec(name, help string, labels []string, buckets []float64) HistogramVec
-	HistogramVecVerbose(opt prometheus.HistogramOpts, labels []string) HistogramVec
-
-	// Summary
-	SummaryVec(name, help string, labels []string, objectives map[float64]float64) SummaryVec
-	SummaryVecVerbose(opt prometheus.SummaryOpts, labels []string) SummaryVec
+	Factory
 
 	Gatherer() prometheus.Gatherer
 }

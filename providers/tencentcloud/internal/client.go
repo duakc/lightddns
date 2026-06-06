@@ -10,6 +10,7 @@ import (
 	urlpkg "net/url"
 
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
+	"github.com/duakc/lightddns/adapter/ddnsprovider"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
@@ -46,18 +47,14 @@ const (
 	DNSPodErrCodeNoDataOfRecord = "ResourceNotFound.NoDataOfRecord"
 )
 
-// Operation labels recorded against the provider API metrics vec. One label
-// per HTTP request.
 const (
-	opDescribeDomains = "describe_domains"
-	opListRecords     = "list_records"
-	opCreateRecord    = "create_record"
-	opModifyRecord    = "modify_record"
-	opDeleteRecord    = "delete_record"
+	opDescribeDomains = ddnsprovider.OpDescribeDomains
+	opListRecords     = ddnsprovider.OpListRecords
+	opCreateRecord    = ddnsprovider.OpCreateRecord
+	opModifyRecord    = ddnsprovider.OpUpdateRecord
+	opDeleteRecord    = ddnsprovider.OpDeleteRecord
 )
 
-// metricOpByAction maps the Tencent DNSPod action name to the metric label
-// recorded for that call.
 var metricOpByAction = map[string]string{
 	DNSPodActionDescribeDomainFilterList: opDescribeDomains,
 	DNSPodActionDescribeRecordList:       opListRecords,

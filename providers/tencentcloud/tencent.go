@@ -51,6 +51,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudPro
 	if option.SecretId == "" {
 		return nil, fmt.Errorf("tencentcloud(%s): secretId is empty", option.Name)
 	}
+
 	if option.SecretKey == "" {
 		return nil, fmt.Errorf("tencentcloud(%s): secretKey is empty", option.Name)
 	}
@@ -59,6 +60,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudPro
 	if err != nil {
 		return nil, err
 	}
+
 	clientOptions, err := option.HTTPOption.Options()
 	if err != nil {
 		return nil, err

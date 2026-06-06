@@ -18,8 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var _ adapter.DatasourceGroup = (*FailOver)(nil)
-
 const DatasourceType = constpkg.DatasourceGroupTypeFailover
 
 func init() {
@@ -35,11 +33,20 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	failover := &FailOver{
-		AbstractManagedType:    adapter.NewManagedType(DatasourceType, option.Name),
-		DatasourceGroupBuilder: adapter.NewDatasourceGroupBuild(option.Datasources),
+	datasources, err := adapter.LookupAllDatasource(
+		services.Lookup[adapter.DatasourceManager](ctx),
+		option.Datasources,
+	)
 
-		logger: logger,
+	if err != nil {
+		return nil, err
+	}
+
+	failover := &FailOver{
+		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
+
+		datasources: datasources,
+		logger:      logger,
 	}
 
 	return failover, nil
@@ -47,19 +54,12 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 
 type FailOver struct {
 	adapter.AbstractManagedType
-	adapter.DatasourceGroupBuilder
 
 	logger      *zap.Logger
 	datasources []adapter.Datasource
 
 	lastSuccess int
 	access      sync.Mutex
-}
-
-func (f *FailOver) WithManager(manager adapter.DatasourceManager) error {
-	var err error
-	f.datasources, err = f.DatasourceGroupBuilder.Build(manager)
-	return err
 }
 
 func (f *FailOver) Start(ctx context.Context, stage services.Stage) error {

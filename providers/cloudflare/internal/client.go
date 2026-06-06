@@ -8,6 +8,7 @@ import (
 	urlpkg "net/url"
 
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
+	"github.com/duakc/lightddns/adapter/ddnsprovider"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
@@ -18,11 +19,11 @@ import (
 )
 
 const (
-	opDescribeDomains = "describe_domains"
-	opListDNSRecords  = "list_dns_records"
-	opCreateDNS       = "create_dns_record"
-	opUpdateDNS       = "update_dns_record"
-	opDeleteDNS       = "delete_dns_record"
+	opDescribeDomains = ddnsprovider.OpDescribeDomains
+	opListRecords     = ddnsprovider.OpListRecords
+	opCreateRecord    = ddnsprovider.OpCreateRecord
+	opUpdateRecord    = ddnsprovider.OpUpdateRecord
+	opDeleteRecord    = ddnsprovider.OpDeleteRecord
 )
 
 var _ ddnsx.DomainIdFetcher = (*Client)(nil)
@@ -48,19 +49,6 @@ type Client struct {
 	do           httpx.HTTPRequester
 
 	apiRouter *ddnsmetric.ProviderAPIRouter
-}
-
-// RegisterMetrics builds the per-op metric router. Must be called once during
-// the owning provider's PreStart, before any API method (including paged
-// listings) fires.
-func (c *Client) RegisterMetrics(factory ddnsmetric.Factory) {
-	c.apiRouter = ddnsmetric.ProviderLeaf.NewRouter(factory, c.providerName, []string{
-		opDescribeDomains,
-		opListDNSRecords,
-		opCreateDNS,
-		opUpdateDNS,
-		opDeleteDNS,
-	})
 }
 
 // FetchDomainId implements [ddnsx.DomainIdFetcher]. It pages through all zones

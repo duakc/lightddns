@@ -22,35 +22,6 @@ type DatasourceDualStack interface {
 	IPv6(ctx context.Context) ([]netip.Addr, error)
 }
 
-type DatasourceGroup interface {
-	Datasource
-
-	WithManager(manager DatasourceManager) error
-}
-
-func NewDatasourceGroupBuild(list []string) DatasourceGroupBuilder {
-	return DatasourceGroupBuilder{datasourcesList: list}
-}
-
-type DatasourceGroupBuilder struct {
-	datasourcesList []string
-}
-
-func (b DatasourceGroupBuilder) Build(manager DatasourceManager) ([]Datasource, error) {
-	var datasources []Datasource
-	for i := 0; i < len(b.datasourcesList); i++ {
-		name := b.datasourcesList[i]
-		if baseDatasource, found := manager.Lookup(name); found {
-			datasources = append(datasources, baseDatasource)
-		} else {
-			return nil, &DatasourceNotFoundError{
-				NewManagedNotFoundError(name),
-			}
-		}
-	}
-	return datasources, nil
-}
-
 type (
 	DatasourceManager = Manager[Datasource]
 )
@@ -118,6 +89,14 @@ func MergeDatasources(ctx context.Context, datasources []Datasource, ipv4, ipv6,
 	return slices.Collect(maps.Keys(merged)), outerErr
 }
 
+func LookupAllDatasource(manager DatasourceManager, names []string) ([]Datasource, error) {
+	all, err := manager.LookupAll(names)
+	if err != nil {
+		return nil, &DatasourceNotFoundError{err}
+	}
+	return all, nil
+}
+
 type DatasourceError struct {
 	Err       error
 	IPVersion string
@@ -144,9 +123,13 @@ func (e *DatasourceError) Unwrap() error {
 }
 
 type DatasourceNotFoundError struct {
-	*ManagedNotFoundError
+	Err error
 }
 
 func (e *DatasourceNotFoundError) Error() string {
-	return fmt.Sprintf("datasource: %s", e.ManagedNotFoundError.Error())
+	return fmt.Sprintf("datasource not found: %s", e.Err.Error())
+}
+
+func (e *DatasourceNotFoundError) Unwrap() error {
+	return e.Err
 }

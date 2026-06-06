@@ -46,6 +46,7 @@ type Manager[T ManagedType] interface {
 	Create(ctx context.Context, logger *zap.Logger, typ string, opt any) (T, error)
 	Lookup(name string) (T, bool)
 	LookupDefault(name string) (T, bool)
+	LookupAll([]string) ([]T, error)
 }
 
 var _ Manager[ManagedType] = (*DefaultManager[ManagedType])(nil)
@@ -118,6 +119,19 @@ func (M *DefaultManager[T]) LookupDefault(name string) (T, bool) {
 	}
 
 	return mt.Zero[T](), false
+}
+
+func (M *DefaultManager[T]) LookupAll(names []string) ([]T, error) {
+	v := make([]T, 0, len(names))
+
+	for _, name := range names {
+		item, ok := M.LookupDefault(name)
+		if !ok {
+			return nil, NewManagedNotFoundError(name)
+		}
+		v = append(v, item)
+	}
+	return v, nil
 }
 
 //func CollectManagedItem[T ManagedType](M Manager[T], names []string) ([]T, error) {
