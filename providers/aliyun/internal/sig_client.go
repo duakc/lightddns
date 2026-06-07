@@ -9,10 +9,14 @@ import (
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt/freebuf"
+
+	"go.uber.org/zap"
 )
 
 type AliyunSignClient struct {
 	httpx.HTTPRequester
+
+	Logger *zap.Logger
 
 	SecretSecurityToken   string
 	SecretAccessKeyId     string
@@ -20,10 +24,22 @@ type AliyunSignClient struct {
 }
 
 func (c *AliyunSignClient) Do(r *http.Request) (resp *http.Response, err error) {
+	defer httpx.NewHTTPRequestRecorder(c.Logger, r, &resp, &err).Record()
+
 	common := Common{
 		SecretSecurityToken: c.SecretSecurityToken,
 	}
 	httpx.ExtendHeadersOverride(r.Header, common.Headers())
+
+	// V3 signing requires Host in the canonical header set. net/http carries
+	// Host on the request struct rather than in Header, so backfill it.
+	if r.Header.Get("Host") == "" {
+		host := r.Host
+		if host == "" {
+			host = r.URL.Host
+		}
+		r.Header.Set("Host", host)
+	}
 
 	buffer := freebuf.NewSerial()
 	defer buffer.FreeMe()
@@ -44,6 +60,11 @@ func (c *AliyunSignClient) Do(r *http.Request) (resp *http.Response, err error) 
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
 
+	// x-acs-content-sha256 is part of the signed header set. It must be set
+	// on the request before computing the signature, otherwise the server's
+	// recomputed canonical headers (which include it) won't match ours.
+	r.Header.Set(HeaderContentSha256, sha256Hex(bodyBytes))
+
 	sig := SigContext{
 		Method:  r.Method,
 		Path:    r.URL.Path,
@@ -55,12 +76,11 @@ func (c *AliyunSignClient) Do(r *http.Request) (resp *http.Response, err error) 
 		SecretAccessKeySecret: c.SecretAccessKeySecret,
 	}
 
-	auth, err := sig.Header()
+	auth, err := sig.Authorization()
 	if err != nil {
-		return nil, fmt.Errorf("aliyun sign: build header: %w", err)
+		return nil, fmt.Errorf("aliyun sign: authorization: %w", err)
 	}
-
-	httpx.ExtendHeadersOverride(r.Header, auth)
+	r.Header.Set(HeaderAuthorization, auth)
 
 	return c.HTTPRequester.Do(r)
 }

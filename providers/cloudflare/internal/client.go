@@ -27,7 +27,7 @@ const (
 	opDeleteRecord    = ddnsprovider.OpDeleteRecord
 )
 
-var _ ddnsx.DomainIdFetcher = (*Client)(nil)
+var _ ddnsx.DomainSearcher = (*Client)(nil)
 
 var cloudflareApiEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
 
@@ -56,14 +56,14 @@ type Client struct {
 	metricsRouter *ddnsprovider.ApiMetricsRouter
 }
 
-// FetchDomainId implements [ddnsx.DomainIdFetcher]. It pages through all zones
+// FetchDomainId implements [ddnsx.DomainSearcher]. It pages through all zones
 // owned by the account and returns the full {zoneName -> zoneID} mapping.
 // [ddnsx.DomainIdCache] picks the longest suffix match for the queried FQDN
 // and remembers the rest for future lookups. Each underlying page request is
 // itself recorded against the API metric — this method does not record a
 // separate top-level metric. Returns nil on transport / API failure so the
 // cache treats it as "no result".
-func (c *Client) FetchDomainId(ctx context.Context, domain string) map[string]string {
+func (c *Client) SearchDomain(ctx context.Context, domain string) map[string]string {
 	if mt.Done(ctx) || len(domain) == 0 {
 		return nil
 	}

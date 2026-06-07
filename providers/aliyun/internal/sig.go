@@ -29,35 +29,29 @@ type SigContext struct {
 	SecretAccessKeySecret string
 }
 
-func (sig SigContext) CanonicalRequest() (
-	canonicalRequest,
-	hashedRequestPayload,
-	signedHeaders string,
-
-	err error,
-) {
+// CanonicalRequest assembles the V3 canonical request and the sorted, ';'
+// joined signed-headers list. The query string is always the RFC3986-encoded
+// URL query (empty if none) and the payload hash is sha256(body)
+// (sha256("") when there is no body); both rules apply regardless of HTTP
+// method.
+//
+// Callers MUST set x-acs-content-sha256 on sig.Headers before invoking this
+// method — it is part of the signed header set, so omitting it produces a
+// canonical form the server won't reproduce.
+func (sig SigContext) CanonicalRequest() (canonicalRequest, signedHeaders string, err error) {
 	if sig.Path == "" {
 		sig.Path = "/"
 	}
 	canonicalURI := xtypes.RFC3986Path(path.Clean(sig.Path)).Encode()
 
-	var canonicalQueryString string
-
 	method := strings.ToUpper(sig.Method)
-	switch method {
-	case http.MethodGet:
-		hashedRequestPayload = sha256Hex(nil)
-		encoder := xtypes.RFC3986Query{Values: sig.Query}
-		canonicalQueryString = encoder.Encode()
-	case http.MethodPost:
-		hashedRequestPayload = sha256Hex(sig.Body)
-		canonicalQueryString = sha256Hex(nil)
-	}
+	queryEnc := xtypes.RFC3986Query{Values: sig.Query}
+	canonicalQueryString := queryEnc.Encode()
+	hashedRequestPayload := sha256Hex(sig.Body)
 
-	var canonicalHeaders string
-	canonicalHeaders, signedHeaders, err = buildHeaders(sig.Headers)
+	canonicalHeaders, signedHeaders, err := buildHeaders(sig.Headers)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
 	var b strings.Builder
@@ -73,7 +67,7 @@ func (sig SigContext) CanonicalRequest() (
 	b.WriteByte('\n')
 	b.WriteString(hashedRequestPayload)
 
-	return b.String(), hashedRequestPayload, signedHeaders, nil
+	return b.String(), signedHeaders, nil
 }
 
 func (sig SigContext) StringToSign(canonicalRequest string) string {
@@ -99,23 +93,26 @@ func (sig SigContext) BuildAuthorization(stringToSign, signedHeaders string) str
 	return b.String()
 }
 
-func (sig SigContext) Header() (http.Header, error) {
-	canonicalRequest, hashedRequestPayload, signedHeaders, err := sig.CanonicalRequest()
+// Authorization returns the value for the Authorization request header.
+// x-acs-content-sha256 must already be set on sig.Headers (see [SigContext.CanonicalRequest]).
+func (sig SigContext) Authorization() (string, error) {
+	canonicalRequest, signedHeaders, err := sig.CanonicalRequest()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	stringToSign := sig.StringToSign(canonicalRequest)
-	authorization := sig.BuildAuthorization(stringToSign, signedHeaders)
-	header := make(http.Header)
-	header.Set(HeaderAuthorization, authorization)
-	header.Set(HeaderContentSha256, hashedRequestPayload)
-
-	return header, nil
+	return sig.BuildAuthorization(stringToSign, signedHeaders), nil
 }
 
+// buildHeaders extracts the V3-signable header subset (host, content-type,
+// x-acs-*), trims and folds values per spec, and returns the canonical
+// representation along with the sorted, ';' joined header-name list.
+//
+// Only Host is mandatory — Content-Type is signed when present (it is
+// expected only on requests that carry a body).
 func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, err error) {
 	signed := make(map[string]string)
-	headerSorted := make([]string, 0, 3)
+	headerSorted := make([]string, 0, 8)
 
 	for k, vals := range headers {
 		lower := strings.ToLower(strings.TrimSpace(k))
@@ -132,10 +129,6 @@ func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, 
 
 	if _, ok := signed["host"]; !ok {
 		return "", "", fmt.Errorf("missing header 'Host'")
-	}
-
-	if _, ok := signed["content-type"]; !ok {
-		return "", "", fmt.Errorf("missing header 'Content-Type'")
 	}
 
 	sort.Strings(headerSorted)

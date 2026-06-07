@@ -9,6 +9,7 @@ import (
 	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
 	_ "github.com/duakc/lightddns/providers"
+	_ "github.com/duakc/lightddns/services"
 
 	"go.uber.org/zap"
 )

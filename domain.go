@@ -65,10 +65,9 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 	if !opt.Enabled || len(opt.Domain) == 0 {
 		return nil, nil
 	}
-	if !opt.IPv4 && !opt.IPv6 {
-		opt.IPv4 = true
-		opt.IPv6 = true
-	}
+
+	opt.IPv4 = opt.IPv4 == opt.IPv6
+	opt.IPv6 = opt.IPv4 == opt.IPv6
 
 	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
 	providerManager := services.Lookup[adapter.ProviderManager](ctx)
@@ -94,7 +93,7 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 		return nil, &adapter.DatasourceNotFoundError{Err: adapter.NewManagedNotFoundError(opt.Datasource)}
 	}
 
-	return &Domain{
+	d := &Domain{
 		logger:         logger,
 		provider:       provider,
 		datasource:     datasource,
@@ -104,7 +103,10 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 		ttl:            opt.TTL,
 		ipv4:           opt.IPv4,
 		ipv6:           opt.IPv6,
-	}, nil
+	}
+	d.RegisterMetrics(services.Lookup[metrics.Registry](ctx))
+
+	return d, nil
 }
 
 func (o *Domain) Start(ctx context.Context, stage services.Stage) error {

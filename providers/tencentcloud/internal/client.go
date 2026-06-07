@@ -61,7 +61,7 @@ const (
 
 var TencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
 
-var _ ddnsx.DomainIdFetcher = (*Client)(nil)
+var _ ddnsx.DomainSearcher = (*Client)(nil)
 
 type Client struct {
 	logger *zap.Logger
@@ -83,6 +83,7 @@ func NewClient(ctx context.Context, logger *zap.Logger,
 		metricsRouter: router,
 		do: &TencentSignHTTPRequester{
 			HTTPRequester: do,
+			Logger:        logger,
 			SecretId:      secretId,
 			SecretKey:     secretKey,
 			Service:       DNSPodServiceName,
@@ -130,7 +131,7 @@ func (c *Client) DeleteRecord(ctx context.Context,
 	return doAction[DeleteRecordResponse](ctx, c, DNSPodActionDeleteRecord, req)
 }
 
-// FetchDomainId implements [ddnsx.DomainIdFetcher] by paging
+// FetchDomainId implements [ddnsx.DomainSearcher] by paging
 // DescribeDomainFilterList. Each underlying HTTP call is recorded against
 // the DescribeDomainFilterList metric — there's no separate top-level
 // metric.
@@ -139,7 +140,7 @@ func (c *Client) DeleteRecord(ctx context.Context,
 // and short-circuits as soon as one keyword turns up a domain that's a parent
 // of `search`. Returns nil on transport / API failure so the cache treats it
 // as "no result".
-func (c *Client) FetchDomainId(ctx context.Context, search string) map[string]string {
+func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
 	if mt.Done(ctx) || len(search) == 0 {
 		return nil
 	}
@@ -161,7 +162,7 @@ func (c *Client) FetchDomainId(ctx context.Context, search string) map[string]st
 				Keyword: keyword,
 			})
 			if err != nil {
-				logger.Warn("tencentcloud: list domains failed",
+				logger.Warn("list domains failed",
 					zap.String("keyword", keyword), zap.Error(err))
 				return nil
 			}
@@ -199,7 +200,6 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, body any)
 	var zero Resp
 
 	logger := c.actionLogger(action)
-	logger.Debug("tencentcloud: api call start")
 
 	req := newRequest(http.MethodPost, action)
 	req.ExtendHeader.Set("Content-Type", ContentTypeJSON)
@@ -215,19 +215,15 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, body any)
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		logger.Warn("tencentcloud: send request failed", zap.Error(err))
 		return zero, fmt.Errorf("send %s: %w", action, err)
 	}
 	if resp == nil {
 		panic("empty response with no error")
 	}
 	if resp.StatusCode >= 400 {
-		logger.Warn("tencentcloud: bad status code", zap.Int("status", resp.StatusCode))
 		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
 	}
 
-	// Read the body up-front so we can log it verbatim on decode failure or
-	// API error. Payloads are a single Response envelope — small.
 	rawBody, err := freebuf.ReadAll(resp.Body)
 	if err != nil {
 		return zero, fmt.Errorf("read body %s: %w", action, err)
@@ -237,20 +233,17 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, body any)
 
 	var out Response[Resp]
 	if err := json.NewDecoder(rawBody).Decode(&out); err != nil {
-		logger.Warn("tencentcloud: decode response failed",
-			zap.Error(err))
+		logger.Warn("decode response failed", zap.Error(err))
 		return zero, fmt.Errorf("decode %s: %w", action, err)
 	}
 
 	if out.Error != nil {
-		logger.Warn("tencentcloud: api returned error",
+		logger.Warn("api returned error",
 			zap.String("error_code", out.Error.Code),
 			zap.String("error_message", out.Error.Message),
 			zap.String("request_id", out.RequestID))
 		return zero, out.Error
 	}
-
-	logger.Debug("tencentcloud: api call ok", zap.String("request_id", out.RequestID))
 	return out.Data, nil
 }
 

@@ -34,6 +34,8 @@ linters:
               json: snake
           - pkg: "providers/tencentcloud/internal"
             ignore: true
+          - pkg: "providers/aliyun/internal"
+            ignore: true
           - pkg: "services/ipserver"
             rules:
               json: snake

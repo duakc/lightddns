@@ -48,6 +48,28 @@ func init() {
 	)
 }
 
+func New(ctx context.Context, logger *zap.Logger, option options.IPServerServiceOption) (adapter.Service, error) {
+	if !option.Enabled {
+		return nil, adapter.ErrManagedItemNotEnabled
+	}
+
+	if option.Port == 0 {
+		return nil, fmt.Errorf("missing port")
+	}
+
+	if option.Path == "" {
+		option.Path = "/"
+	}
+	return &IPServer{
+		AbstractManagedType: adapter.NewManagedType(option.Type, option.Name),
+		logger:              logger,
+		addr: net.JoinHostPort(option.Listen,
+			strconv.FormatUint(uint64(option.Port), 10)),
+		path: option.Path,
+		dump: option.Dump,
+	}, nil
+}
+
 type IPServer struct {
 	adapter.AbstractManagedType
 
@@ -227,28 +249,6 @@ func (s *IPServer) Close() error {
 		err = errors.Join(err, serveErr)
 	}
 	return err
-}
-
-func New(ctx context.Context, logger *zap.Logger, option options.IPServerServiceOption) (adapter.Service, error) {
-	if !option.Enabled {
-		return nil, adapter.ErrManagedItemNotEnabled
-	}
-
-	if option.Port == 0 {
-		return nil, fmt.Errorf("missing port")
-	}
-
-	if option.Path == "" {
-		option.Path = "/"
-	}
-	return &IPServer{
-		AbstractManagedType: adapter.NewManagedType(option.Type, option.Name),
-		logger:              logger,
-		addr: net.JoinHostPort(option.Listen,
-			strconv.FormatUint(uint64(option.Port), 10)),
-		path: option.Path,
-		dump: option.Dump,
-	}, nil
 }
 
 type loggingResponseWriter struct {

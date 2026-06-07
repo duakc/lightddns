@@ -10,8 +10,8 @@ import (
 	"github.com/duakc/mt/common/generic"
 )
 
-type DomainIdFetcher interface {
-	FetchDomainId(ctx context.Context, domain string) map[string]string
+type DomainSearcher interface {
+	SearchDomain(ctx context.Context, domain string) map[string]string
 }
 
 type DomainIdCache struct {
@@ -23,7 +23,7 @@ type DomainIdCache struct {
 }
 
 func (cache *DomainIdCache) LoadOrStore(ctx context.Context,
-	domain string, fetch DomainIdFetcher,
+	domain string, fetch DomainSearcher,
 ) string {
 	if domain == "" || mt.Done(ctx) {
 		return ""
@@ -40,7 +40,7 @@ func (cache *DomainIdCache) LoadOrStore(ctx context.Context,
 		return found
 	}
 
-	fetchResult := fetch.FetchDomainId(ctx, domain)
+	fetchResult := fetch.SearchDomain(ctx, domain)
 	if fetchResult == nil {
 		return ""
 	}

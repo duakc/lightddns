@@ -10,6 +10,8 @@ import (
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt/freebuf"
+
+	"go.uber.org/zap"
 )
 
 // TencentSignHTTPRequester signs outgoing requests with TC3-HMAC-SHA256 before
@@ -25,12 +27,16 @@ import (
 type TencentSignHTTPRequester struct {
 	httpx.HTTPRequester
 
+	Logger *zap.Logger
+
 	SecretId  string
 	SecretKey string
 	Service   string
 }
 
-func (tc *TencentSignHTTPRequester) Do(r *http.Request) (*http.Response, error) {
+func (tc *TencentSignHTTPRequester) Do(r *http.Request) (resp *http.Response, err error) {
+	defer httpx.NewHTTPRequestRecorder(tc.Logger, r, &resp, &err).Record()
+
 	common := Common{
 		Timestamp: time.Now().UTC().Unix(),
 	}

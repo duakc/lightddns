@@ -80,7 +80,8 @@ func GenSchema() ([]byte, error) {
 	rootSchema.Properties[datasourceTag] = datasourceSchema()
 	rootSchema.Properties[servicesTag] = servicesSchema()
 
-	rootSchema.Required = append(rootSchema.Required, domainTag, providerTag, datasourceTag)
+	// rootSchema.Required = append(rootSchema.Required,
+	//	domainTag, providerTag, datasourceTag)
 
 	return rootSchema.MarshalJSON()
 }
