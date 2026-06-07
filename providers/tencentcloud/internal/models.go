@@ -56,6 +56,12 @@ func (c *Common) Headers() http.Header {
 	return h
 }
 
+// DefaultRecordLine is the line used for DDNS records: 默认 (default).
+//
+// Tencent's API expects the line name in Chinese; this is the documented
+// value for the catch-all line.
+const DefaultRecordLine = "默认"
+
 // Record is one DNS record returned by DescribeRecordList.
 //
 // https://cloud.tencent.com/document/api/1427/56166
@@ -78,38 +84,7 @@ type Record struct {
 	// DomainId      uint64 `json:"DomainId"`
 }
 
-// DefaultRecordLine is the line used for DDNS records: 默认 (default).
-//
-// Tencent's API expects the line name in Chinese; this is the documented
-// value for the catch-all line.
-const DefaultRecordLine = "默认"
-
-// CreateRecordRequest is the request body for CreateRecord.
-//
-// https://cloud.tencent.com/document/api/1427/56180
-type CreateRecordRequest struct {
-	Domain     string `json:"Domain"`
-	SubDomain  string `json:"SubDomain"`
-	RecordType string `json:"RecordType"`
-	RecordLine string `json:"RecordLine"`
-	Value      string `json:"Value"`
-	TTL        uint32 `json:"TTL,omitempty"`
-}
-
-// ModifyRecordRequest is the request body for ModifyRecord.
-//
-// https://cloud.tencent.com/document/api/1427/56157
-type ModifyRecordRequest struct {
-	Domain     string `json:"Domain"`
-	RecordId   uint64 `json:"RecordId"`
-	SubDomain  string `json:"SubDomain"`
-	RecordType string `json:"RecordType"`
-	RecordLine string `json:"RecordLine"`
-	Value      string `json:"Value"`
-	TTL        uint32 `json:"TTL,omitempty"`
-}
-
-// DomainInfo is one domain returned by DescribeDomainFilterList / DomainInfo.
+// DomainInfo is one domain returned by DescribeDomainFilterList.
 type DomainInfo struct {
 	Name string `json:"Name"`
 
@@ -137,3 +112,88 @@ type DomainInfo struct {
 	// VipEndAt         string   `json:"VipEndAt"`
 	// VipStartAt       string   `json:"VipStartAt"`
 }
+
+// DescribeDomainFilterListRequest — https://cloud.tencent.com/document/api/1427/56173
+type DescribeDomainFilterListRequest struct {
+	Type    string `json:"Type"`
+	Limit   int    `json:"Limit,omitempty"`
+	Offset  int    `json:"Offset,omitempty"`
+	Keyword string `json:"Keyword,omitempty"`
+}
+
+type DescribeDomainFilterListResponse struct {
+	DomainCountInfo struct {
+		DomainTotal int `json:"DomainTotal"`
+
+		// uncomment when needed.
+		// AllTotal      int `json:"AllTotal"`
+		// ErrorTotal    int `json:"ErrorTotal"`
+		// GroupTotal    int `json:"GroupTotal"`
+		// LockTotal     int `json:"LockTotal"`
+		// MineTotal     int `json:"MineTotal"`
+		// PauseTotal    int `json:"PauseTotal"`
+		// ShareOutTotal int `json:"ShareOutTotal"`
+		// ShareTotal    int `json:"ShareTotal"`
+		// SpamTotal     int `json:"SpamTotal"`
+		// VipExpire     int `json:"VipExpire"`
+		// VipTotal      int `json:"VipTotal"`
+	} `json:"DomainCountInfo"`
+	DomainList []DomainInfo `json:"DomainList"`
+}
+
+// DescribeRecordListRequest — https://cloud.tencent.com/document/api/1427/56166
+type DescribeRecordListRequest struct {
+	Domain     string `json:"Domain"`
+	Subdomain  string `json:"Subdomain,omitempty"`
+	RecordType string `json:"RecordType,omitempty"`
+	Limit      int    `json:"Limit,omitempty"`
+	Offset     int    `json:"Offset,omitempty"`
+}
+
+type DescribeRecordListResponse struct {
+	RecordCountInfo struct {
+		TotalCount int `json:"TotalCount"`
+
+		// uncomment when needed.
+		// SubdomainCount int `json:"SubdomainCount"`
+		// ListCount      int `json:"ListCount"`
+	} `json:"RecordCountInfo"`
+	RecordList []Record `json:"RecordList"`
+}
+
+// CreateRecordRequest — https://cloud.tencent.com/document/api/1427/56180
+type CreateRecordRequest struct {
+	Domain     string `json:"Domain"`
+	SubDomain  string `json:"SubDomain"`
+	RecordType string `json:"RecordType"`
+	RecordLine string `json:"RecordLine"`
+	Value      string `json:"Value"`
+	TTL        uint32 `json:"TTL,omitempty"`
+}
+
+type CreateRecordResponse struct {
+	RecordId uint64 `json:"RecordId"`
+}
+
+// ModifyRecordRequest — https://cloud.tencent.com/document/api/1427/56157
+type ModifyRecordRequest struct {
+	Domain     string `json:"Domain"`
+	RecordId   uint64 `json:"RecordId"`
+	SubDomain  string `json:"SubDomain"`
+	RecordType string `json:"RecordType"`
+	RecordLine string `json:"RecordLine"`
+	Value      string `json:"Value"`
+	TTL        uint32 `json:"TTL,omitempty"`
+}
+
+type ModifyRecordResponse struct {
+	RecordId uint64 `json:"RecordId"`
+}
+
+// DeleteRecordRequest — https://cloud.tencent.com/document/api/1427/56176
+type DeleteRecordRequest struct {
+	Domain   string `json:"Domain"`
+	RecordId uint64 `json:"RecordId"`
+}
+
+type DeleteRecordResponse struct{}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool/dialerx"
@@ -45,18 +44,20 @@ func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProvi
 	}
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
+	resolveDialer := resolvectl.NewDialer(connectDialer,
+		mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
+		resolvectl.DefaultResolveClient)
+
 	clientOptions = append(clientOptions,
-		httpx.ClientOptionWithDialer(
-			resolvectl.NewDialer(connectDialer,
-				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
+		httpx.ClientOptionWithDialer(resolveDialer))
 
 	return &Cloudflare{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		client: internal.NewClient(logger, option.Name,
+		client: internal.NewClient(ctx, logger, option.Name,
 			httpx.NewClient(clientOptions...), option.Token),
 
 		proxied: option.Proxy,
-		logger:  logger,
+		logger:  logger.Named("client"),
 	}, nil
 }
 
@@ -70,10 +71,6 @@ type Cloudflare struct {
 
 	proxied      bool
 	privateRoute bool
-}
-
-func (c *Cloudflare) RegisterMetrics(factory ddnsmetric.Factory) {
-	c.client.RegisterMetrics(factory)
 }
 
 func (c *Cloudflare) Close() error { return nil }

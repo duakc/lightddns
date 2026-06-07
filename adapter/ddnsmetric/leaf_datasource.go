@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/duakc/lightddns/infra/metrics"
+
 	"github.com/duakc/mt/services"
 )
 
@@ -17,7 +18,7 @@ func NewDatasourceFactory(factory metrics.Factory) DataSourceFactory {
 		return df
 	}
 	return &defaultDatasourceFactory{
-		Factory: factory,
+		Factory: metrics.NewNameFactory(factory, Namespace, SubsystemDatasource),
 	}
 }
 

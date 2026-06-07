@@ -75,6 +75,7 @@ func New(ctx context.Context, option options.Options) (*LightDDNS, error) {
 	if datasources, err = createDatasources(ctx, logger, datasourceManager, option.Datasources); err != nil {
 		return nil, err
 	}
+
 	if providers, err = createProviders(ctx, logger, providerManager, option.Providers); err != nil {
 		return nil, err
 	}
@@ -82,6 +83,7 @@ func New(ctx context.Context, option options.Options) (*LightDDNS, error) {
 	if registeredService, err = createServices(ctx, logger, serviceManager, option.Services); err != nil {
 		return nil, err
 	}
+
 	if domains, err = creatDomains(ctx, logger, option.Domains); err != nil {
 		return nil, err
 	}
@@ -126,6 +128,7 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 	for i := 0; i < len(ld.services); i++ {
 		err = errors.Join(err, services.Start(ctx, stage, ld.services[i]))
 	}
+
 	for i := 0; i < len(ld.domains); i++ {
 		domain := ld.domains[i]
 		err = errors.Join(err, domain.Start(ctx, stage))
@@ -163,12 +166,13 @@ func createLogger(ctx context.Context, opt options.LogOption) (*zap.Logger, erro
 	if opt.Disabled {
 		return zaplog.NOP, nil
 	}
+
 	var (
 		fileHelper = services.Lookup[filehelper.Helper](ctx)
 		level      = zapcore.Level(opt.Level)
 		err        error
 	)
-	zaplog.DefaultLevel(level)
+
 	closeManager := services.Lookup[closeme.Manager](ctx)
 
 	var outputFD io.Writer
@@ -184,6 +188,7 @@ func createLogger(ctx context.Context, opt options.LogOption) (*zap.Logger, erro
 		}
 	}
 
+	zaplog.DefaultLevel(level)
 	logger := zaplog.NewDefault(closeManager, outputFD, level, nil)
 	return logger, nil
 }
@@ -221,7 +226,6 @@ func createDatasources(
 	datasourceManager adapter.DatasourceManager,
 	datasourceOptions []options.DatasourceOption,
 ) ([]adapter.Datasource, error) {
-
 	resortedDatasource, err := resortDatasources(datasourceOptions)
 	if err != nil {
 		return nil, fmt.Errorf("resolve dependence for datasources: %w", err)
@@ -331,7 +335,8 @@ func creatDomains(
 	ctx context.Context,
 	logger *zap.Logger,
 	domainOptions []options.DomainOption) (
-	[]*Domain, error) {
+	[]*Domain, error,
+) {
 	var domains []*Domain
 	initLogger := logger.Named("init/domain")
 

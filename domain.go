@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -87,11 +87,11 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 
 	provider, providerFound := providerManager.LookupDefault(opt.Provider)
 	if !providerFound {
-		return nil, &adapter.ProviderNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Provider)}
+		return nil, &adapter.ProviderNotFoundError{Err: adapter.NewManagedNotFoundError(opt.Provider)}
 	}
 	datasource, datasourceFound := datasourceManager.LookupDefault(opt.Datasource)
 	if !datasourceFound {
-		return nil, &adapter.DatasourceNotFoundError{ManagedNotFoundError: adapter.NewManagedNotFoundError(opt.Datasource)}
+		return nil, &adapter.DatasourceNotFoundError{Err: adapter.NewManagedNotFoundError(opt.Datasource)}
 	}
 
 	return &Domain{
@@ -244,7 +244,7 @@ func (o *Domain) updateLoop() error {
 	return nil
 }
 
-func (o *Domain) RegisterMetrics(factory ddnsmetric.Factory) {
+func (o *Domain) RegisterMetrics(factory metrics.Factory) {
 	labels := []string{constpkg.MetricLabelDomain}
 	o.activationCounter = factory.CounterVec(metricActivationTotal,
 		"Total number of times a domain update was triggered.", labels).With(o.domainName)

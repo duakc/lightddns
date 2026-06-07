@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/duakc/lightddns/infra/metrics"
+
 	"github.com/duakc/mt/services"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -34,7 +36,7 @@ func NewProviderFactory(factory metrics.Factory) ProviderFactory {
 	}
 
 	return &defaultProviderFactory{
-		Factory: factory,
+		Factory: metrics.NewNameFactory(factory, Namespace, SubsystemProvider),
 	}
 }
 

@@ -1,20 +1,20 @@
 package httpx
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/duakc/mt/debug"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-// HTTPRequestRecorder logs the lifecycle of one outbound HTTP request. It's a
-// debug aid for custom HTTPRequester implementations (e.g. a signing client's
-// Do method) that want a uniform "started / ended / errored" trail without
-// each provider reinventing the same zap.Debug pattern.
-//
-// Pure logging — metrics are recorded separately via ddnsmetric.ProviderAPIRouter.
 type HTTPRequestRecorder struct {
+	Request  *http.Request
+	Response **http.Response
+
 	Logger *zap.Logger
 	Err    *error
 
@@ -22,13 +22,27 @@ type HTTPRequestRecorder struct {
 
 	Start time.Time
 	End   time.Time
+
+	// debug only
+	id string
 }
 
-func NewHTTPRequestRecorder(logger *zap.Logger, endpoint string, err *error) *HTTPRequestRecorder {
+func NewHTTPRequestRecorder(logger *zap.Logger, req *http.Request,
+	resp **http.Response, err *error,
+) *HTTPRequestRecorder {
+	if debug.Enabled {
+		logger = logger.With(zap.String("http_request_id", uuid.NewString()))
+	}
+
+	logger.Debug("http record start")
+
 	return &HTTPRequestRecorder{
+		Request:  req,
+		Response: resp,
 		Logger:   logger,
 		Err:      err,
-		Endpoint: endpoint,
+
+		Endpoint: req.URL.Path,
 		Start:    time.Now(),
 	}
 }
@@ -38,7 +52,10 @@ func (r *HTTPRequestRecorder) Stop() {
 }
 
 func (r *HTTPRequestRecorder) Record() {
-	r.End = time.Now()
+	if r.End.IsZero() {
+		r.End = time.Now()
+	}
+
 	consume := r.End.Sub(r.Start)
 
 	var err error
@@ -46,23 +63,30 @@ func (r *HTTPRequestRecorder) Record() {
 		err = *r.Err
 	}
 
-	if debug.Enabled {
-		r.Logger.Debug("api call record",
-			zap.String("api_endpoint", r.Endpoint),
-			zap.Duration("api_called_time", consume),
-			zap.Bool("api_is_error", err != nil),
-		)
-	}
-
-	if err == nil {
+	if err == nil && debug.Enabled {
 		return
 	}
 
-	if ce := r.Logger.Check(zap.ErrorLevel, "api call end"); ce != nil {
+	checkLevel := zapcore.WarnLevel
+	if debug.Enabled {
+		checkLevel = zapcore.DebugLevel
+	}
+
+	if ce := r.Logger.Check(checkLevel, "http record end"); ce != nil {
 		fields := []zap.Field{
-			zap.String("api_endpoint", r.Endpoint),
-			zap.Duration("api_called_time", consume),
-			zap.Error(err),
+			zap.String("http_endpoint", r.Endpoint),
+			zap.Duration("http_time", consume),
+		}
+
+		if err != nil {
+			fields = append(fields, zap.Error(err))
+		}
+
+		if r.Response != nil && *r.Response != nil {
+			fields = append(fields,
+				zap.Int("http_status_code", (*r.Response).StatusCode),
+				zap.Any("http_response_header", (*r.Response).Header),
+			)
 		}
 		ce.Write(fields...)
 	}

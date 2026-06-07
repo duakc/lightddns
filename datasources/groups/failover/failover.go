@@ -37,7 +37,6 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		services.Lookup[adapter.DatasourceManager](ctx),
 		option.Datasources,
 	)
-
 	if err != nil {
 		return nil, err
 	}

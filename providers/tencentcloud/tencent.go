@@ -2,12 +2,12 @@ package tencentcloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool"
@@ -67,21 +67,19 @@ func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudPro
 	}
 
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
+	resolveDialer := resolvectl.NewDialer(connectDialer,
+		mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
+		resolvectl.DefaultResolveClient)
+
 	clientOptions = append(clientOptions,
-		httpx.ClientOptionWithDialer(
-			resolvectl.NewDialer(connectDialer,
-				mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)))
+		httpx.ClientOptionWithDialer(resolveDialer))
 
 	return &TencentCloud{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		client: internal.NewClient(logger, option.Name,
+		client: internal.NewClient(ctx, logger, option.Name,
 			httpx.NewClient(clientOptions...), option.SecretId, option.SecretKey),
-		logger: logger,
+		logger: logger.Named("client"),
 	}, nil
-}
-
-func (t *TencentCloud) RegisterMetrics(factory ddnsmetric.Factory) {
-	t.client.RegisterMetrics(factory)
 }
 
 func (t *TencentCloud) Close() error { return nil }
@@ -96,18 +94,6 @@ func (t *TencentCloud) resolveZone(ctx context.Context, fqdn string) (string, er
 		return "", fmt.Errorf("domain not found: %s", fqdn)
 	}
 	return zone, nil
-}
-
-// subDomain returns the host part of fqdn relative to zone. For an apex
-// record (fqdn == zone) it returns "@", matching Tencent's API convention.
-func subDomain(fqdn, zone string) string {
-	if strings.EqualFold(fqdn, zone) {
-		return "@"
-	}
-	if strings.HasSuffix(strings.ToLower(fqdn), "."+strings.ToLower(zone)) {
-		return fqdn[:len(fqdn)-len(zone)-1]
-	}
-	return fqdn
 }
 
 func (t *TencentCloud) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
@@ -131,28 +117,49 @@ func (t *TencentCloud) diff(ctx context.Context, domain string, addr []netip.Add
 }
 
 func (t *TencentCloud) listExisting(ctx context.Context, zone, sub, dnsType string) ([]ddnsx.Existing[internal.Record], error) {
-	records, err := t.client.DescribeRecordList(ctx, zone, sub, dnsType)
-	if err != nil {
-		return nil, fmt.Errorf("DescribeRecordList: %w", err)
-	}
+	const pageSize = 100
 	var existing []ddnsx.Existing[internal.Record]
-	for _, r := range records {
-		// Records of different types share the same SubDomain space; the API
-		// filter by RecordType should already constrain this, but guard
-		// defensively against any leakage.
-		if r.Type != dnsType {
-			continue
-		}
-		ip, perr := netip.ParseAddr(r.Value)
-		if perr != nil {
-			return nil, fmt.Errorf("record %d: not an address: %s: %w", r.RecordId, r.Value, perr)
-		}
-		existing = append(existing, ddnsx.Existing[internal.Record]{
-			Addr:   ip,
-			Record: r,
+	for offset := 0; ; {
+		page, err := t.client.DescribeRecordList(ctx, internal.DescribeRecordListRequest{
+			Domain:     zone,
+			Subdomain:  sub,
+			RecordType: dnsType,
+			Limit:      pageSize,
+			Offset:     offset,
 		})
+		if err != nil {
+			// Tencent returns NoDataOfRecord when the domain has no matching
+			// records. For initial DDNS setup that's the expected state, not
+			// a failure — surface it as an empty list so the caller proceeds
+			// to CreateRecord instead of bailing.
+			if apiErr, ok := errors.AsType[*internal.APIError](err); ok &&
+				apiErr.Code == internal.DNSPodErrCodeNoDataOfRecord {
+
+				return existing, nil
+			}
+			return nil, fmt.Errorf("DescribeRecordList: %w", err)
+		}
+		for _, r := range page.RecordList {
+			// Records of different types share the same SubDomain space; the
+			// API filter by RecordType should already constrain this, but
+			// guard defensively against any leakage.
+			if r.Type != dnsType {
+				continue
+			}
+			ip, perr := netip.ParseAddr(r.Value)
+			if perr != nil {
+				return nil, fmt.Errorf("record %d: not an address: %s: %w", r.RecordId, r.Value, perr)
+			}
+			existing = append(existing, ddnsx.Existing[internal.Record]{
+				Addr:   ip,
+				Record: r,
+			})
+		}
+		offset += len(page.RecordList)
+		if len(page.RecordList) == 0 || offset >= page.RecordCountInfo.TotalCount {
+			return existing, nil
+		}
 	}
-	return existing, nil
 }
 
 func (t *TencentCloud) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
@@ -199,7 +206,7 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 	switch d.Action {
 	case ddnsx.DDNSActionCreate:
 		logger.Info("create")
-		return t.client.CreateRecord(ctx, internal.CreateRecordRequest{
+		_, err := t.client.CreateRecord(ctx, internal.CreateRecordRequest{
 			Domain:     zone,
 			SubDomain:  sub,
 			RecordType: recordTypeOf(d.Target),
@@ -207,9 +214,10 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 			Value:      d.Target.Unmap().String(),
 			TTL:        ttl,
 		})
+		return err
 	case ddnsx.DDNSActionUpdate:
 		logger.Info("update")
-		return t.client.ModifyRecord(ctx, internal.ModifyRecordRequest{
+		_, err := t.client.ModifyRecord(ctx, internal.ModifyRecordRequest{
 			Domain:     zone,
 			RecordId:   d.Record.RecordId,
 			SubDomain:  sub,
@@ -218,9 +226,14 @@ func (t *TencentCloud) applyDiff(ctx context.Context, logger *zap.Logger,
 			Value:      d.Target.Unmap().String(),
 			TTL:        ttl,
 		})
+		return err
 	case ddnsx.DDNSActionDelete:
 		logger.Info("delete")
-		return t.client.DeleteRecord(ctx, zone, d.Record.RecordId)
+		_, err := t.client.DeleteRecord(ctx, internal.DeleteRecordRequest{
+			Domain:   zone,
+			RecordId: d.Record.RecordId,
+		})
+		return err
 	}
 	return nil
 }
@@ -237,4 +250,16 @@ func lineOrDefault(line string) string {
 		return internal.DefaultRecordLine
 	}
 	return line
+}
+
+// subDomain returns the host part of fqdn relative to zone. For an apex
+// record (fqdn == zone) it returns "@", matching Tencent's API convention.
+func subDomain(fqdn, zone string) string {
+	if strings.EqualFold(fqdn, zone) {
+		return "@"
+	}
+	if strings.HasSuffix(strings.ToLower(fqdn), "."+strings.ToLower(zone)) {
+		return fqdn[:len(fqdn)-len(zone)-1]
+	}
+	return fqdn
 }

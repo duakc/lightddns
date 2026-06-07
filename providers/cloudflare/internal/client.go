@@ -14,6 +14,7 @@ import (
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
+	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -30,25 +31,29 @@ var _ ddnsx.DomainIdFetcher = (*Client)(nil)
 
 var cloudflareApiEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
 
-func NewClient(logger *zap.Logger, providerName string,
+func NewClient(ctx context.Context, logger *zap.Logger, providerName string,
 	do httpx.HTTPRequester, token string,
 ) *Client {
+	router := ddnsprovider.NewMetricsRouter(
+		services.Lookup[ddnsmetric.ProviderFactory](ctx), providerName)
+	router.RegisterDefault()
+
 	return &Client{
-		logger:       logger,
-		providerName: providerName,
-		do: &httpx.TokenClient{
+		logger:        logger,
+		metricsRouter: router,
+		do: &CloudflareHTTPRequester{
 			HTTPRequester: do,
+			Logger:        logger,
 			Token:         token,
 		},
 	}
 }
 
 type Client struct {
-	logger       *zap.Logger
-	providerName string
-	do           httpx.HTTPRequester
+	logger *zap.Logger
+	do     httpx.HTTPRequester
 
-	apiRouter *ddnsmetric.ProviderAPIRouter
+	metricsRouter *ddnsprovider.ApiMetricsRouter
 }
 
 // FetchDomainId implements [ddnsx.DomainIdFetcher]. It pages through all zones
@@ -62,20 +67,22 @@ func (c *Client) FetchDomainId(ctx context.Context, domain string) map[string]st
 	if mt.Done(ctx) || len(domain) == 0 {
 		return nil
 	}
+
 	logger := c.actionLogger(opDescribeDomains).With(zap.String("domain", domain))
 	logger.Info("search zone id from upstream")
 
 	pager := c.ListZones()
 	result := make(map[string]string)
+
 	for page, perr := pager.Next(ctx); perr != io.EOF; page, perr = pager.Next(ctx) {
 		if perr != nil {
-			logger.Warn("cloudflare: list zones failed", zap.Error(perr))
+			logger.Warn("list zones failed", zap.Error(perr))
 			return nil
 		}
 		for i := 0; i < len(page); i++ {
 			zone := page[i]
 			if !domains.IsDomainName(zone.Name) {
-				logger.Warn("cloudflare: upstream returned a bad zone name",
+				logger.Warn("upstream returned a bad zone name",
 					zap.String("zone_name", zone.Name))
 				continue
 			}
@@ -107,16 +114,16 @@ func (c *Client) ListDNSRecords(name string, zoneID string, qtype string) (*Page
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records")
 	r.Query.Set("name", name)
 	r.Query.Set("type", qtype)
-	return NewPaging[DNSRecord](c, opListDNSRecords, r), nil
+	return NewPaging[DNSRecord](c, opListRecords, r), nil
 }
 
 func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 	content UpdateDNSRecordRequest,
 ) (err error) {
-	defer c.apiRouter.RecordAPI(opCreateDNS)(&err)
+	defer c.metricsRouter.RecordAPI(opCreateRecord)(&err)
 
-	logger := c.actionLogger(opCreateDNS).With(zap.String("zone_id", zoneID))
-	logger.Debug("cloudflare: api call start")
+	logger := c.actionLogger(opCreateRecord).With(zap.String("zone_id", zoneID))
+	logger.Debug("api call start")
 	r := c.NewRequestConfig(http.MethodPost)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records")
 	r.Body = content
@@ -126,23 +133,24 @@ func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 	}
 
 	if joined := createResult.JoinError(perr); joined != nil {
-		logger.Warn("cloudflare: create dns record failed", zap.Error(joined))
+		logger.Warn("create dns record failed", zap.Error(joined))
 		err = joined
 		return err
 	}
+
 	return nil
 }
 
 func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID string,
 	content UpdateDNSRecordRequest,
 ) (err error) {
-	defer c.apiRouter.RecordAPI(opUpdateDNS)(&err)
+	defer c.metricsRouter.RecordAPI(opUpdateRecord)(&err)
 
-	logger := c.actionLogger(opUpdateDNS).With(
+	logger := c.actionLogger(opUpdateRecord).With(
 		zap.String("zone_id", zoneID),
 		zap.String("record_id", recordID),
 	)
-	logger.Debug("cloudflare: api call start")
+
 	r := c.NewRequestConfig(http.MethodPatch)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", recordID)
 	r.Body = content
@@ -152,7 +160,7 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 	}
 
 	if joined := updateResult.JoinError(perr); joined != nil {
-		logger.Warn("cloudflare: update dns record failed", zap.Error(joined))
+		logger.Warn("update dns record failed", zap.Error(joined))
 		err = joined
 		return err
 	}
@@ -160,13 +168,13 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID string) (err error) {
-	defer c.apiRouter.RecordAPI(opDeleteDNS)(&err)
+	defer c.metricsRouter.RecordAPI(opDeleteRecord)(&err)
 
-	logger := c.actionLogger(opDeleteDNS).With(
+	logger := c.actionLogger(opDeleteRecord).With(
 		zap.String("zone_id", zoneID),
 		zap.String("record_id", dnsRecordID),
 	)
-	logger.Debug("cloudflare: api call start")
+
 	r := c.NewRequestConfig(http.MethodDelete)
 	r.ExtendPath = append(r.ExtendPath, zoneID, "dns_records", dnsRecordID)
 	httpReq, perr := r.ToRequestContext(ctx)
@@ -180,12 +188,13 @@ func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID
 		defer resp.Body.Close()
 	}
 	if perr != nil {
-		logger.Warn("cloudflare: delete request failed", zap.Error(perr))
+		logger.Warn("delete request failed", zap.Error(perr))
 		err = &httpx.BaseResponseError{Err: perr, Method: r.Method}
 		return err
 	}
+
 	if resp != nil && resp.StatusCode != http.StatusOK {
-		logger.Warn("cloudflare: delete bad status", zap.Int("status", resp.StatusCode))
+		logger.Warn("delete bad status", zap.Int("status", resp.StatusCode))
 		err = &httpx.BadStatusCodeError{
 			Got: resp.StatusCode,
 		}

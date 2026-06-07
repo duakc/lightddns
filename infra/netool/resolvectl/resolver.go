@@ -33,9 +33,9 @@ func (e *RcodeError) Error() string {
 	return fmt.Sprintf("bad rcode: %s, excepted: %s", mDns.RcodeToString[e.Code], mDns.RcodeToString[e.Excepted])
 }
 
-var DefaultResolveClient = NewResolver()
-
 var resolveLogger = zaplog.NewPackage("netool", "resolvectl")
+
+var DefaultResolveClient = NewResolver(resolveLogger)
 
 type ResolveClient interface {
 	Lookup(ctx context.Context, transport transports.Transport, domain string, strategy ResolveStrategy) (addresses []netip.Addr, err error)
@@ -47,15 +47,18 @@ type dnsCacheMessage struct {
 }
 
 type defaultResolveClient struct {
+	logger *zap.Logger
+
 	// cache
 	cacheMax int
 	sf       generic.SingleFlight[mDns.Question, *mDns.Msg]
 	cache    freelru.Cache[mDns.Question, dnsCacheMessage]
 }
 
-func NewResolver() ResolveClient {
+func NewResolver(logger *zap.Logger) ResolveClient {
 	seed := maphash.MakeSeed()
 	return &defaultResolveClient{
+		logger: logger,
 		cache: mt.Must(freelru.NewSharded[mDns.Question, dnsCacheMessage](defaultCacheSize,
 			(&bindSeed[mDns.Question]{seed}).hash())),
 		cacheMax: defaultCacheSize,
@@ -65,7 +68,7 @@ func NewResolver() ResolveClient {
 func (r *defaultResolveClient) Lookup(ctx context.Context, transport transports.Transport,
 	domain string, strategy ResolveStrategy,
 ) (addresses []netip.Addr, err error) {
-	logger := zaplog.FromOrDefault(ctx, resolveLogger).
+	logger := r.logger.
 		WithLazy(zap.String("resolve_domain", domain))
 	//
 	domain = strings.TrimSpace(domain)
@@ -157,7 +160,7 @@ func (r *defaultResolveClient) lookupToExchange(ctx context.Context,
 func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transports.Transport,
 	message *mDns.Msg,
 ) (response *mDns.Msg, err error) {
-	logger := zaplog.FromOrDefault(ctx, resolveLogger)
+	logger := r.logger
 
 	if len(message.Question) != 1 {
 		logger.Error("bad question length",
@@ -168,15 +171,16 @@ func (r *defaultResolveClient) Exchange(ctx context.Context, dnsTransport transp
 	question := message.Question[0]
 
 	logger = logger.WithLazy(
-		zap.String("type", mDns.TypeToString[question.Qtype]),
-		zap.String("resolve_domain", question.Name))
+		zap.String("query_type", mDns.TypeToString[question.Qtype]),
+		zap.String("query_fqdn", question.Name))
 
 	cacheMessage, cached := r.cache.Get(question)
 	now := time.Now()
 	logger.Debug("new exchange")
 	if cached {
 		expired := cacheMessage.expire.After(now)
-		logger.Debug("cached", zap.Bool("expired", expired))
+		logger.Debug("cached",
+			zap.Bool("message_expired", expired))
 		if expired {
 			r.cache.Remove(question)
 			goto exchange
@@ -198,15 +202,16 @@ exchange:
 		if r.cache.Len() > r.cacheMax {
 			r.cache.RemoveOldest()
 		}
+
 		if ce := logger.Check(zapcore.DebugLevel, "exchanged"); ce != nil {
 			fields := []zap.Field{
-				zap.String("type", mDns.TypeToString[question.Qtype]),
-				zap.String("fqdn", question.Name),
 				zap.Uint32("ttl", ttl),
 			}
+
 			if addresses := transports.MessageToAddresses(responseMessage); len(addresses) > 0 {
 				fields = append(fields, zap.Stringers("addresses", addresses))
 			}
+
 			ce.Write(fields...)
 		}
 

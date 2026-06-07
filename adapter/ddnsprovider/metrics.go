@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/adapter/ddnsmetric"
-	"github.com/duakc/lightddns/infra/metrics"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -15,13 +15,13 @@ type apiMetricsSet struct {
 }
 
 type ApiMetricsRouter struct {
-	factory      metrics.Factory
+	factory      ddnsmetric.ProviderFactory
 	providerName string
 
 	sets map[string]apiMetricsSet
 }
 
-func NewMetricsRouter(factory metrics.Factory, providerName string) *ApiMetricsRouter {
+func NewMetricsRouter(factory ddnsmetric.ProviderFactory, providerName string) *ApiMetricsRouter {
 	return &ApiMetricsRouter{
 		sets:         make(map[string]apiMetricsSet),
 		factory:      factory,
@@ -30,7 +30,7 @@ func NewMetricsRouter(factory metrics.Factory, providerName string) *ApiMetricsR
 }
 
 func (r *ApiMetricsRouter) RegisterDefault() {
-	var defaults = []string{
+	defaults := []string{
 		OpDescribeDomains, OpListRecords, OpCreateRecord,
 		OpUpdateRecord, OpDeleteRecord,
 	}
@@ -40,9 +40,9 @@ func (r *ApiMetricsRouter) RegisterDefault() {
 func (r *ApiMetricsRouter) Register(ops ...string) {
 	for _, op := range ops {
 		r.sets[op] = apiMetricsSet{
-			total:    ddnsmetric.ProviderLeaf.RequestTotal(r.factory, r.providerName, op),
-			failure:  ddnsmetric.ProviderLeaf.RequestFailure(r.factory, r.providerName, op),
-			duration: ddnsmetric.ProviderLeaf.RequestDuration(r.factory, r.providerName, op, nil),
+			total:    r.factory.RequestTotal(r.providerName, op),
+			failure:  r.factory.RequestFailure(r.providerName, op),
+			duration: r.factory.RequestDuration(r.providerName, op, nil),
 		}
 	}
 }

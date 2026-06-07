@@ -65,6 +65,10 @@ func entry(cmd *cobra.Command, args []string) {
 	if err != nil {
 		zaplog.Fatal("initial instance failed", zap.Error(err))
 	}
+
+	// seal
+	services.RegistryFromContext(ctx).Seal()
+
 	signalCtx, cancel := gos.InterruptSignalContext(ctx)
 	defer cancel()
 	if commandArgument.Once {

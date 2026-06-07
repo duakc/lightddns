@@ -12,7 +12,7 @@ import (
 	"github.com/duakc/mt/freebuf"
 )
 
-// TencentSignClient signs outgoing requests with TC3-HMAC-SHA256 before
+// TencentSignHTTPRequester signs outgoing requests with TC3-HMAC-SHA256 before
 // forwarding them to the wrapped HTTPRequester.
 //
 // The caller is expected to have already set X-TC-Action and X-TC-Version
@@ -22,7 +22,7 @@ import (
 // The request body is buffered fully because TC3 signs the SHA256 of the
 // body. This is fine for DNSPod payloads (tiny JSON) but is the wrong
 // shape for streaming APIs.
-type TencentSignClient struct {
+type TencentSignHTTPRequester struct {
 	httpx.HTTPRequester
 
 	SecretId  string
@@ -30,7 +30,7 @@ type TencentSignClient struct {
 	Service   string
 }
 
-func (tc *TencentSignClient) Do(r *http.Request) (*http.Response, error) {
+func (tc *TencentSignHTTPRequester) Do(r *http.Request) (*http.Response, error) {
 	common := Common{
 		Timestamp: time.Now().UTC().Unix(),
 	}

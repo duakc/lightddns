@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/duakc/lightddns/infra/metrics"
+
 	"github.com/duakc/mt/services"
 )
 
@@ -17,7 +18,7 @@ func NewServiceFactory(factory metrics.Factory) ServiceFactory {
 		return sf
 	}
 	return &defaultServiceFactory{
-		Factory: factory,
+		Factory: metrics.NewNameFactory(factory, Namespace, SubsystemService),
 	}
 }
 
