@@ -130,72 +130,42 @@ func (c *Client) DeleteRecord(ctx context.Context,
 	return doAction[DeleteRecordResponse](ctx, c, DNSPodActionDeleteRecord, req)
 }
 
-// SearchDomain implements [ddnsx.DomainSearcher] by paging
-// DescribeDomainFilterList. Each underlying HTTP call is recorded against
-// the DescribeDomainFilterList metric — there's no separate top-level
-// metric.
-//
-// To minimise data transfer the search walks suffixes of `search`
-// (longest-first) using Keyword as a progressive filter and short-circuits
-// as soon as one keyword turns up a domain that's a parent of `search`.
-// Returns nil on transport / API failure so the cache treats it as "no
-// result".
-func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
-	if mt.Done(ctx) || len(search) == 0 {
-		return nil
-	}
-
+func (c *Client) SearchDomain(ctx context.Context, keyword string) map[string]string {
 	const pageSize = 100
 
 	logger := c.actionLogger(DNSPodActionDescribeDomainFilterList).
-		With(zap.String("search", search))
+		With(zap.String("keyword", keyword))
 	logger.Info("search domain id from upstream")
 
 	result := make(map[string]string)
-	for _, keyword := range append(domains.CutFromHead(search), "") {
-		matched := false
-		for offset := 0; ; {
-			page, err := c.DescribeDomainFilterList(ctx, DescribeDomainFilterListRequest{
-				Type:    "ALL",
-				Limit:   pageSize,
-				Offset:  offset,
-				Keyword: keyword,
-			})
-			if err != nil {
-				logger.Warn("list domains failed",
-					zap.String("keyword", keyword), zap.Error(err))
-				return nil
-			}
-			for _, di := range page.DomainList {
-				if !domains.IsDomainName(di.Name) {
-					continue
-				}
-				result[di.Name] = di.Name
-				if domains.IsSubDomain(search, di.Name) {
-					matched = true
-				}
-			}
-			offset += len(page.DomainList)
-			if len(page.DomainList) == 0 || offset >= page.DomainCountInfo.DomainTotal {
-				break
-			}
+	for offset := 0; ; {
+		page, err := c.DescribeDomainFilterList(ctx, DescribeDomainFilterListRequest{
+			Type:    "ALL",
+			Limit:   pageSize,
+			Offset:  offset,
+			Keyword: keyword,
+		})
+		if err != nil {
+			logger.Warn("list domains failed", zap.Error(err))
+			return nil
 		}
-		if matched {
+		for _, di := range page.DomainList {
+			if !domains.IsDomainName(di.Name) {
+				continue
+			}
+			result[di.Name] = di.Name
+		}
+		offset += len(page.DomainList)
+		if len(page.DomainList) == 0 || offset >= page.DomainCountInfo.DomainTotal {
 			return result
 		}
 	}
-	return result
 }
 
 func (c *Client) actionLogger(action string) *zap.Logger {
 	return c.logger.With(zap.String("action", action))
 }
 
-// doAction issues one POST against the Tencent Cloud DNSPod endpoint, marshals
-// the typed body as JSON, and decodes the typed response envelope. Metric
-// recording is the caller's responsibility — each public API method defers
-// metricsRouter.RecordAPI before invoking doAction so failure attribution
-// stays at the action level.
 func doAction[Resp any](ctx context.Context, c *Client, action string, body any) (Resp, error) {
 	var zero Resp
 

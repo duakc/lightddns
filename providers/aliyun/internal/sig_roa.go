@@ -78,15 +78,6 @@ type ROASigContext struct {
 	SecretAccessKeySecret string
 }
 
-// CanonicalRequest assembles the V3 canonical request and the sorted, ';'
-// joined signed-headers list. The query string is always the RFC3986-encoded
-// URL query (empty if none) and the payload hash is sha256(body)
-// (sha256("") when there is no body); both rules apply regardless of HTTP
-// method.
-//
-// Callers MUST set x-acs-content-sha256 on sig.Headers before invoking this
-// method — it is part of the signed header set, so omitting it produces a
-// canonical form the server won't reproduce.
 func (sig ROASigContext) CanonicalRequest() (canonicalRequest, signedHeaders, hashedRequestPayload string, err error) {
 	if sig.Path == "" {
 		sig.Path = "/"
@@ -142,9 +133,6 @@ func (sig ROASigContext) BuildAuthorization(stringToSign, signedHeaders string) 
 	return b.String()
 }
 
-// Authorization returns the value for the Authorization request header.
-// x-acs-content-sha256 must already be set on sig.Headers (see
-// [ROASigContext.CanonicalRequest]).
 func (sig ROASigContext) Authorization() (string, error) {
 	canonicalRequest, signedHeaders, _, err := sig.CanonicalRequest()
 	if err != nil {
@@ -154,12 +142,6 @@ func (sig ROASigContext) Authorization() (string, error) {
 	return sig.BuildAuthorization(stringToSign, signedHeaders), nil
 }
 
-// buildHeaders extracts the V3-signable header subset (host, content-type,
-// x-acs-*), trims and folds values per spec, and returns the canonical
-// representation along with the sorted, ';' joined header-name list.
-//
-// Only Host is mandatory — Content-Type is signed when present (it is
-// expected only on requests that carry a body).
 func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, err error) {
 	signed := make(map[string]string)
 	headerSorted := make([]string, 0, 8)

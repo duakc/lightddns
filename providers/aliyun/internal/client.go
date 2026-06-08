@@ -34,11 +34,6 @@ const (
 	AlidnsActionAddDomainRecord       = "AddDomainRecord"
 	AlidnsActionUpdateDomainRecord    = "UpdateDomainRecord"
 	AlidnsActionDeleteDomainRecord    = "DeleteDomainRecord"
-
-	// AlidnsErrCodeDomainRecordDuplicate is returned by UpdateDomainRecord
-	// when the new value equals the current value. For DDNS reconcile loops
-	// that race against themselves this is benign and should be ignored.
-	AlidnsErrCodeDomainRecordDuplicate = "DomainRecordDuplicate"
 )
 
 const (
@@ -126,71 +121,42 @@ func (c *Client) DeleteDomainRecord(ctx context.Context,
 	return doAction[DeleteDomainRecordResponse](ctx, c, AlidnsActionDeleteDomainRecord, req.Query())
 }
 
-// SearchDomain implements [ddnsx.DomainSearcher] by paging DescribeDomains.
-// Each underlying HTTP call is recorded against the DescribeDomains metric.
-//
-// To minimise API calls the search walks suffixes of `search` (longest-first)
-// and short-circuits as soon as one keyword turns up a domain that's a parent
-// of `search`. Returns nil on transport / API failure so the cache treats it
-// as "no result". Alidns keys zones by DomainName (no opaque id is needed by
-// the record APIs), so the map's value equals its key.
-func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
-	if mt.Done(ctx) || len(search) == 0 {
-		return nil
-	}
+func (c *Client) SearchDomain(ctx context.Context, keyword string) map[string]string {
 
 	const pageSize = 100
 
 	logger := c.actionLogger(AlidnsActionDescribeDomains).
-		With(zap.String("search", search))
+		With(zap.String("keyword", keyword))
 	logger.Info("search domain id from upstream")
 
 	result := make(map[string]string)
-	for _, keyword := range append(domains.CutFromHead(search), "") {
-		matched := false
-		for pageNumber := 1; ; pageNumber++ {
-			page, err := c.DescribeDomains(ctx, DescribeDomainsRequest{
-				KeyWord:    keyword,
-				PageNumber: pageNumber,
-				PageSize:   pageSize,
-			})
-			if err != nil {
-				logger.Warn("list domains failed",
-					zap.String("keyword", keyword), zap.Error(err))
-				return nil
-			}
-			for _, di := range page.Domains.Domain {
-				if !domains.IsDomainName(di.DomainName) {
-					continue
-				}
-				result[di.DomainName] = di.DomainName
-				if domains.IsSubDomain(search, di.DomainName) {
-					matched = true
-				}
-			}
-			if len(page.Domains.Domain) < pageSize ||
-				int64(pageNumber)*pageSize >= page.TotalCount {
-				break
-			}
+	for pageNumber := 1; ; pageNumber++ {
+		page, err := c.DescribeDomains(ctx, DescribeDomainsRequest{
+			KeyWord:    keyword,
+			PageNumber: pageNumber,
+			PageSize:   pageSize,
+		})
+		if err != nil {
+			logger.Warn("list domains failed", zap.Error(err))
+			return nil
 		}
-		if matched {
+		for _, di := range page.Domains.Domain {
+			if !domains.IsDomainName(di.DomainName) {
+				continue
+			}
+			result[di.DomainName] = di.DomainName
+		}
+		if len(page.Domains.Domain) < pageSize ||
+			int64(pageNumber)*pageSize >= page.TotalCount {
 			return result
 		}
 	}
-	return result
 }
 
 func (c *Client) actionLogger(action string) *zap.Logger {
 	return c.logger.With(zap.String("action", action))
 }
 
-// doAction issues one POST against the Aliyun Alidns endpoint with action
-// parameters carried on the URL query string. The body stays empty —
-// Alidns is RPC-style and all parameters (public + action + Signature)
-// ride on the URL per the v1 signing spec. Metric recording is the
-// caller's responsibility: each public API method defers
-// metricsRouter.RecordAPI before invoking doAction so failure attribution
-// stays at the action level.
 func doAction[Resp any](ctx context.Context, c *Client, action string, query urlpkg.Values) (Resp, error) {
 	var zero Resp
 
@@ -243,11 +209,6 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, query url
 	return out, nil
 }
 
-// newRequest seeds a POST against the Alidns endpoint with the v1 public
-// params that identify which API to invoke. The remaining public params
-// (AccessKeyId / Timestamp / SignatureNonce / SignatureMethod /
-// SignatureVersion / Format / Signature) are added by [AliyunRPCSignClient]
-// just before transmission.
 func newRequest(action string) httpx.ReqConfig {
 	r := httpx.NewReqConfig(http.MethodPost, AliyunDNSEndpoint)
 	r.Query.Set(ParamAction, action)

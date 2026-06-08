@@ -62,21 +62,11 @@ type RPCSigContext struct {
 	SecretAccessKeySecret string
 }
 
-// CanonicalQueryString returns the sorted, RFC 3986 percent-encoded query
-// string. The sort + encoding rules must match the server's recomputation
-// exactly.
 func (sig RPCSigContext) CanonicalQueryString() string {
 	encoder := xtypes.RFC3986Query{Values: sig.Query}
 	return encoder.Encode()
 }
 
-// StringToSign assembles the canonical string fed into the HMAC:
-//
-//	HTTPMethod + "&" + percentEncode("/") + "&" + percentEncode(CanonicalQueryString)
-//
-// The trailing percent-encode of the already-encoded query string is
-// intentional — the spec double-encodes so '&' and '=' inside the canonical
-// query become %26 / %3D in the signed payload.
 func (sig RPCSigContext) StringToSign(canonicalQueryString string) string {
 	var b strings.Builder
 	b.WriteString(strings.ToUpper(sig.Method))
@@ -87,9 +77,6 @@ func (sig RPCSigContext) StringToSign(canonicalQueryString string) string {
 	return b.String()
 }
 
-// Signature returns the base64-encoded HMAC-SHA1 of StringToSign keyed by
-// (AccessKeySecret + "&"). Add the result to the URL query as
-// "Signature=…".
 func (sig RPCSigContext) Signature() string {
 	canonical := sig.CanonicalQueryString()
 	stringToSign := sig.StringToSign(canonical)
@@ -99,14 +86,6 @@ func (sig RPCSigContext) Signature() string {
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
 
-// rpcPercentEncode applies RFC 3986 percent-encoding with the corrections
-// the Aliyun RPC spec calls out relative to url.QueryEscape:
-//   - space  →  %20   (not '+')
-//   - '*'    →  %2A   (already correct under QueryEscape)
-//   - '~'    →  '~'   (not %7E)
-//
-// This matches the encoding the server applies when it recomputes the
-// canonical query string.
 func rpcPercentEncode(s string) string {
 	encoded := urlpkg.QueryEscape(s)
 	encoded = strings.ReplaceAll(encoded, "+", "%20")

@@ -73,7 +73,6 @@ func (r *HTTPRequestRecorder) Record() {
 
 	if ce := r.Logger.Check(checkLevel, "http record end"); ce != nil {
 		fields := []zap.Field{
-
 			zap.Duration("http_request_duration", consume),
 		}
 		if r.Request != nil {

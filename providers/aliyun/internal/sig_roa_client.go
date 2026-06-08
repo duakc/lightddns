@@ -11,13 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// AliyunROASignClient signs outgoing requests with the Aliyun V3 ROA-style
-// scheme: public params live in X-Acs-* headers, the body is hashed into
-// x-acs-content-sha256, and the resulting HMAC-SHA256 signature goes into
-// the Authorization header.
-//
-// Kept in the package for ROA services. Alidns uses the RPC-style v1
-// scheme instead — see [AliyunRPCSignClient].
 type AliyunROASignClient struct {
 	httpx.HTTPRequester
 

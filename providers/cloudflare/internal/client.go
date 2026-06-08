@@ -56,22 +56,12 @@ type Client struct {
 	metricsRouter *ddnsprovider.ApiMetricsRouter
 }
 
-// FetchDomainId implements [ddnsx.DomainSearcher]. It pages through all zones
-// owned by the account and returns the full {zoneName -> zoneID} mapping.
-// [ddnsx.DomainIdCache] picks the longest suffix match for the queried FQDN
-// and remembers the rest for future lookups. Each underlying page request is
-// itself recorded against the API metric — this method does not record a
-// separate top-level metric. Returns nil on transport / API failure so the
-// cache treats it as "no result".
-func (c *Client) SearchDomain(ctx context.Context, domain string) map[string]string {
-	if mt.Done(ctx) || len(domain) == 0 {
-		return nil
-	}
+func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
 
-	logger := c.actionLogger(opDescribeDomains).With(zap.String("domain", domain))
+	logger := c.actionLogger(opDescribeDomains)
 	logger.Info("search zone id from upstream")
 
-	pager := c.ListZones()
+	pager := c.ListZoneName(search)
 	result := make(map[string]string)
 
 	for page, perr := pager.Next(ctx); perr != io.EOF; page, perr = pager.Next(ctx) {
@@ -105,7 +95,7 @@ func (c *Client) ListZones() *PageConfig[Zone] {
 func (c *Client) ListZoneName(name string) *PageConfig[Zone] {
 	r := c.NewRequestConfig(http.MethodGet)
 	r.Query.Set("status", "active")
-	r.Query.Set("name", name)
+	r.Query.Set("name", "contains:"+name)
 	return NewPaging[Zone](c, opDescribeDomains, r)
 }
 
