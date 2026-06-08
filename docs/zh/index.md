@@ -1,6 +1,6 @@
 # Lightddns — 轻量级动态 DNS
 
-Lightddns 让你的域名始终指向家里的 IP 地址，完全自动。每当运营商更换你的公网 IP，Lightddns 会在几秒内检测到变化并更新 DNS 记录。
+Lightddns 让你的域名始终指向你当前的 IP 地址，完全自动。每当运营商更换你的公网 IP，Lightddns 会在几秒内检测到变化并更新 DNS 记录。
 
 ## 什么是 DDNS？
 
@@ -9,12 +9,13 @@ Lightddns 让你的域名始终指向家里的 IP 地址，完全自动。每当
 ## 为什么选 Lightddns？
 
 - **简洁的 YAML 配置**——一个文件，清晰易读
-- **兼容你已有的域名**——通过 Cloudflare 管理（更多服务商即将支持）
+- **多家 DNS 服务商**——Cloudflare、阿里云、腾讯云
 - **多种 IP 获取方式**——HTTP API、本地网卡、或自定义脚本
 - **双栈支持**——每个域名可同时管理 IPv4 和 IPv6
-- **智能分组**——合并数据源（sum）或创建故障转移链（failover）
+- **智能分组**——合并数据源（`sum`）或串成失败回退（`failover`）
+- **自带指标**——可选启用 Prometheus 导出器，同一个二进制内
 - **资源占用极低**——单个小巧的二进制文件
-- **模板配置**——通过 `{{.Env.VAR}}` 从环境变量注入密钥
+- **模板配置**——通过 `{{ .Env.VAR }}` 从环境变量注入密钥
 
 ## 快速开始
 
@@ -29,19 +30,21 @@ Lightddns 让你的域名始终指向家里的 IP 地址，完全自动。每当
 ```yaml
 datasources:
   - type: http
-    name: my-ip
-    url: https://api64.ipify.org?format=json
-    json: ".ip"
+    name: data-http
+    url: https://api.ip.sb/ip
+    dialStrategy: ipv4_only
 
 providers:
   - type: cloudflare
-    name: cf
-    token: "{{.Env.CF_API_TOKEN}}"
+    name: prov-cf
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
 
 domains:
-  - domain: home.example.com
-    provider: cf
-    datasource: my-ip
+  - enabled: true
+    domain: home.example.com
+    provider: prov-cf
+    datasource: data-http
+    ipv4: true
 ```
 
 ### 3. 运行
@@ -53,21 +56,21 @@ lightddns run -c lightddns.yaml
 Lightddns 默认每 30 秒检查一次 IP，仅在变化时更新 DNS。加 `--once` 参数可以只执行一次后退出。
 
 !!! tip "环境变量"
-    将 Cloudflare API 令牌存入 `.env` 文件或导出为环境变量 `CF_API_TOKEN`。配置文件中的 `{{.Env.CF_API_TOKEN}}` 会自动替换。
+    将 Cloudflare API 令牌存入 `.env` 文件或导出为环境变量 `CLOUDFLARE_TOKEN`。配置文件中的 `{{ .Env.CLOUDFLARE_TOKEN }}` 会自动替换。
 
 ## 工作原理
 
-Lightddns 把三样东西连接起来：
+Lightddns 把五个部分组合在一起：
 
 1. **数据源（Datasource）**——获取你当前的公网 IP。可以通过 HTTP API 查询（如 ipify.org）、读取本机网卡地址、或执行自定义脚本。
-2. **服务提供方（Provider）**——向 DNS 服务商（目前支持 Cloudflare）推送 DNS 更新。
+2. **服务提供方（Provider）**——向 DNS 服务商（Cloudflare、阿里云、腾讯云）推送 DNS 更新。
 3. **域名（Domain）**——将域名绑定到数据源和 Provider，并设定更新周期。
+4. **日志（Log）**——全局日志输出与级别。
+5. **服务（Services）**——可选的后台 HTTP 服务，如 Prometheus 导出器或 IP 回显服务。
 
 每个域名独立运行，按设定的间隔检查 IP，仅在 IP 变化时才会调用服务商接口更新 DNS 记录。
 
 ## 下一步
 
-- [安装指南](manual/installation.md) — 各平台的详细安装步骤
-- [快速开始](manual/getting-started.md) — 手把手完成首次配置
-- [工作原理](manual/how-it-works.md) — 深入了解各个组件
+- [手册](manual/index.md) — 架构总览与即用即跑的示例
 - [配置参考](configuration/options.md) — 所有配置项详解

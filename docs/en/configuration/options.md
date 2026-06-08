@@ -3,23 +3,33 @@
 Structure overview of the Lightddns configuration file. See sub-pages for detailed field references.
 
 ```yaml
-# required
+log:
+  level: info
+
 datasources:
   - type: http
     name: data-http
     # ... HTTP datasource config
+
 providers:
   - type: cloudflare
     name: prov-cf
     # ... Cloudflare provider config
+
 domains:
   - domain: example.com
     provider: prov-cf
     datasource: data-http
 
-log:
-  level: info
+services:
+  - type: prometheus
+    name: svc-metrics
+    # ... Prometheus exporter config
 ```
+
+## `log`
+
+Global logging configuration. See [Log](log.md).
 
 ## `datasources`
 
@@ -40,6 +50,8 @@ A list of Service Providers. Each provider pushes IP updates to the correspondin
 | Type | Description |
 |---|---|
 | [`cloudflare`](provider/cloudflare.md) | Update DNS records via the Cloudflare API. Supports A/AAAA records and proxy mode. |
+| [`aliyun`](provider/aliyun.md) | Update DNS records via Aliyun DNS (alidns). |
+| [`tencentcloud`](provider/tencentcloud.md) | Update DNS records via Tencent Cloud DNSPod. |
 
 ## `domains`
 
@@ -47,6 +59,11 @@ A list of domain records. Each entry binds a domain, provider, and datasource to
 
 See [Domain](domain.md).
 
-## `log`
+## `services`
 
-Global logging configuration. See [Log](log.md).
+A list of background HTTP services. All are optional.
+
+| Type | Description |
+|---|---|
+| [`prometheus`](service/prometheus.md) | Expose internal metrics in Prometheus format. |
+| [`ipserver`](service/ipserver.md) | Echo the caller's public IP — useful for building your own HTTP datasource. |

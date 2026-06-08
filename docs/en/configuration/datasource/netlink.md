@@ -10,7 +10,7 @@ name: data-netlink
 # optional
 ifName: eth0
 ifIndex: 0
-allowPrivate: false
+allowBogon: false
 ```
 
 ??? note "Behavior"
@@ -36,10 +36,10 @@ Filter by network interface index. When both `ifName` and `ifIndex` are set, `if
 ifIndex: 2
 ```
 
-## `allowPrivate`
+## `allowBogon`
 
-Whether to include private IP addresses (RFC 1918, etc.). When `false` (default), only global unicast addresses are returned.
+Whether to include bogon IP addresses — private (RFC 1918), link-local, loopback, and other reserved ranges. When `false` (default), only global unicast addresses are returned.
 
 ```yaml
-allowPrivate: false
+allowBogon: false
 ```

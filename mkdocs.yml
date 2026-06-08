@@ -12,9 +12,12 @@ edit_uri: ""
 nav:
   - Home: index.md
   - Manual:
-      - Installation: manual/installation.md
-      - Getting Started: manual/getting-started.md
-      - How It Works: manual/how-it-works.md
+      - Overview: manual/index.md
+      - Cloudflare: manual/cloudflare.md
+      - Aliyun: manual/aliyun.md
+      - TencentCloud: manual/tencentcloud.md
+      - Groups: manual/groups.md
+      - Services: manual/services.md
   - Configuration:
       - Options: configuration/options.md
       - Log: configuration/log.md
@@ -27,6 +30,11 @@ nav:
           - Failover: configuration/datasource/failover.md
       - Providers:
           - Cloudflare: configuration/provider/cloudflare.md
+          - Aliyun: configuration/provider/aliyun.md
+          - TencentCloud: configuration/provider/tencentcloud.md
+      - Services:
+          - Prometheus: configuration/service/prometheus.md
+          - IPServer: configuration/service/ipserver.md
       - Shared:
           - ConnectOption: configuration/shared/connect.md
           - HTTPOption: configuration/shared/http.md
@@ -86,9 +94,11 @@ plugins:
           nav_translations:
             Home: Home
             Manual: 手册
-            Installation: 安装
-            Getting Started: 快速开始
-            How It Works: 工作原理
+            Overview: 总览
+            Cloudflare: Cloudflare
+            Aliyun: 阿里云
+            TencentCloud: 腾讯云
+            Groups: 分组数据源
             Configuration: 配置
             Options: 配置文件
             Log: 日志
@@ -100,7 +110,9 @@ plugins:
             Sum: Sum
             Failover: Failover
             Providers: 服务提供方
-            Cloudflare: Cloudflare
+            Services: 服务
+            Prometheus: Prometheus
+            IPServer: IPServer
             Shared: 共享
             ConnectOption: ConnectOption
             HTTPOption: HTTPOption

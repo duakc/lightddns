@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/ddnsmetric"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/options"
@@ -22,8 +23,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Metrics declared by Domain. Final names are
-// "ddns_domain_<leaf>" after ddnsmetric.Factory prefixes them.
 const (
 	metricActivationTotal       = "activation_total"
 	metricUpdateSuccessTotal    = "update_success_total"
@@ -105,7 +104,8 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 		ipv6:           opt.IPv6,
 	}
 
-	d.RegisterMetrics(services.Lookup[metrics.Registry](ctx))
+	d.RegisterMetrics(metrics.NewNameFactory(services.Lookup[metrics.Registry](ctx),
+		ddnsmetric.Namespace, ddnsmetric.SubsystemDomain))
 
 	return d, nil
 }

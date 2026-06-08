@@ -1,6 +1,6 @@
 # Lightddns — Lightweight Dynamic DNS
 
-Lightddns keeps your domain name pointed at your home IP address, automatically. Whenever your ISP changes your IP, Lightddns detects the change and updates your DNS records in seconds.
+Lightddns keeps your domain name pointed at your current IP address, automatically. Whenever your ISP changes your IP, Lightddns detects the change and updates your DNS records in seconds.
 
 ## What is DDNS?
 
@@ -9,12 +9,13 @@ Most home internet connections get a **dynamic IP address** — your ISP can cha
 ## Why Lightddns?
 
 - **Simple YAML config** — one file, easy to read and edit
-- **Works with your existing domains** — managed through Cloudflare (more providers coming)
+- **Multiple DNS providers** — Cloudflare, Aliyun, Tencent Cloud
 - **Multiple IP sources** — HTTP APIs, local network interfaces, or shell commands
 - **Dual-stack support** — handles both IPv4 and IPv6 for each domain
-- **Smart groups** — combine datasources (sum) or create failover chains
+- **Smart groups** — combine datasources (`sum`) or chain them as fallbacks (`failover`)
+- **Built-in metrics** — optional Prometheus exporter ships in the same binary
 - **Low resource usage** — a single, small binary with minimal footprint
-- **Template configs** — use `{{.Env.VAR}}` to pull secrets from environment variables
+- **Template configs** — use `{{ .Env.VAR }}` to pull secrets from environment variables
 
 ## Quick Start
 
@@ -29,19 +30,21 @@ Create a file named `lightddns.yaml`:
 ```yaml
 datasources:
   - type: http
-    name: my-ip
-    url: https://api64.ipify.org?format=json
-    json: ".ip"
+    name: data-http
+    url: https://api.ip.sb/ip
+    dialStrategy: ipv4_only
 
 providers:
   - type: cloudflare
-    name: cf
-    token: "{{.Env.CF_API_TOKEN}}"
+    name: prov-cf
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
 
 domains:
-  - domain: home.example.com
-    provider: cf
-    datasource: my-ip
+  - enabled: true
+    domain: home.example.com
+    provider: prov-cf
+    datasource: data-http
+    ipv4: true
 ```
 
 ### 3. Run it
@@ -53,21 +56,21 @@ lightddns run -c lightddns.yaml
 Lightddns will check your IP every 30 seconds and update the DNS record whenever it changes. Use `--once` to run a single check and exit.
 
 !!! tip "Environment Variables"
-    Store your Cloudflare API token in a `.env` file or export it as `CF_API_TOKEN`. The `{{.Env.CF_API_TOKEN}}` in the config will be replaced automatically.
+    Store your Cloudflare API token in a `.env` file or export it as `CLOUDFLARE_TOKEN`. The `{{ .Env.CLOUDFLARE_TOKEN }}` in the config will be replaced automatically.
 
 ## How It Works
 
-Lightddns connects three things together:
+Lightddns connects five pieces:
 
 1. **Datasource** — discovers your current public IP address. Options include querying HTTP APIs (like ipify.org), reading from a local network interface, or running a custom script.
-2. **Provider** — pushes DNS updates to your DNS hosting service (currently Cloudflare).
+2. **Provider** — pushes DNS updates to your DNS service (Cloudflare, Aliyun, Tencent Cloud).
 3. **Domain** — binds a domain name to a datasource + provider, and sets the update schedule.
+4. **Log** — global logger output and level.
+5. **Services** — optional background HTTP services such as a Prometheus exporter or an IP echo server.
 
-Each domain runs independently, checks its datasource on a configurable interval, and calls the provider to update DNS records when the IP has changed.
+Each domain runs independently, checks its datasource on a configurable interval, and calls the provider to update DNS records only when the IP has changed.
 
 ## Next Steps
 
-- [Installation Guide](manual/installation.md) — detailed install steps for all platforms
-- [Getting Started](manual/getting-started.md) — walkthrough of your first setup
-- [How It Works](manual/how-it-works.md) — deeper explanation for curious users
+- [Manual](manual/index.md) — architecture overview and ready-to-use examples
 - [Configuration Reference](configuration/options.md) — every option explained

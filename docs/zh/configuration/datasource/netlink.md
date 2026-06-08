@@ -10,7 +10,7 @@ name: data-netlink
 # optional
 ifName: eth0
 ifIndex: 0
-allowPrivate: false
+allowBogon: false
 ```
 
 ??? note "行为说明"
@@ -36,10 +36,10 @@ ifName: eth0
 ifIndex: 2
 ```
 
-## `allowPrivate`
+## `allowBogon`
 
-是否允许返回私有 IP 地址（RFC 1918 等）。设为 `false`（默认）时，仅返回全球单播地址。
+是否允许返回 bogon 地址 — 包括私有（RFC 1918）、链路本地、回环以及其他保留范围。设为 `false`（默认）时，仅返回全球单播地址。
 
 ```yaml
-allowPrivate: false
+allowBogon: false
 ```
