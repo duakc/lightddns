@@ -87,9 +87,12 @@ func (I Info) JSON() {
 
 func (I Info) Plain() {
 	const temp = `%s: Version: %s, Branch: %s, Debug: %t
-Supported Datasource: %s
-Supported Provider: %s
-Supported Services: %s
+Supported Datasource Type: 
+	%s
+Supported Provider Type: 
+	%s
+Supported Service Type: 
+	%s
 `
 	_, _ = fmt.Fprintf(os.Stderr, temp, I.Name,
 		I.Version, I.Branch, I.Debug,

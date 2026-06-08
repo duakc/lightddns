@@ -10,13 +10,62 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/duakc/mt/xtypes"
+
+	"github.com/google/uuid"
 )
 
+// Aliyun ROA-style V3 signature (ACS3-HMAC-SHA256). Public params travel as
+// X-Acs-* request headers, the canonical request hashes the body, and the
+// resulting signature lives in the Authorization header.
+//
+// Kept in the package for reference and for ROA services other than Alidns
+// — Alidns itself goes through [AliyunRPCSignClient] (see sig_rpc.go).
+//
 // https://help.aliyun.com/zh/sdk/product-overview/v3-request-structure-and-signature
 
-type SigContext struct {
+const (
+	HeaderAction         = "X-Acs-Action"
+	HeaderVersion        = "X-Acs-Version"
+	HeaderContentSha256  = "X-Acs-Content-Sha256"
+	HeaderDate           = "X-Acs-Date"
+	HeaderSignatureNonce = "X-Acs-Signature-Nonce"
+	HeaderSecurityToken  = "X-Acs-Security-Token"
+	HeaderAuthorization  = "Authorization"
+)
+
+const SigAlgoACS3HMACSHA256 = "ACS3-HMAC-SHA256"
+
+// ROACommon collects the per-request public values that V3 transports as
+// X-Acs-* headers. Zero fields are filled lazily by [ROACommon.Headers] so
+// callers can reuse the struct as a default.
+type ROACommon struct {
+	SecretSecurityToken string
+
+	Nonce string
+	Time  time.Time
+}
+
+func (c ROACommon) Headers() http.Header {
+	if c.Time.IsZero() {
+		c.Time = time.Now().UTC()
+	}
+	if c.Nonce == "" {
+		c.Nonce = uuid.NewString()
+	}
+
+	header := make(http.Header)
+	header.Set(HeaderDate, c.Time.Format(time.RFC3339))
+	header.Set(HeaderSignatureNonce, c.Nonce)
+	if c.SecretSecurityToken != "" {
+		header.Set(HeaderSecurityToken, c.SecretSecurityToken)
+	}
+	return header
+}
+
+type ROASigContext struct {
 	Method string
 	Path   string
 
@@ -38,7 +87,7 @@ type SigContext struct {
 // Callers MUST set x-acs-content-sha256 on sig.Headers before invoking this
 // method — it is part of the signed header set, so omitting it produces a
 // canonical form the server won't reproduce.
-func (sig SigContext) CanonicalRequest() (canonicalRequest, signedHeaders string, err error) {
+func (sig ROASigContext) CanonicalRequest() (canonicalRequest, signedHeaders, hashedRequestPayload string, err error) {
 	if sig.Path == "" {
 		sig.Path = "/"
 	}
@@ -47,11 +96,11 @@ func (sig SigContext) CanonicalRequest() (canonicalRequest, signedHeaders string
 	method := strings.ToUpper(sig.Method)
 	queryEnc := xtypes.RFC3986Query{Values: sig.Query}
 	canonicalQueryString := queryEnc.Encode()
-	hashedRequestPayload := sha256Hex(sig.Body)
+	hashedRequestPayload = sha256Hex(sig.Body)
 
 	canonicalHeaders, signedHeaders, err := buildHeaders(sig.Headers)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	var b strings.Builder
@@ -67,16 +116,16 @@ func (sig SigContext) CanonicalRequest() (canonicalRequest, signedHeaders string
 	b.WriteByte('\n')
 	b.WriteString(hashedRequestPayload)
 
-	return b.String(), signedHeaders, nil
+	return b.String(), signedHeaders, hashedRequestPayload, nil
 }
 
-func (sig SigContext) StringToSign(canonicalRequest string) string {
+func (sig ROASigContext) StringToSign(canonicalRequest string) string {
 	return strings.Join([]string{
 		SigAlgoACS3HMACSHA256, sha256Hex([]byte(canonicalRequest)),
 	}, "\n")
 }
 
-func (sig SigContext) BuildAuthorization(stringToSign, signedHeaders string) string {
+func (sig ROASigContext) BuildAuthorization(stringToSign, signedHeaders string) string {
 	signature := hex.EncodeToString(hmacsha256([]byte(sig.SecretAccessKeySecret), stringToSign))
 
 	var b strings.Builder
@@ -89,14 +138,15 @@ func (sig SigContext) BuildAuthorization(stringToSign, signedHeaders string) str
 	b.WriteString(signedHeaders)
 	b.WriteByte(',')
 	b.WriteString("Signature=")
-	b.WriteString(signature)
+	b.WriteString(strings.ToLower(signature))
 	return b.String()
 }
 
 // Authorization returns the value for the Authorization request header.
-// x-acs-content-sha256 must already be set on sig.Headers (see [SigContext.CanonicalRequest]).
-func (sig SigContext) Authorization() (string, error) {
-	canonicalRequest, signedHeaders, err := sig.CanonicalRequest()
+// x-acs-content-sha256 must already be set on sig.Headers (see
+// [ROASigContext.CanonicalRequest]).
+func (sig ROASigContext) Authorization() (string, error) {
+	canonicalRequest, signedHeaders, _, err := sig.CanonicalRequest()
 	if err != nil {
 		return "", err
 	}
@@ -116,9 +166,10 @@ func buildHeaders(headers http.Header) (canonicalHeaders, signedHeaders string, 
 
 	for k, vals := range headers {
 		lower := strings.ToLower(strings.TrimSpace(k))
-		if lower == "" ||
-			(lower != "content-type" && lower != "host" &&
-				!strings.HasPrefix(lower, "x-acs-")) {
+		if !(lower == "host" ||
+			strings.HasPrefix(lower, "x-acs-") ||
+			lower == "content-type") {
+
 			continue
 		}
 

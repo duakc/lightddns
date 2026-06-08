@@ -14,7 +14,6 @@ import (
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
-	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
@@ -131,15 +130,16 @@ func (c *Client) DeleteRecord(ctx context.Context,
 	return doAction[DeleteRecordResponse](ctx, c, DNSPodActionDeleteRecord, req)
 }
 
-// FetchDomainId implements [ddnsx.DomainSearcher] by paging
+// SearchDomain implements [ddnsx.DomainSearcher] by paging
 // DescribeDomainFilterList. Each underlying HTTP call is recorded against
 // the DescribeDomainFilterList metric — there's no separate top-level
 // metric.
 //
-// To minimise API calls the search walks suffixes of `search` (longest-first)
-// and short-circuits as soon as one keyword turns up a domain that's a parent
-// of `search`. Returns nil on transport / API failure so the cache treats it
-// as "no result".
+// To minimise data transfer the search walks suffixes of `search`
+// (longest-first) using Keyword as a progressive filter and short-circuits
+// as soon as one keyword turns up a domain that's a parent of `search`.
+// Returns nil on transport / API failure so the cache treats it as "no
+// result".
 func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
 	if mt.Done(ctx) || len(search) == 0 {
 		return nil
@@ -202,6 +202,7 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, body any)
 	logger := c.actionLogger(action)
 
 	req := newRequest(http.MethodPost, action)
+	req.ExtendHeader.Set("Host", TencentCloudEndpoint.Host)
 	req.ExtendHeader.Set("Content-Type", ContentTypeJSON)
 	req.Body = body
 
@@ -224,15 +225,8 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, body any)
 		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
 	}
 
-	rawBody, err := freebuf.ReadAll(resp.Body)
-	if err != nil {
-		return zero, fmt.Errorf("read body %s: %w", action, err)
-	}
-
-	defer rawBody.FreeMe()
-
 	var out Response[Resp]
-	if err := json.NewDecoder(rawBody).Decode(&out); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		logger.Warn("decode response failed", zap.Error(err))
 		return zero, fmt.Errorf("decode %s: %w", action, err)
 	}

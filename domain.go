@@ -104,6 +104,7 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 		ipv4:           opt.IPv4,
 		ipv6:           opt.IPv6,
 	}
+
 	d.RegisterMetrics(services.Lookup[metrics.Registry](ctx))
 
 	return d, nil

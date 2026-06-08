@@ -18,8 +18,6 @@ type HTTPRequestRecorder struct {
 	Logger *zap.Logger
 	Err    *error
 
-	Endpoint string
-
 	Start time.Time
 	End   time.Time
 
@@ -42,8 +40,7 @@ func NewHTTPRequestRecorder(logger *zap.Logger, req *http.Request,
 		Logger:   logger,
 		Err:      err,
 
-		Endpoint: req.URL.Path,
-		Start:    time.Now(),
+		Start: time.Now(),
 	}
 }
 
@@ -63,7 +60,9 @@ func (r *HTTPRequestRecorder) Record() {
 		err = *r.Err
 	}
 
-	if err == nil && debug.Enabled {
+	if err == nil && !debug.Enabled {
+		r.Logger.Debug("http record end",
+			zap.Duration("http_request_duration", consume))
 		return
 	}
 
@@ -74,8 +73,17 @@ func (r *HTTPRequestRecorder) Record() {
 
 	if ce := r.Logger.Check(checkLevel, "http record end"); ce != nil {
 		fields := []zap.Field{
-			zap.String("http_endpoint", r.Endpoint),
-			zap.Duration("http_time", consume),
+
+			zap.Duration("http_request_duration", consume),
+		}
+		if r.Request != nil {
+			if debug.Enabled {
+				fields = append(fields,
+					zap.String("http_request_query", r.Request.URL.RawQuery),
+				)
+			}
+			fields = append(fields,
+				zap.String("http_request_path", r.Request.URL.Path))
 		}
 
 		if err != nil {
@@ -84,9 +92,13 @@ func (r *HTTPRequestRecorder) Record() {
 
 		if r.Response != nil && *r.Response != nil {
 			fields = append(fields,
-				zap.Int("http_status_code", (*r.Response).StatusCode),
-				zap.Any("http_response_header", (*r.Response).Header),
+				zap.Int("http_response_code", (*r.Response).StatusCode),
 			)
+			if debug.Enabled {
+				fields = append(fields,
+					zap.Any("http_response_header", (*r.Response).Header),
+				)
+			}
 		}
 		ce.Write(fields...)
 	}

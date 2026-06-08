@@ -2,10 +2,7 @@ package internal
 
 import (
 	"fmt"
-	"net/http"
-	"time"
-
-	"github.com/google/uuid"
+	urlpkg "net/url"
 )
 
 // DefaultRecordLine is the line used for DDNS records.
@@ -31,33 +28,6 @@ type APIError struct {
 func (e *APIError) Error() string {
 	return fmt.Sprintf("aliyun api error: status=%d code=%s message=%s request_id=%s",
 		e.StatusCode, e.Code, e.Message, e.RequestID)
-}
-
-// Common carries values that go into the request headers for every Aliyun V3
-// call. Zero values are filled lazily by Headers so callers can reuse the
-// struct as a default.
-type Common struct {
-	SecretSecurityToken string
-
-	Nonce string
-	Time  time.Time
-}
-
-func (c Common) Headers() http.Header {
-	if c.Time.IsZero() {
-		c.Time = time.Now()
-	}
-	if c.Nonce == "" {
-		c.Nonce = uuid.NewString()
-	}
-
-	header := make(http.Header)
-	header.Set(HeaderDate, c.Time.UTC().Format(time.RFC3339))
-	header.Set(HeaderSignatureNonce, c.Nonce)
-	if c.SecretSecurityToken != "" {
-		header.Set(HeaderSecurityToken, c.SecretSecurityToken)
-	}
-	return header
 }
 
 // Domain is one zone returned by DescribeDomains.
@@ -100,10 +70,27 @@ type Record struct {
 }
 
 // DescribeDomainsRequest — https://help.aliyun.com/document_detail/29751.html
+//
+// All fields are optional; unset (zero) fields are omitted so the server
+// applies its defaults (PageNumber=1, PageSize=20, no keyword filter).
 type DescribeDomainsRequest struct {
-	KeyWord    string `json:"KeyWord,omitempty"`
-	PageNumber int    `json:"PageNumber,omitempty"`
-	PageSize   int    `json:"PageSize,omitempty"`
+	KeyWord    string
+	PageNumber int
+	PageSize   int
+}
+
+func (r DescribeDomainsRequest) Query() urlpkg.Values {
+	p := NewParams()
+	if r.KeyWord != "" {
+		Add(p, "KeyWord", r.KeyWord)
+	}
+	if r.PageNumber > 0 {
+		Add(p, "PageNumber", r.PageNumber)
+	}
+	if r.PageSize > 0 {
+		Add(p, "PageSize", r.PageSize)
+	}
+	return p.Query()
 }
 
 type DescribeDomainsResponse struct {
@@ -116,12 +103,34 @@ type DescribeDomainsResponse struct {
 }
 
 // DescribeDomainRecordsRequest — https://help.aliyun.com/document_detail/29774.html
+//
+// DomainName is required. RRKeyWord / TypeKeyWord narrow the result set and
+// are added only when set; PageNumber / PageSize fall back to server
+// defaults (1 / 20) when zero.
 type DescribeDomainRecordsRequest struct {
-	DomainName  string `json:"DomainName"`
-	RRKeyWord   string `json:"RRKeyWord,omitempty"`
-	TypeKeyWord string `json:"TypeKeyWord,omitempty"`
-	PageNumber  int    `json:"PageNumber,omitempty"`
-	PageSize    int    `json:"PageSize,omitempty"`
+	DomainName  string
+	RRKeyWord   string
+	TypeKeyWord string
+	PageNumber  int
+	PageSize    int
+}
+
+func (r DescribeDomainRecordsRequest) Query() urlpkg.Values {
+	p := NewParams()
+	Add(p, "DomainName", r.DomainName)
+	if r.RRKeyWord != "" {
+		Add(p, "RRKeyWord", r.RRKeyWord)
+	}
+	if r.TypeKeyWord != "" {
+		Add(p, "TypeKeyWord", r.TypeKeyWord)
+	}
+	if r.PageNumber > 0 {
+		Add(p, "PageNumber", r.PageNumber)
+	}
+	if r.PageSize > 0 {
+		Add(p, "PageSize", r.PageSize)
+	}
+	return p.Query()
 }
 
 type DescribeDomainRecordsResponse struct {
@@ -134,13 +143,32 @@ type DescribeDomainRecordsResponse struct {
 }
 
 // AddDomainRecordRequest — https://help.aliyun.com/document_detail/29772.html
+//
+// DomainName / RR / Type / Value are required. Line falls back to "default"
+// on the server when omitted; TTL falls back to the zone's configured
+// default (commonly 600s).
 type AddDomainRecordRequest struct {
-	DomainName string `json:"DomainName"`
-	RR         string `json:"RR"`
-	Type       string `json:"Type"`
-	Value      string `json:"Value"`
-	Line       string `json:"Line,omitempty"`
-	TTL        uint32 `json:"TTL,omitempty"`
+	DomainName string
+	RR         string
+	Type       string
+	Value      string
+	Line       string
+	TTL        uint32
+}
+
+func (r AddDomainRecordRequest) Query() urlpkg.Values {
+	p := NewParams()
+	Add(p, "DomainName", r.DomainName)
+	Add(p, "RR", r.RR)
+	Add(p, "Type", r.Type)
+	Add(p, "Value", r.Value)
+	if r.Line != "" {
+		Add(p, "Line", r.Line)
+	}
+	if r.TTL > 0 {
+		Add(p, "TTL", r.TTL)
+	}
+	return p.Query()
 }
 
 type AddDomainRecordResponse struct {
@@ -148,13 +176,32 @@ type AddDomainRecordResponse struct {
 }
 
 // UpdateDomainRecordRequest — https://help.aliyun.com/document_detail/29773.html
+//
+// RecordId / RR / Type / Value are required (the API treats the call as a
+// full record replacement, not a patch). Line / TTL retain their existing
+// values on the server when omitted.
 type UpdateDomainRecordRequest struct {
-	RecordId string `json:"RecordId"`
-	RR       string `json:"RR"`
-	Type     string `json:"Type"`
-	Value    string `json:"Value"`
-	Line     string `json:"Line,omitempty"`
-	TTL      uint32 `json:"TTL,omitempty"`
+	RecordId string
+	RR       string
+	Type     string
+	Value    string
+	Line     string
+	TTL      uint32
+}
+
+func (r UpdateDomainRecordRequest) Query() urlpkg.Values {
+	p := NewParams()
+	Add(p, "RecordId", r.RecordId)
+	Add(p, "RR", r.RR)
+	Add(p, "Type", r.Type)
+	Add(p, "Value", r.Value)
+	if r.Line != "" {
+		Add(p, "Line", r.Line)
+	}
+	if r.TTL > 0 {
+		Add(p, "TTL", r.TTL)
+	}
+	return p.Query()
 }
 
 type UpdateDomainRecordResponse struct {
@@ -163,7 +210,13 @@ type UpdateDomainRecordResponse struct {
 
 // DeleteDomainRecordRequest — https://help.aliyun.com/document_detail/29771.html
 type DeleteDomainRecordRequest struct {
-	RecordId string `json:"RecordId"`
+	RecordId string
+}
+
+func (r DeleteDomainRecordRequest) Query() urlpkg.Values {
+	p := NewParams()
+	Add(p, "RecordId", r.RecordId)
+	return p.Query()
 }
 
 type DeleteDomainRecordResponse struct {

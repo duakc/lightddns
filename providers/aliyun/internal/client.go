@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	urlpkg "net/url"
 
@@ -14,50 +15,30 @@ import (
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
-	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
 
-// Aliyun Alidns API surface — V3 signature, RPC-style.
+// Aliyun Alidns API surface — RPC-style, signed with v1 (HMAC-SHA1).
+// See sig_rpc.go for the signing logic and sig_roa.go for the ROA / V3
+// scheme kept around for non-Alidns services.
 //
 // https://help.aliyun.com/zh/dns/api-alidns-2015-01-09-overview
 const (
 	AlidnsServiceName    = "alidns"
 	AlidnsDefaultVersion = "2015-01-09"
 
-	AlidnsActionDescribeDomains       = AlidnsServiceName + ":" + "DescribeDomains"
-	AlidnsActionDescribeDomainRecords = AlidnsServiceName + ":" + "DescribeDomainRecords"
-	AlidnsActionAddDomainRecord       = AlidnsServiceName + ":" + "AddDomainRecord"
-	AlidnsActionUpdateDomainRecord    = AlidnsServiceName + ":" + "UpdateDomainRecord"
-	AlidnsActionDeleteDomainRecord    = AlidnsServiceName + ":" + "DeleteDomainRecord"
+	AlidnsActionDescribeDomains       = "DescribeDomains"
+	AlidnsActionDescribeDomainRecords = "DescribeDomainRecords"
+	AlidnsActionAddDomainRecord       = "AddDomainRecord"
+	AlidnsActionUpdateDomainRecord    = "UpdateDomainRecord"
+	AlidnsActionDeleteDomainRecord    = "DeleteDomainRecord"
 
 	// AlidnsErrCodeDomainRecordDuplicate is returned by UpdateDomainRecord
 	// when the new value equals the current value. For DDNS reconcile loops
 	// that race against themselves this is benign and should be ignored.
 	AlidnsErrCodeDomainRecordDuplicate = "DomainRecordDuplicate"
-)
-
-const (
-	HeaderAction  = "X-Acs-Action"
-	HeaderVersion = "X-Acs-Version"
-
-	HeaderContentSha256  = "X-Acs-Content-Sha256"
-	HeaderDate           = "X-Acs-Date"
-	HeaderSignatureNonce = "X-Acs-Signature-Nonce"
-	HeaderAuthorization  = "Authorization"
-	HeaderSecurityToken  = "X-Acs-Security-Token"
-)
-
-const (
-	SigAlgoACS3HMACSHA256 = "ACS3-HMAC-SHA256"
-)
-
-const (
-	ContentTypeJSON         = "application/json"
-	ContentTypeBinaryStream = "application/octet-stream"
-	ContentTypeForm         = "application/x-www-form-urlencoded"
 )
 
 const (
@@ -91,7 +72,11 @@ func NewClient(ctx context.Context, logger *zap.Logger,
 	return &Client{
 		logger:        logger,
 		metricsRouter: router,
-		do: &AliyunSignClient{
+		// Alidns uses the RPC-style v1 signature: all public params (and
+		// the resulting Signature) ride on the URL query string. The
+		// ROA-style signer in [AliyunROASignClient] is kept in the package
+		// for reference / future use against ROA services.
+		do: &AliyunRPCSignClient{
 			HTTPRequester:         do,
 			Logger:                logger,
 			SecretSecurityToken:   secretSecurityToken,
@@ -106,7 +91,7 @@ func (c *Client) DescribeDomains(ctx context.Context,
 	req DescribeDomainsRequest,
 ) (resp DescribeDomainsResponse, err error) {
 	defer c.metricsRouter.RecordAPI(opDescribeDomains)(&err)
-	return doAction[DescribeDomainsResponse](ctx, c, AlidnsActionDescribeDomains, req)
+	return doAction[DescribeDomainsResponse](ctx, c, AlidnsActionDescribeDomains, req.Query())
 }
 
 // DescribeDomainRecords — https://help.aliyun.com/document_detail/29774.html
@@ -114,7 +99,7 @@ func (c *Client) DescribeDomainRecords(ctx context.Context,
 	req DescribeDomainRecordsRequest,
 ) (resp DescribeDomainRecordsResponse, err error) {
 	defer c.metricsRouter.RecordAPI(opListRecords)(&err)
-	return doAction[DescribeDomainRecordsResponse](ctx, c, AlidnsActionDescribeDomainRecords, req)
+	return doAction[DescribeDomainRecordsResponse](ctx, c, AlidnsActionDescribeDomainRecords, req.Query())
 }
 
 // AddDomainRecord — https://help.aliyun.com/document_detail/29772.html
@@ -122,7 +107,7 @@ func (c *Client) AddDomainRecord(ctx context.Context,
 	req AddDomainRecordRequest,
 ) (resp AddDomainRecordResponse, err error) {
 	defer c.metricsRouter.RecordAPI(opCreateRecord)(&err)
-	return doAction[AddDomainRecordResponse](ctx, c, AlidnsActionAddDomainRecord, req)
+	return doAction[AddDomainRecordResponse](ctx, c, AlidnsActionAddDomainRecord, req.Query())
 }
 
 // UpdateDomainRecord — https://help.aliyun.com/document_detail/29773.html
@@ -130,7 +115,7 @@ func (c *Client) UpdateDomainRecord(ctx context.Context,
 	req UpdateDomainRecordRequest,
 ) (resp UpdateDomainRecordResponse, err error) {
 	defer c.metricsRouter.RecordAPI(opUpdateRecord)(&err)
-	return doAction[UpdateDomainRecordResponse](ctx, c, AlidnsActionUpdateDomainRecord, req)
+	return doAction[UpdateDomainRecordResponse](ctx, c, AlidnsActionUpdateDomainRecord, req.Query())
 }
 
 // DeleteDomainRecord — https://help.aliyun.com/document_detail/29771.html
@@ -138,7 +123,7 @@ func (c *Client) DeleteDomainRecord(ctx context.Context,
 	req DeleteDomainRecordRequest,
 ) (resp DeleteDomainRecordResponse, err error) {
 	defer c.metricsRouter.RecordAPI(opDeleteRecord)(&err)
-	return doAction[DeleteDomainRecordResponse](ctx, c, AlidnsActionDeleteDomainRecord, req)
+	return doAction[DeleteDomainRecordResponse](ctx, c, AlidnsActionDeleteDomainRecord, req.Query())
 }
 
 // SearchDomain implements [ddnsx.DomainSearcher] by paging DescribeDomains.
@@ -200,30 +185,25 @@ func (c *Client) actionLogger(action string) *zap.Logger {
 }
 
 // doAction issues one POST against the Aliyun Alidns endpoint with action
-// parameters carried as a JSON body. Alidns advertises support for JSON
-// payloads via Content-Type: application/json under the V3 protocol — this
-// keeps a single code path for both read and write actions and lets the
-// httpx framework marshal the typed request struct. Metric recording is the
-// caller's responsibility — each public API method defers
+// parameters carried on the URL query string. The body stays empty —
+// Alidns is RPC-style and all parameters (public + action + Signature)
+// ride on the URL per the v1 signing spec. Metric recording is the
+// caller's responsibility: each public API method defers
 // metricsRouter.RecordAPI before invoking doAction so failure attribution
 // stays at the action level.
-func doAction[Resp any](ctx context.Context, c *Client, action string, body any) (Resp, error) {
+func doAction[Resp any](ctx context.Context, c *Client, action string, query urlpkg.Values) (Resp, error) {
 	var zero Resp
 
 	logger := c.actionLogger(action)
 
 	req := newRequest(action)
-	req.Body = body
+	maps.Copy(req.Query, query)
 
 	httpReq, err := req.ToRequestContext(ctx)
 	if err != nil {
 		return zero, fmt.Errorf("build request %s: %w", action, err)
 	}
 
-	// HTTP-level logging (transport error, status, duration) is recorded by
-	// AliyunSignClient via httpx.HTTPRequestRecorder. We only log here for
-	// concerns that the recorder can't see: body-decode failures and parsed
-	// API errors.
 	resp, err := c.do.Do(httpReq)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -235,38 +215,42 @@ func doAction[Resp any](ctx context.Context, c *Client, action string, body any)
 		panic("empty response with no error")
 	}
 
-	rawBody, err := freebuf.ReadAll(resp.Body)
-	if err != nil {
-		return zero, fmt.Errorf("read body %s: %w", action, err)
-	}
-	defer rawBody.FreeMe()
-
 	if resp.StatusCode >= 400 {
 		apiErr := &APIError{StatusCode: resp.StatusCode}
-		if jerr := json.NewDecoder(rawBody).Decode(apiErr); jerr != nil {
+		if jerr := json.NewDecoder(resp.Body).Decode(apiErr); jerr != nil {
 			logger.Warn("decode error response failed",
-				zap.Int("status", resp.StatusCode), zap.Error(jerr))
+				zap.Int("status", resp.StatusCode),
+				zap.Error(jerr),
+			)
 			return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
 		}
 		logger.Warn("api returned error",
 			zap.String("error_code", apiErr.Code),
 			zap.String("error_message", apiErr.Message),
-			zap.String("request_id", apiErr.RequestID))
+			zap.String("request_id", apiErr.RequestID),
+		)
 		return zero, apiErr
 	}
 
 	var out Resp
-	if err := json.NewDecoder(rawBody).Decode(&out); err != nil {
-		logger.Warn("decode response failed", zap.Error(err))
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		logger.Warn("decode response failed",
+			zap.Error(err),
+		)
+
 		return zero, fmt.Errorf("decode %s: %w", action, err)
 	}
 	return out, nil
 }
 
+// newRequest seeds a POST against the Alidns endpoint with the v1 public
+// params that identify which API to invoke. The remaining public params
+// (AccessKeyId / Timestamp / SignatureNonce / SignatureMethod /
+// SignatureVersion / Format / Signature) are added by [AliyunRPCSignClient]
+// just before transmission.
 func newRequest(action string) httpx.ReqConfig {
 	r := httpx.NewReqConfig(http.MethodPost, AliyunDNSEndpoint)
-	r.ExtendHeader.Set(HeaderAction, action)
-	r.ExtendHeader.Set(HeaderVersion, AlidnsDefaultVersion)
-	r.ExtendHeader.Set("Content-Type", ContentTypeJSON)
+	r.Query.Set(ParamAction, action)
+	r.Query.Set(ParamVersion, AlidnsDefaultVersion)
 	return r
 }

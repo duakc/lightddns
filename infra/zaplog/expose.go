@@ -56,17 +56,25 @@ func Warn(msg string, fields ...zap.Field) {
 }
 
 func Error(msg string, fields ...zap.Field) {
+	_ = defaultLogger.Sync()
+
 	defaultLogger.Error(msg, fields...)
 }
 
 func DPanic(msg string, fields ...zap.Field) {
+	_ = defaultLogger.Sync()
+
 	defaultLogger.DPanic(msg, fields...)
 }
 
 func Panic(msg string, fields ...zap.Field) {
+	_ = defaultLogger.Sync()
+
 	defaultLogger.Panic(msg, fields...)
 }
 
 func Fatal(msg string, fields ...zap.Field) {
+	_ = defaultLogger.Sync()
+
 	defaultLogger.Fatal(msg, fields...)
 }
