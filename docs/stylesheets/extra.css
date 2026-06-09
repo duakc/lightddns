@@ -5,3 +5,7 @@
 [data-md-color-scheme="slate"] {
     --md-hue: 210;
 }
+
+p img {
+    border-radius: 10px;
+}
