@@ -65,8 +65,9 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 		return nil, nil
 	}
 
-	opt.IPv4 = opt.IPv4 == opt.IPv6
-	opt.IPv6 = opt.IPv4 == opt.IPv6
+	if !opt.IPv4 && !opt.IPv6 {
+		opt.IPv4, opt.IPv6 = true, true
+	}
 
 	datasourceManager := services.Lookup[adapter.DatasourceManager](ctx)
 	providerManager := services.Lookup[adapter.ProviderManager](ctx)
