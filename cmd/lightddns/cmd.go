@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/duakc/lightddns/cmd/lightddns/internal/check"
-	"github.com/duakc/lightddns/cmd/lightddns/internal/globalcontext"
+	"github.com/duakc/lightddns/cmd/lightddns/internal/common"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
 	"github.com/duakc/lightddns/constant"
@@ -33,10 +33,16 @@ var rootCommand = &cobra.Command{
 	PersistentPreRun: preRun,
 }
 
-var workingDirectory string
+var (
+	workingDirectory string
+	envFile          string
+)
 
 func init() {
-	rootCommand.Flags().StringVarP(&workingDirectory, "workdir", "D", ".", "Working directory")
+	rootCommand.PersistentFlags().StringVarP(&workingDirectory, "workdir", "D", ".", "Working directory")
+	rootCommand.PersistentFlags().StringVar(&envFile, "env-file", "",
+		"Load KEY=VALUE pairs from this file into the environment ({{ .Env }}); "+
+			"default: use the inherited environment only")
 
 	rootCommand.AddCommand(
 		run.Command,
@@ -45,7 +51,7 @@ func init() {
 }
 
 func preRun(cmd *cobra.Command, args []string) {
-	ctx := services.NewRegistry(globalcontext.Load(), services.NewDefaultRegistry())
+	ctx := services.NewRegistry(common.Context(), services.NewDefaultRegistry())
 
 	closeManager = closeme.NewManager()
 
@@ -55,11 +61,19 @@ func preRun(cmd *cobra.Command, args []string) {
 	}
 	defer closeme.AddClose(closeManager, fileHelper)
 
+	// Opt-in: fold an env file into the process environment so every command
+	// (and {{ .Env }} in the config) sees it.
+	if envFile != "" {
+		if err := common.ApplyEnvFile(fileHelper, envFile); err != nil {
+			zaplog.Fatal("apply env file failed", zap.String("file", envFile), zap.Error(err))
+		}
+	}
+
 	services.Store[filehelper.Helper](ctx, fileHelper)
 	services.Store[closeme.Manager](ctx, closeManager)
 	services.Store[container.Provider](ctx, container.NewDefaultProvider())
 
-	globalcontext.Store(ctx)
+	common.StoreContext(ctx)
 }
 
 func main() {

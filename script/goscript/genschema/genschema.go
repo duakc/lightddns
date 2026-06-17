@@ -9,6 +9,7 @@ import (
 	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
 	_ "github.com/duakc/lightddns/providers"
+	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	_ "github.com/duakc/lightddns/services"
 
 	"go.uber.org/zap"
@@ -17,7 +18,8 @@ import (
 var output string
 
 func init() {
-	flag.StringVar(&output, "o", "./build/schema.json", "Output")
+	// Tracked in release/ so it resolves via raw.githubusercontent at a ref.
+	flag.StringVar(&output, "o", common.ReleaseDir("schema.json"), "Output")
 }
 
 func Run(ctx context.Context) {

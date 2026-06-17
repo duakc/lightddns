@@ -1,0 +1,48 @@
+[Unit]
+Description=lightddns - lightweight dynamic DNS updater (user service)
+Documentation=https://lightddns.duaky.com man:lightddns(1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+
+StateDirectory=lightddns
+WorkingDirectory=%S/lightddns
+
+EnvironmentFile=-%E/lightddns/env
+
+ExecStartPre=%h/.local/bin/lightddns -D %S/lightddns check -c %E/lightddns/config.yaml
+ExecStart=%h/.local/bin/lightddns -D %S/lightddns run -c %E/lightddns/config.yaml $ARG
+
+Restart=on-failure
+RestartSec=5s
+ExecReload=/bin/kill -TERM $MAINPID
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+# netlink for the "netlink" datasource; inet for HTTP/DoT and services; unix
+# for journald.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+# Drop all ambient capabilities (the user manager grants none anyway).
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=default.target

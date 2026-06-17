@@ -1,0 +1,46 @@
+.\" Manpage for lightddns.
+.\" STUB - placeholder slot. Flesh out the sections below over time.
+.TH LIGHTDDNS 1 "2026" "lightddns" "User Commands"
+.SH NAME
+lightddns \- lightweight dynamic DNS updater
+.SH SYNOPSIS
+.B lightddns
+[\fB\-D\fR \fIworkdir\fR] [\fB\-\-env\-file\fR \fIfile\fR]
+.IR command " [options]"
+.SH DESCRIPTION
+.B lightddns
+watches an IP through a datasource and pushes changes to a DNS provider.
+Configuration is a YAML file (a Go template exposing \fB{{ .Env.KEY }}\fR).
+.SH COMMANDS
+.TP
+.B run \-c \fIfile\fR
+Start the updater daemon.
+.TP
+.B check \-c \fIfile\fR
+Validate a configuration file and exit.
+.TP
+.B version
+Print version information.
+.SH "GLOBAL OPTIONS"
+.TP
+.BR \-D ", " \-\-workdir " \fIdir\fR"
+Working directory. Relative \fB\-c\fR paths resolve against it; absolute ones
+are read directly.
+.TP
+.B \-\-env\-file " \fIfile\fR"
+Load KEY=VALUE pairs from \fIfile\fR into the environment. Without it only the
+inherited environment is used.
+.SH FILES
+.TP
+.I /etc/lightddns.yaml
+Main configuration.
+.TP
+.I /etc/lightddns.d/*.yaml
+Per-instance configs, run via \fBlightddns@\fIname\fR\fB.service\fR.
+.TP
+.I /etc/default/lightddns
+Environment / secrets and the optional \fBARG\fR override.
+.SH "SEE ALSO"
+Full documentation at
+.UR https://lightddns.duaky.com
+.UE .

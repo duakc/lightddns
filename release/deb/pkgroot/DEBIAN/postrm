@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+function remove_systemd() {
+    if [ -d /run/systemd/system ]; then
+        systemctl disable lightddns.service || true
+        systemctl daemon-reload || true
+    fi
+}
+
+case "$1" in
+    remove)
+        remove_systemd
+        ;;
+    purge)
+        remove_systemd
+
+        # Drop the dedicated account and leftover state/config that dpkg does
+        # not own (conffiles themselves are removed by dpkg on purge).
+        if getent passwd lightddns >/dev/null; then
+          deluser --system lightddns || true
+        fi
+        if getent group lightddns >/dev/null; then
+          delgroup --system lightddns || true
+        fi
+        rm -rf /etc/lightddns.d /var/lib/lightddns \
+          /etc/lightddns.yaml \
+          /etc/default/lightddns.yaml ;
+        ;;
+esac
+
+exit 0

@@ -1,14 +1,10 @@
 package check
 
 import (
-	"github.com/duakc/lightddns/cmd/lightddns/internal/globalcontext"
-	"github.com/duakc/lightddns/infra/badyaml"
+	"github.com/duakc/lightddns/cmd/lightddns/internal/common"
 	"github.com/duakc/lightddns/infra/zaplog"
-	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/lightddns"
-	"github.com/duakc/mt/services"
-	"github.com/duakc/mt/services/filehelper"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -33,20 +29,21 @@ func init() {
 }
 
 func entry(cmd *cobra.Command, args []string) {
-	ctx := globalcontext.Load()
-	fileHelper := services.Lookup[filehelper.Helper](ctx)
-	configFile, err := fileHelper.Open(commandArguments.Config)
+	ctx := common.Context()
+
+	// Same load path as `run`: template expansion + strict decoding, so a
+	// passing check means the daemon will start with this exact config.
+	option, err := common.LoadConfig(ctx, commandArguments.Config)
 	if err != nil {
-		zaplog.Fatal("open config failed", zap.Error(err))
-	}
-	defer configFile.Close()
-	var option options.Options
-
-	if err = badyaml.NewDecoder(configFile).Decode(&option); err != nil {
-		zaplog.Fatal("decode config failed", zap.Error(err))
+		zaplog.Fatal("load config failed", zap.Error(err))
 	}
 
-	if _, err = lightddns.New(ctx, option); err != nil {
+	var ddns *lightddns.LightDDNS
+	if ddns, err = lightddns.New(ctx, option); err != nil {
 		zaplog.Fatal("create new ddns instance failed", zap.Error(err))
 	}
+
+	_ = ddns.Close()
+
+	zaplog.Info("configuration is valid", zap.String("file", commandArguments.Config))
 }

@@ -1,0 +1,72 @@
+[Unit]
+Description=lightddns - lightweight dynamic DNS updater
+Documentation=https://lightddns.duaky.com man:lightddns(1)
+After=nss-lookup.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=lightddns
+Group=lightddns
+
+# State/working directory (-D). systemd creates /var/lib/lightddns owned by the
+# service user and makes it writable even under ProtectSystem=strict. Config is
+# passed as an ABSOLUTE path, so it is read directly and stays decoupled from
+# this state dir (see run.go LoadConfig). -D/--workdir is a ROOT-command flag
+# and MUST come before the sub-command.
+StateDirectory=lightddns
+WorkingDirectory=/var/lib/lightddns
+
+# Secrets (provider tokens, etc.) and the optional $ARG override live in the
+# Debian-conventional defaults file. The config reads secrets via {{ .Env.KEY }};
+# $ARG lets you append flags to "run" (e.g. ARG="--once") without editing this
+# unit. Leading "-" makes the file optional; $ARG is word-split by systemd.
+EnvironmentFile=-/etc/default/lightddns
+
+# Validate the config before starting and report errors to the journal, instead
+# of crash-looping. `check` uses the SAME load path as `run` (template + decode).
+ExecStartPre=/usr/bin/lightddns -D /var/lib/lightddns check -c /etc/lightddns.yaml
+ExecStart=/usr/bin/lightddns -D /var/lib/lightddns run -c /etc/lightddns.yaml $ARG
+
+Restart=on-failure
+RestartSec=5s
+
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+# AF_NETLINK is required by the "netlink" datasource (reads local interface
+# addresses); AF_INET/AF_INET6 for HTTP/DoT and the prometheus/ipserver
+# services; AF_UNIX for journald logging.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+# Drop ALL capabilities by default. If you use ConnectOption features that need
+# privilege, uncomment the matching lines:
+#   - fwmark            -> CAP_NET_ADMIN
+#   - bindInterface     -> CAP_NET_RAW
+CapabilityBoundingSet=
+AmbientCapabilities=
+#CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+#AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target

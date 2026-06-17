@@ -117,9 +117,7 @@ func (s *IPServer) Start(ctx context.Context, stage services.Stage) error {
 			close(s.serveErrC)
 		}()
 		return nil
-	case services.StagePostStart:
 	default:
-		panic(fmt.Sprintf("unknown stage: %d", stage))
 	}
 	return nil
 }

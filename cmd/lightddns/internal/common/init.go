@@ -1,14 +1,14 @@
-package globalcontext
+package common
 
 import "context"
 
 var globalContext context.Context
 
-func Store(ctx context.Context) {
+func StoreContext(ctx context.Context) {
 	globalContext = ctx
 }
 
-func Load() context.Context {
+func Context() context.Context {
 	if globalContext == nil {
 		globalContext = context.Background()
 	}

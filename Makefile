@@ -2,18 +2,13 @@ NAME="lightddns"
 MAIN_WORKDIR=$(shell cd cmd/$(NAME) && pwd)
 SCRIPT_WORKDIR=$(shell cd script/goscript && pwd)
 
-GIT_VERSION=$(shell git rev-parse --short HEAD)
-GIT_BRANCH=$(shell git branch --show-current)
-BUILD_OUTPUT="./build"
+BUILD_DIR="./build"
+RELEASE_FILE_DIR="./release"
 
 GO_SCRIPT=go run $(SCRIPT_WORKDIR)/run.go
 
-GO_BUILD=$(GO_SCRIPT) build -verbose \
-			-version $(GIT_VERSION) -branch $(GIT_BRANCH)\
-			-workdir $(MAIN_WORKDIR) -binary $(NAME)\
-			-output $(BUILD_OUTPUT)
-
-GO_LINT=golangci-lint
+GO_BUILD=$(GO_SCRIPT) build --verbose \
+			--workdir $(MAIN_WORKDIR) --binary $(NAME)
 
 ifeq ($(origin DOCKER_CLI), undefined)
     DOCKER_CLI := $(shell command -v nerdctl || command -v docker)
@@ -23,11 +18,11 @@ endif
 
 .PHONY: all
 all: toolchain clean generate test \
-	generate-schema build-all
+	generate-schema build-all build-deb-all
 
 .PHONY: test
 test: lint
-	@go test -v -tags debug ./...
+	@go test -v --tags debug ./...
 
 .PHONY: generate
 generate:
@@ -43,29 +38,30 @@ toolchain:
 
 .PHONY: fmt
 fmt:
-	$(GO_LINT) fmt ./...
+	golangci-lint fmt ./...
 
 .PHONY: lint
 lint: fmt
 	go vet ./...
-	$(GO_LINT) run --timeout=30s ./...
+	golangci-lint run --timeout=30s ./...
 
 .PHONY: lint-fix
 lint-fix:
-	$(GO_LINT) run --timeout=30s --fix ./...
+	golangci-lint run --timeout=30s --fix ./...
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_OUTPUT) site/ .cache/
-	go mod tidy
+	@rm -rf site/ $(BUILD_DIR) \
+		.cache/ .wrangler/
+	@go mod tidy
 
 .PHONY: build-all
 build-all: build
-	@$(GO_BUILD) -all
+	@$(GO_BUILD) --all
 
 .PHONY: build-dev
 build-dev: generate
-	@$(GO_BUILD) -tags debug
+	@$(GO_BUILD) --tags debug
 
 .PHONY: build
 build: generate
@@ -76,12 +72,13 @@ build-docs:
 	@pip install -r requirements.txt && mkdocs build
 
 .PHONY: build-docker
-build-docker: _check-docker
+build-docker:
 	$(DOCKER_CLI) build -t $(NAME):latest -f Dockerfile .
 
-.PHONY: _check-docker
-_check-docker:
-	@if [ -z "$(DOCKER_CLI)" ]; then \
-		echo "Please set DOCKER_CLI manually or install nerdctl/docker."; \
-		exit 1; \
-	fi
+.PHONY: build-deb
+build-deb:
+	$(GO_SCRIPT) deb --verbose
+
+.PHONY: build-deb-all
+build-deb-all:
+	$(GO_SCRIPT) deb --all --verbose

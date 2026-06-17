@@ -1,0 +1,10 @@
+# extra system environment for lightddns - sourced by the systemd unit (EnvironmentFile=).
+
+# Extra arguments appended to the "run" command (systemd word-splits on
+# whitespace), so you can change behaviour without editing the unit.
+
+ARG=""
+
+# Any environment variables your config references as {{ .Env.KEY }} go here,
+# e.g. provider tokens / credentials:
+#   <SOMETHING>_TOKEN=...
