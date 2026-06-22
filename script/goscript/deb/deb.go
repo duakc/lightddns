@@ -1,13 +1,11 @@
 // Package deb builds .deb packages. Go only prepares the preconditions and data
-// for the real tool: it compiles each shipped target (build package) straight
-// into a staging tree (the skeleton from release/deb/pkgroot plus units / man),
-// fills in the dynamic bits (version, arch, schema URL), then shells out to
-// dpkg-deb - the same "orchestrate in Go, run the real tool" idea as build.
+// for the real tool: it lays down the packaged files (declared in
+// packingFileList, with per-file placeholder substitution from subSet) into a
+// staging tree, compiles each shipped target straight into it, then shells out
+// to dpkg-deb - the same "orchestrate in Go, run the real tool" idea as build.
 package deb
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"flag"
 	"fmt"
@@ -16,63 +14,98 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/build"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
+	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
+	"github.com/duakc/mt"
+	"github.com/duakc/mt/services/filehelper"
 )
 
-const binaryBase = constant.Project
+const binaryBase = constpkg.Project
+
+// placeholder keys (rendered as __KEY__ in the source files, see packing).
+const (
+	subVersion   = "VERSION"
+	subArch      = "ARCH"
+	subSchemaURL = "SCHEMA_URL"
+)
 
 var (
-	outputDir  = common.BuildDir("deb") // finished .debs
-	pkgrootDir = common.ReleaseDir("deb", "pkgroot")
-	systemdDir = common.ReleaseDir("systemd")
-	manFile    = common.ReleaseDir("man", "lightddns.1")
+	releaseDirFileHelper = mt.Must(filehelper.New(common.ReleaseDir()))
+	debFileHelper        = mt.Must(filehelper.New(common.ReleaseDir("deb", "pkgroot")))
+)
 
-	params   = build.DefaultParams() // flags bind onto this; reused for each build
-	buildAll bool
-	verbose  bool
+// packingFileList enumerates every static file shipped in the .deb. The binary
+// is per-arch and compiled separately. DEBIAN/* and etc/* come from the pkgroot
+// skeleton; the systemd units and the (gzipped) man page come from release/ and
+// land under lib/systemd/system and usr/share/man respectively.
+var packingFileList = []packing.File{
+	{FS: debFileHelper, From: "DEBIAN/control", To: "DEBIAN/control", Mode: 0o644, SubSetVec: packing.SubSetVec{subVersion, subArch}},
+	{FS: debFileHelper, From: "DEBIAN/conffiles", To: "DEBIAN/conffiles", Mode: 0o644},
+	{FS: debFileHelper, From: "DEBIAN/postinst", To: "DEBIAN/postinst", Mode: 0o755},
+	{FS: debFileHelper, From: "DEBIAN/prerm", To: "DEBIAN/prerm", Mode: 0o755},
+	{FS: debFileHelper, From: "DEBIAN/postrm", To: "DEBIAN/postrm", Mode: 0o755},
+	{FS: debFileHelper, From: "etc/lightddns.yaml", To: "etc/lightddns.yaml", Mode: 0o640, SubSetVec: packing.SubSetVec{subSchemaURL}},
+	{FS: debFileHelper, From: "etc/lightddns.d/example.yaml", To: "etc/lightddns.d/example.yaml", Mode: 0o640, SubSetVec: packing.SubSetVec{subSchemaURL}},
+	{FS: debFileHelper, From: "etc/default/lightddns", To: "etc/default/lightddns", Mode: 0o640},
+	{FS: releaseDirFileHelper, From: "systemd/lightddns.service", To: "lib/systemd/system/lightddns.service", Mode: 0o644},
+	{FS: releaseDirFileHelper, From: "systemd/lightddns@.service", To: "lib/systemd/system/lightddns@.service", Mode: 0o644},
+	{FS: releaseDirFileHelper, From: "man/lightddns.1", To: "usr/share/man/man1/lightddns.1.gz", Mode: 0o644, Gzip: true},
+}
+
+var (
+	outputDir = common.BuildDir("deb") // finished .debs
+
+	buildAll     bool
+	buildVersion string
+	buildBranch  string
+
+	verbose bool
 
 	pkgVersion string // Debian-valid version (sanitized), used for the package
 	schemaURL  string
 )
 
 func Run(ctx context.Context) {
-	flag.StringVar(&params.Version, "version", "", "package version (default: git tag or short hash)")
-	flag.StringVar(&params.Branch, "branch", "", "build branch (default: current git branch)")
+	flag.StringVar(&buildVersion, "version", "", "package version (default: git tag or short hash)")
+	flag.StringVar(&buildBranch, "branch", "", "build branch (default: current git branch)")
 	flag.BoolVar(&buildAll, "all", false, "build every shipped arch (default: host arch only)")
 	flag.BoolVar(&verbose, "verbose", false, "verbose output")
 	flag.Parse()
 	common.Verbose = verbose
 
-	// params.Version is the tag or short hash: it stamps the binary and is the
-	// schema URL ref. pkgVersion is its Debian-valid form, for the package.
-	if params.Version == "" {
-		params.Version = gitver.Version(ctx)
+	// buildVersion is the tag or short hash: it stamps the binary. pkgVersion is
+	// its Debian-valid form, for the package. The schema URL is pinned to the
+	// build branch so an installed config validates against the matching schema.
+	if buildVersion == "" {
+		buildVersion = gitver.Version(ctx)
 	}
-	if params.Branch == "" {
-		params.Branch = gitver.Branch(ctx)
+
+	if buildBranch == "" {
+		buildBranch = gitver.Branch(ctx)
 	}
-	pkgVersion = sanitizeVersion(params.Version)
-	schemaURL = fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/release/schema.json", constant.Repo, params.Version)
+
+	pkgVersion = sanitizeVersion(buildVersion)
+	schemaURL = fmt.Sprintf(
+		"https://raw.githubusercontent.com/%s/%s/%s/release/schema.json",
+		constpkg.Repo, buildVersion, buildBranch)
 
 	built := 0
+
 	for _, tgt := range target.All() {
-		if !tgt.Deb ||
-			(!buildAll && runtime.GOARCH != tgt.GOARCH && runtime.GOOS != tgt.GOOS) {
+		if !tgt.Deb || (runtime.GOARCH != tgt.GOARCH || runtime.GOOS != tgt.GOOS) {
 			continue
 		}
 
-		debArch, ok := tgt.PackageArch(target.FormatDeb)
-		if !ok {
-			continue
-		}
+		common.Infof("GOOS=%s GOARCH=%s TARGET_GOOS=%s TARGET_GOARCH=%s",
+			runtime.GOOS, runtime.GOARCH, tgt.GOOS, tgt.GOARCH)
 
-		deb, err := pack(ctx, tgt, debArch)
+		deb, err := pack(ctx, tgt)
 		if err != nil {
-			common.Fatalf("package %s: %s", debArch, err)
+			common.Fatalf("package: %s", err)
 		}
 		common.Infof("built %s", deb)
 		built++
@@ -81,107 +114,68 @@ func Run(ctx context.Context) {
 	if built == 0 {
 		common.Fatalf("no deb built with GOARCH=%s GOOS=%s", runtime.GOARCH, runtime.GOOS)
 	}
-	common.Infof("done: built %d package(s)", built)
+	common.Infof("done, built %d package(s)", built)
 }
 
 // pack stages one arch under build/draft and runs dpkg-deb, writing the
 // finished .deb into the products dir.
-func pack(ctx context.Context, tgt target.Target, debArch string) (string, error) {
+func pack(ctx context.Context, tgt target.Target) (string, error) {
+	debArch := tgt.DEBArchName()
 	pkgName := fmt.Sprintf("%s_%s_%s", binaryBase, pkgVersion, debArch)
+
 	stage := common.BuildDraftDir("deb", pkgName)
 	if err := os.RemoveAll(stage); err != nil {
 		return "", err
 	}
-
-	// skeleton (DEBIAN/ + etc/), then overlay the per-build files.
-	if err := os.CopyFS(stage, os.DirFS(pkgrootDir)); err != nil {
-		return "", fmt.Errorf("copy skeleton: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Join(stage, "etc/lightddns.d"), 0o755); err != nil {
+	if err := os.MkdirAll(stage, 0o755); err != nil {
 		return "", err
+	}
+
+	stageFileHelper, err := filehelper.New(stage)
+	if err != nil {
+		return "", err
+	}
+	defer stageFileHelper.Close()
+
+	subSet := packing.SubSet{
+		subVersion:   pkgVersion,
+		subArch:      debArch,
+		subSchemaURL: schemaURL,
+	}
+
+	// static files: substitute placeholders (and gzip where asked) and write
+	// into the stage tree. Indexed so the File's lazy-read state isn't copied.
+	for i := range packingFileList {
+		pf := &packingFileList[i]
+		if err := pf.Process(stageFileHelper, subSet); err != nil {
+			return "", fmt.Errorf("%s: %w", pf.To, err)
+		}
 	}
 
 	// Compile straight into the package tree (build.Binary's OutputDir),
 	// reusing the shared params with the plain (non-qualified) binary name.
-	p := params
+	if err := stageFileHelper.MkdirAll("usr/bin", 0o755); err != nil {
+		return "", err
+	}
+	p := build.DefaultParams()
 	p.OutputDir = filepath.Join(stage, "usr/bin")
+	p.Qualified = false
+	p.BinaryName = binaryBase
+	p.Version = buildVersion
+	p.Branch = buildBranch
+
 	if _, err := build.Binary(ctx, tgt, p); err != nil {
 		return "", err
 	}
 
-	for _, unit := range []string{"lightddns.service", "lightddns@.service"} {
-		if err := put(filepath.Join(systemdDir, unit), filepath.Join(stage, "lib/systemd/system", unit), 0o644); err != nil {
-			return "", err
-		}
-	}
-	if man, err := os.ReadFile(manFile); err == nil {
-		if err := write(filepath.Join(stage, "usr/share/man/man1/lightddns.1.gz"), gzipBytes(man), 0o644); err != nil {
-			return "", err
-		}
-	} else {
-		common.Warnf("no man page at %s (skipping)", manFile)
-	}
-
-	// dynamic data + permissions (config/secrets not world-readable).
-	if err := subst(filepath.Join(stage, "DEBIAN/control"), "__VERSION__", pkgVersion, "__ARCH__", debArch); err != nil {
-		return "", err
-	}
-	if err := subst(filepath.Join(stage, "etc/lightddns.yaml"), "__SCHEMA_URL__", schemaURL); err != nil {
-		return "", err
-	}
-	for path, mode := range map[string]os.FileMode{
-		"DEBIAN/postinst":       0o755,
-		"DEBIAN/prerm":          0o755,
-		"DEBIAN/postrm":         0o755,
-		"etc/lightddns.yaml":    0o640,
-		"etc/default/lightddns": 0o640,
-	} {
-		if err := os.Chmod(filepath.Join(stage, path), mode); err != nil {
-			return "", err
-		}
-	}
-
 	deb := filepath.Join(outputDir, pkgName+".deb")
-	if err := common.Stream(ctx, common.Cmd{
+	if err := common.CommandStream(ctx, common.Cmd{
 		Name: "dpkg-deb",
 		Args: []string{"--root-owner-group", "--build", stage, deb},
 	}); err != nil {
 		return "", err
 	}
 	return deb, nil
-}
-
-// put copies src to dst with the given mode; write writes bytes to dst.
-func put(src, dst string, mode os.FileMode) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	return write(dst, data, mode)
-}
-
-func write(dst string, data []byte, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(dst, data, mode)
-}
-
-// subst replaces old/new pairs in a file in place.
-func subst(path string, pairs ...string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(strings.NewReplacer(pairs...).Replace(string(data))), 0o644)
-}
-
-func gzipBytes(data []byte) []byte {
-	var buf bytes.Buffer
-	gz, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
-	_, _ = gz.Write(data)
-	_ = gz.Close()
-	return buf.Bytes()
 }
 
 // sanitizeVersion strips a leading "v" and keeps it Debian-valid (digit first).

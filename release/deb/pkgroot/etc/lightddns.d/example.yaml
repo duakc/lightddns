@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=__SCHEMA_URL__
+#
+# Minimal lightddns configuration.
+#
+# This is intentionally bare: it only sets the log level so the daemon starts
+# cleanly out of the box. Add what you need under the top-level sections -
+# providers, datasources, domains, services - per the docs:
+#
+#   Docs:    https://lightddns.duaky.com
+#
+# Secrets should be referenced as {{ .Env.KEY }} and supplied via
+# /etc/default/lightddns, not hard-coded here.
+#
+# For multiple independent instances, drop one file per instance into
+# /etc/lightddns.d/<name>.yaml and start it with:
+#   systemctl enable --now lightddns@<name>.service
+
+log:
+  level: info

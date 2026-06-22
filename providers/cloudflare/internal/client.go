@@ -57,7 +57,6 @@ type Client struct {
 }
 
 func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
-
 	logger := c.actionLogger(opDescribeDomains)
 	logger.Info("search zone id from upstream")
 

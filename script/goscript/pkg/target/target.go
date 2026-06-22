@@ -44,15 +44,6 @@ type Target struct {
 	RPM bool
 }
 
-// Format identifies an OS packaging system. Architecture naming differs per
-// system, which is why the name is translated by archName() per format.
-type Format string
-
-const (
-	FormatDeb Format = "deb"
-	FormatRPM Format = "rpm"
-)
-
 // all is the full target matrix. Commented-out entries are kept for the record
 // (and pre-tagged with their packaging support for whenever they're enabled).
 var all = []Target{
@@ -170,56 +161,43 @@ func (t Target) BinaryName(base string) string {
 	return strings.Join(append([]string{base}, t.variantParts()...), "-")
 }
 
-func (t Target) PackageArch(f Format) (string, bool) {
-	switch f {
-	case FormatDeb:
-		if !t.Deb {
-			return "", false
-		}
-	case FormatRPM:
-		if !t.RPM {
-			return "", false
-		}
-	default:
-		return "", false
+func (t Target) DEBArchName() string {
+	if !t.Deb {
+		return ""
 	}
-	return archName(t, f), true
+	switch t.GOARCH {
+	case "arm":
+		if t.GOARMVersion == 7 {
+			return "armhf"
+		}
+		return "armel"
+	case "386":
+		return "i386"
+	case "mipsle":
+		return "mipsel"
+	case "ppc64le":
+		return "ppc64el"
+	default:
+		// amd64/arm64/mips/riscv64/loong64/ppc64/s390x/sparc64
+		// all map straight through.
+		return t.GOARCH
+	}
 }
 
-// archName translates a Go arch to the packaging system's arch name. Only the
-// names that differ from GOARCH are listed; everything else maps 1:1.
-func archName(t Target, f Format) string {
-	switch f {
-	case FormatDeb:
-		switch t.GOARCH {
-		case "arm":
-			if t.GOARMVersion == 7 {
-				return "armhf"
-			}
-			return "armel"
-		case "386":
-			return "i386"
-		case "mipsle":
-			return "mipsel"
-		case "ppc64le":
-			return "ppc64el"
-		}
-	case FormatRPM:
-		switch t.GOARCH {
-		case "amd64":
-			return "x86_64"
-		case "arm64":
-			return "aarch64"
-		case "arm":
-			return "armv7hl"
-		case "386":
-			return "i686"
-		case "loong64":
-			return "loongarch64"
-		}
+func (t Target) RPMArchName() string {
+	switch t.GOARCH {
+	case "amd64":
+		return "x86_64"
+	case "arm64":
+		return "aarch64"
+	case "arm":
+		return "armv7hl"
+	case "386":
+		return "i686"
+	case "loong64":
+		return "loongarch64"
+	default:
+		// riscv64/ppc64/ppc64le/s390x all map straight through.
+		return t.GOARCH
 	}
-
-	// amd64/arm64/mips/riscv64/loong64/ppc64/s390x/sparc64 (deb) and
-	// riscv64/ppc64/ppc64le/s390x (rpm) all map straight through.
-	return t.GOARCH
 }

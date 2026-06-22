@@ -50,7 +50,7 @@ domains:
 ### 3. 运行
 
 ```bash
-lightddns run -c lightddns.yaml
+lightddns run -c example.yaml
 ```
 
 Lightddns 默认每 30 秒检查一次 IP，仅在变化时更新 DNS。加 `--once` 参数可以只执行一次后退出。

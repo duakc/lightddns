@@ -50,7 +50,7 @@ domains:
 ### 3. Run it
 
 ```bash
-lightddns run -c lightddns.yaml
+lightddns run -c example.yaml
 ```
 
 Lightddns will check your IP every 30 seconds and update the DNS record whenever it changes. Use `--once` to run a single check and exit.

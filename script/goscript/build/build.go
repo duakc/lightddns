@@ -15,7 +15,7 @@ import (
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
 )
 
-const workdir = "./cmd/lightddns/"
+const defaultWorkdir = "./cmd/lightddns/"
 
 type Params struct {
 	Version string
@@ -33,9 +33,10 @@ type Params struct {
 
 func DefaultParams() Params {
 	return Params{
-		WorkingDir: workdir,
+		WorkingDir: defaultWorkdir,
 		OutputDir:  common.BuildDir("bin"),
 		BinaryName: constant.Project,
+		Qualified:  true,
 	}
 }
 
@@ -100,7 +101,7 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 
 	outPath := filepath.Join(p.OutputDir, name)
 	args = append(args, "-o", outPath, p.WorkingDir)
-	if err := common.Stream(ctx, common.Cmd{Name: "go", Args: args, Env: env}); err != nil {
+	if err := common.CommandStream(ctx, common.Cmd{Name: "go", Args: args, Env: env}); err != nil {
 		return "", err
 	}
 	return outPath, nil

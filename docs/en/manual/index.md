@@ -48,10 +48,10 @@ This keeps credentials out of the committed config.
 
 ```bash
 # continuous
-lightddns run -c lightddns.yaml
+lightddns run -c example.yaml
 
 # one-shot (single update pass, then exit)
-lightddns run -c lightddns.yaml --once
+lightddns run -c example.yaml --once
 ```
 
 ## Examples

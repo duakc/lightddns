@@ -27,6 +27,6 @@ func Branch(ctx context.Context) string {
 const unknown = "(unknown)"
 
 func git(ctx context.Context, args ...string) string {
-	out, _ := common.Capture(ctx, common.Cmd{Name: "git", Args: args})
+	out, _ := common.CommandCapture(ctx, common.Cmd{Name: "git", Args: args})
 	return out
 }

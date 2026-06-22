@@ -122,7 +122,6 @@ func (c *Client) DeleteDomainRecord(ctx context.Context,
 }
 
 func (c *Client) SearchDomain(ctx context.Context, keyword string) map[string]string {
-
 	const pageSize = 100
 
 	logger := c.actionLogger(AlidnsActionDescribeDomains).

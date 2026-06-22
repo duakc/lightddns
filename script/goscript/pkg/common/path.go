@@ -5,27 +5,23 @@ import (
 	"path/filepath"
 )
 
-const (
+var (
 	// Note: sync with Makefile.
-	draftRoot   = "draft"
-	buildRoot   = "build"
-	releaseRoot = "release"
+	draftRoot   = getEnvOrDefault("GOSCRIPT_DRAFT_SUB_DIR", "draft")
+	buildRoot   = getEnvOrDefault("GOSCRIPT_BUILD_DIR", "build")
+	releaseRoot = getEnvOrDefault("GOSCRIPT_RELEASE_DIR", "release")
 )
 
 var buildDraft = filepath.Join(buildRoot, draftRoot)
 
-// BuildDir returns a path under the build output dir, creating it so callers
-// don't each have to MkdirAll.
 func BuildDir(parts ...string) string {
 	return ensure(filepath.Join(append([]string{buildRoot}, parts...)...))
 }
 
-// BuildDraftDir returns a path under build/draft (local scratch), creating it.
 func BuildDraftDir(parts ...string) string {
 	return ensure(filepath.Join(append([]string{buildDraft}, parts...)...))
 }
 
-// ReleaseDir returns a path under release/ (existing payload; not created).
 func ReleaseDir(parts ...string) string {
 	return filepath.Join(append([]string{releaseRoot}, parts...)...)
 }
@@ -33,4 +29,12 @@ func ReleaseDir(parts ...string) string {
 func ensure(dir string) string {
 	_ = os.MkdirAll(dir, 0o755)
 	return dir
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }

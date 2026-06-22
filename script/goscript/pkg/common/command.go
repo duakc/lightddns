@@ -16,13 +16,13 @@ type Cmd struct {
 	Env  []string // extra variables, appended to os.Environ()
 }
 
-func Stream(ctx context.Context, c Cmd) error {
+func CommandStream(ctx context.Context, c Cmd) error {
 	cmd := c.prepare(ctx)
 	cmd.Stdout, cmd.Stderr, cmd.Stdin = os.Stdout, os.Stderr, os.Stdin
 	return cmd.Run()
 }
 
-func Capture(ctx context.Context, c Cmd) (string, error) {
+func CommandCapture(ctx context.Context, c Cmd) (string, error) {
 	out, err := c.prepare(ctx).Output()
 	return strings.TrimSpace(string(out)), err
 }

@@ -48,10 +48,10 @@ providers:
 
 ```bash
 # 持续运行
-lightddns run -c lightddns.yaml
+lightddns run -c example.yaml
 
 # 单次（执行一轮更新后退出）
-lightddns run -c lightddns.yaml --once
+lightddns run -c example.yaml --once
 ```
 
 ## 示例
