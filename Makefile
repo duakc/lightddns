@@ -18,7 +18,7 @@ endif
 
 .PHONY: all
 all: toolchain clean generate test \
-	generate-schema build-all build-deb-all
+	generate-schema build-all build-deb-all build-rpm-all
 
 .PHONY: test
 test: lint
@@ -82,3 +82,11 @@ build-deb:
 .PHONY: build-deb-all
 build-deb-all:
 	$(GO_SCRIPT) deb --all --verbose
+
+.PHONY: build-rpm
+build-rpm:
+	$(GO_SCRIPT) rpm --verbose
+
+.PHONY: build-rpm-all
+build-rpm-all:
+	$(GO_SCRIPT) rpm --all --verbose

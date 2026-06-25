@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -105,6 +106,21 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 		return "", err
 	}
 	return outPath, nil
+}
+
+// Plain builds tgt's binary with the plain (unqualified) name into outputDir,
+// creating outputDir if needed. It is the shared "compile straight into a
+// staging tree" step used by the package builders.
+func Plain(ctx context.Context, tgt target.Target, outputDir, version, branch string) (string, error) {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return "", err
+	}
+	p := DefaultParams()
+	p.OutputDir = outputDir
+	p.Qualified = false
+	p.Version = version
+	p.Branch = branch
+	return Binary(ctx, tgt, p)
 }
 
 func Run(ctx context.Context) {

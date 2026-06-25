@@ -20,6 +20,7 @@ import (
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
+
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/services/filehelper"
 )
@@ -39,18 +40,19 @@ var (
 )
 
 // packingFileList enumerates every static file shipped in the .deb. The binary
-// is per-arch and compiled separately. DEBIAN/* and etc/* come from the pkgroot
-// skeleton; the systemd units and the (gzipped) man page come from release/ and
-// land under lib/systemd/system and usr/share/man respectively.
+// is per-arch and compiled separately. DEBIAN/* comes from the deb-specific
+// pkgroot skeleton; the example configs, systemd units and (gzipped) man page
+// are format-agnostic and come from the shared release/ subdirs - the single
+// example/lightddns.yaml serves both /etc/lightddns.yaml and the .d/ sample.
 var packingFileList = []packing.File{
 	{FS: debFileHelper, From: "DEBIAN/control", To: "DEBIAN/control", Mode: 0o644, SubSetVec: packing.SubSetVec{subVersion, subArch}},
 	{FS: debFileHelper, From: "DEBIAN/conffiles", To: "DEBIAN/conffiles", Mode: 0o644},
 	{FS: debFileHelper, From: "DEBIAN/postinst", To: "DEBIAN/postinst", Mode: 0o755},
 	{FS: debFileHelper, From: "DEBIAN/prerm", To: "DEBIAN/prerm", Mode: 0o755},
 	{FS: debFileHelper, From: "DEBIAN/postrm", To: "DEBIAN/postrm", Mode: 0o755},
-	{FS: debFileHelper, From: "etc/lightddns.yaml", To: "etc/lightddns.yaml", Mode: 0o640, SubSetVec: packing.SubSetVec{subSchemaURL}},
-	{FS: debFileHelper, From: "etc/lightddns.d/example.yaml", To: "etc/lightddns.d/example.yaml", Mode: 0o640, SubSetVec: packing.SubSetVec{subSchemaURL}},
-	{FS: debFileHelper, From: "etc/default/lightddns", To: "etc/default/lightddns", Mode: 0o640},
+	{FS: releaseDirFileHelper, From: "example/lightddns.yaml", To: "etc/lightddns.yaml", Mode: 0o640, SubSetVec: packing.SubSetVec{subSchemaURL}},
+	{FS: releaseDirFileHelper, From: "example/lightddns.yaml", To: "etc/lightddns.d/example.yaml", Mode: 0o640, SubSetVec: packing.SubSetVec{subSchemaURL}},
+	{FS: releaseDirFileHelper, From: "example/environment", To: "etc/default/lightddns", Mode: 0o640},
 	{FS: releaseDirFileHelper, From: "systemd/lightddns.service", To: "lib/systemd/system/lightddns.service", Mode: 0o644},
 	{FS: releaseDirFileHelper, From: "systemd/lightddns@.service", To: "lib/systemd/system/lightddns@.service", Mode: 0o644},
 	{FS: releaseDirFileHelper, From: "man/lightddns.1", To: "usr/share/man/man1/lightddns.1.gz", Mode: 0o644, Gzip: true},
@@ -90,13 +92,13 @@ func Run(ctx context.Context) {
 
 	pkgVersion = sanitizeVersion(buildVersion)
 	schemaURL = fmt.Sprintf(
-		"https://raw.githubusercontent.com/%s/%s/%s/release/schema.json",
-		constpkg.Repo, buildVersion, buildBranch)
+		"https://raw.githubusercontent.com/%s/%s/release/schema.json",
+		constpkg.Repo, buildVersion)
 
 	built := 0
 
 	for _, tgt := range target.All() {
-		if !tgt.Deb || (runtime.GOARCH != tgt.GOARCH || runtime.GOOS != tgt.GOOS) {
+		if !tgt.Deb || (!buildAll && (runtime.GOARCH != tgt.GOARCH || runtime.GOOS != tgt.GOOS)) {
 			continue
 		}
 
@@ -143,28 +145,12 @@ func pack(ctx context.Context, tgt target.Target) (string, error) {
 		subSchemaURL: schemaURL,
 	}
 
-	// static files: substitute placeholders (and gzip where asked) and write
-	// into the stage tree. Indexed so the File's lazy-read state isn't copied.
-	for i := range packingFileList {
-		pf := &packingFileList[i]
-		if err := pf.Process(stageFileHelper, subSet); err != nil {
-			return "", fmt.Errorf("%s: %w", pf.To, err)
-		}
-	}
-
-	// Compile straight into the package tree (build.Binary's OutputDir),
-	// reusing the shared params with the plain (non-qualified) binary name.
-	if err := stageFileHelper.MkdirAll("usr/bin", 0o755); err != nil {
+	// Lay down the static files, then compile the binary straight into the
+	// package tree under usr/bin.
+	if err := packing.ProcessAll(stageFileHelper, packingFileList, subSet); err != nil {
 		return "", err
 	}
-	p := build.DefaultParams()
-	p.OutputDir = filepath.Join(stage, "usr/bin")
-	p.Qualified = false
-	p.BinaryName = binaryBase
-	p.Version = buildVersion
-	p.Branch = buildBranch
-
-	if _, err := build.Binary(ctx, tgt, p); err != nil {
+	if _, err := build.Plain(ctx, tgt, filepath.Join(stage, "usr/bin"), buildVersion, buildBranch); err != nil {
 		return "", err
 	}
 

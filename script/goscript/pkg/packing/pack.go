@@ -93,6 +93,19 @@ func (file *File) Process(stageFileHelper filehelper.Helper, subSet SubSet) erro
 	return stageFileHelper.WriteFile(file.To, replacedBuffer, file.Mode.Perm())
 }
 
+// ProcessAll writes every file into dst, substituting placeholders from subSet
+// (and gzipping where asked). Indexed so each File's lazy-read state isn't
+// copied. It is the shared "lay down the static files" step for the packagers.
+func ProcessAll(dst filehelper.Helper, files []File, subSet SubSet) error {
+	for i := range files {
+		pf := &files[i]
+		if err := pf.Process(dst, subSet); err != nil {
+			return fmt.Errorf("%s: %w", pf.To, err)
+		}
+	}
+	return nil
+}
+
 func gzipBytes(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	gz, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)

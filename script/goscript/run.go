@@ -9,6 +9,7 @@ import (
 	"github.com/duakc/lightddns/script/goscript/deb"
 	"github.com/duakc/lightddns/script/goscript/gendoc"
 	"github.com/duakc/lightddns/script/goscript/genschema"
+	"github.com/duakc/lightddns/script/goscript/rpm"
 )
 
 // Thin dispatcher:
@@ -35,6 +36,8 @@ func main() {
 		genschema.Run(ctx)
 	case "deb":
 		deb.Run(ctx)
+	case "rpm":
+		rpm.Run(ctx)
 	default:
 		panic("unknown command: " + command)
 	}
