@@ -18,7 +18,7 @@ endif
 
 .PHONY: all
 all: toolchain clean generate test \
-	generate-schema build-all build-deb-all build-rpm-all
+	generate-schema build-all
 
 .PHONY: test
 test: lint
@@ -90,3 +90,9 @@ build-rpm:
 .PHONY: build-rpm-all
 build-rpm-all:
 	$(GO_SCRIPT) rpm --all --verbose
+
+# Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
+# the package for the host system. The result lands under build/nix/result.
+.PHONY: build-nix
+build-nix:
+	nix build .#default --print-build-logs -o $(BUILD_DIR)/nix/result

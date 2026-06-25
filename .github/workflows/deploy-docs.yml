@@ -4,7 +4,6 @@ on:
     branches:
       - stable
       - testing
-      - ci_trigger/docs
     paths:
       - "docs/**"
       - "mkdocs.yml"
@@ -12,6 +11,8 @@ on:
       - "wrangler.toml"
       - ".cloudflare/worker/**"
       - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
 jobs:
   deploy:
     name: Deploy MkDocs to Cloudflare Workers
