@@ -1,0 +1,17 @@
+---
+enabled: true
+defaultTags: [
+  "provider_with_cloudflare",
+  "provider_with_tencentcloud",
+  "provider_with_aliyun",
+  # uncomment below to enable some tags
+  #"freebuf_low_mem"
+  #"debug"
+]
+
+# empty for default, output in build/bin
+# if set, output build result to build/build_<buildName>/bin
+# Note: multi build configuration can not be duplicated.
+buildName: ""
+---
+# another configuration below.
