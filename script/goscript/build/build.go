@@ -88,7 +88,11 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	}
 
 	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
+		joined := strings.Join(tags, ",")
+		args = append(args, "-tags", joined)
+		// Stamp the build tags so `version` can report what was compiled in.
+		ldflags = append(ldflags,
+			fmt.Sprintf(`-X "github.com/%s/constant.Tags=%s"`, constant.Repo, joined))
 	}
 	if len(ldflags) > 0 {
 		args = append(args, "-ldflags", strings.Join(ldflags, " "))

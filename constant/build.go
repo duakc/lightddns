@@ -1,14 +1,33 @@
 package constant
 
+import (
+	"strings"
+	"sync"
+)
+
 const unknown = "(unknown)"
 
 var (
 	Version = unknown
 	Branch  = unknown
+
+	Tags = unknown
 )
 
-const Project = "lightddns"
+const (
+	Project = "lightddns"
+	Repo    = "duakc/lightddns"
+)
 
-// Repo is the GitHub "owner/name" slug, used to build module paths and
-// release / raw.githubusercontent URLs.
-const Repo = "duakc/lightddns"
+var (
+	tagSplitOnce sync.Once
+	tagsArray    []string
+)
+
+func TagList() []string {
+	tagSplitOnce.Do(func() {
+		tagsArray = strings.Split(Tags, ",")
+	})
+
+	return tagsArray
+}

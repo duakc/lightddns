@@ -33,6 +33,7 @@ type Info struct {
 	Name       string
 	Version    string
 	Branch     string
+	Tags       []string
 	Debug      bool
 	Datasource []string
 	Provider   []string
@@ -67,12 +68,26 @@ func NewInfo() Info {
 		Name:    constpkg.Project,
 		Version: constpkg.Version,
 		Branch:  constpkg.Branch,
+		Tags:    displayTags(constpkg.TagList()),
 
 		Debug:      debug.Enabled,
 		Datasource: datasourceTypes,
 		Provider:   providerTypes,
 		Services:   serviceTypes,
 	}
+}
+
+// displayTags drops provider_with_* tags: which providers are compiled in is
+// already reported by the Provider list.
+func displayTags(tags []string) []string {
+	var out []string
+	for _, t := range tags {
+		if strings.HasPrefix(t, "provider_with_") {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
 }
 
 func (I Info) YAML() {
@@ -86,17 +101,24 @@ func (I Info) JSON() {
 }
 
 func (I Info) Plain() {
-	const temp = `%s: Version: %s, Branch: %s, Debug: %t
-Supported Datasource Type: 
-	%s
-Supported Provider Type: 
-	%s
-Supported Service Type: 
-	%s
-`
-	_, _ = fmt.Fprintf(os.Stderr, temp, I.Name,
-		I.Version, I.Branch, I.Debug,
-		strings.Join(I.Datasource, ","),
-		strings.Join(I.Provider, ","),
-		strings.Join(I.Services, ","))
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s %s", I.Name, I.Version)
+	if I.Branch != "" {
+		fmt.Fprintf(&b, " (branch %s)", I.Branch)
+	}
+	fmt.Fprintf(&b, " debug=%t\n", I.Debug)
+
+	line := func(key, value string) {
+		if value == "" {
+			return
+		}
+		fmt.Fprintf(&b, "%s: %s\n", key, value)
+	}
+	line("tags", strings.Join(I.Tags, ","))
+	line("datasources", strings.Join(I.Datasource, ","))
+	line("providers", strings.Join(I.Provider, ","))
+	line("services", strings.Join(I.Services, ","))
+
+	_, _ = os.Stderr.WriteString(b.String())
 }
