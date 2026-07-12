@@ -94,7 +94,6 @@ func (c *Client) ListZones() *PageConfig[Zone] {
 func (c *Client) ListZoneName(name string) *PageConfig[Zone] {
 	r := c.NewRequestConfig(http.MethodGet)
 	r.Query.Set("status", "active")
-	r.Query.Set("name", "contains:"+name)
 	return NewPaging[Zone](c, opDescribeDomains, r)
 }
 

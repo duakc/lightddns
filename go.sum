@@ -5,14 +5,6 @@ github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XL
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/duakc/mt v0.0.0-20260604125623-19b51589e572 h1:ipbz8JO6RvrnFflGPxGLGAa+Ik75u+9bu3oq5hRFYUk=
-github.com/duakc/mt v0.0.0-20260604125623-19b51589e572/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260618073851-0c8acef33a2b h1:Z3jHhq723Efp7YeVE9O+kg2zOu4llpf4Ovj6LApKStc=
-github.com/duakc/mt v0.0.0-20260618073851-0c8acef33a2b/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260618082148-19b0dfe77bb8 h1:toYCySpbpJ5tuBsgiZk0bvAeQGHvtErixCo/fGpCnc0=
-github.com/duakc/mt v0.0.0-20260618082148-19b0dfe77bb8/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
-github.com/duakc/mt v0.0.0-20260622085243-8255aaca9321 h1:4ratsyrXtCb9IYQIUTtSESX/35+8OwqFFJt8tBiKpuM=
-github.com/duakc/mt v0.0.0-20260622085243-8255aaca9321/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/mt v0.0.0-20260622092557-3273326f7db6 h1:BOZxqMdmCxpFfYeHMevAVyofk38cBEENZe/pzyw5PlU=
 github.com/duakc/mt v0.0.0-20260622092557-3273326f7db6/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
