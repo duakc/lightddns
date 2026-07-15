@@ -32,7 +32,9 @@ func (ws *fixConsoleWs) Sync() error {
 				}
 			}
 		} else {
-			if errors.Is(err, syscall.EBADF) || errors.Is(err, syscall.ENOTTY) {
+			if errors.Is(err, syscall.EBADF) ||
+				errors.Is(err, syscall.ENOTTY) ||
+				errors.Is(err, syscall.EINVAL) {
 				err = nil
 			}
 		}

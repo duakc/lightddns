@@ -55,7 +55,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.AliyunProviderO
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	resolveDialer := resolvectl.NewDialer(connectDialer,
 		mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
-		resolvectl.DefaultResolveClient)
+		resolvectl.NewResolver(logger))
 
 	clientOptions = append(clientOptions,
 		httpx.ClientOptionWithDialer(resolveDialer))

@@ -120,7 +120,7 @@ func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
 }
 
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
-	if stage == services.StagePreStart && len(ld.datasources) == 0 && len(ld.services) == 0 {
+	if stage == services.StagePreStart && len(ld.domains) == 0 && len(ld.services) == 0 {
 		return fmt.Errorf("noting to need to start")
 	}
 

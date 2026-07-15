@@ -78,7 +78,8 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
 	if needDNS {
 		connectDialer = resolvectl.NewDialer(connectDialer,
-			mt.Must(option.DNS.NewTransport(ctx, connectDialer)), resolvectl.DefaultResolveClient)
+			mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
+			resolvectl.NewResolver(logger))
 	}
 
 	if v4URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv6 {

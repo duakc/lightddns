@@ -2,15 +2,15 @@ package resolvectl
 
 import "fmt"
 
-type ResolveStrategy uint
+type LookupStrategy uint
 
 const (
-	ResolveAsis ResolveStrategy = iota
+	ResolveAsis LookupStrategy = iota
 	ResolveIPv6
 	ResolveIPv4
 )
 
-func (rs ResolveStrategy) String() string {
+func (rs LookupStrategy) String() string {
 	switch rs {
 	case ResolveAsis:
 		return "asis"

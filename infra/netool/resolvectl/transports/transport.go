@@ -20,6 +20,12 @@ type Transport interface {
 	Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error)
 }
 
+type FuncTransport func(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error)
+
+func (f FuncTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error) {
+	return f(ctx, message)
+}
+
 func CalculateTTL(message *mDns.Msg) (ttl uint32) {
 	for _, rrs := range [][]mDns.RR{message.Answer, message.Ns, message.Extra} {
 		for _, rr := range rrs {
