@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/common/generic"
+
 	"github.com/elastic/go-freelru"
 	mDns "github.com/miekg/dns"
 )
@@ -131,7 +133,8 @@ func (c *stubResolverCache) Clear() {
 }
 
 func (c *stubResolverCache) LoadUpstream(ctx context.Context,
-	upstream transports.Transport, message *mDns.Msg) (*mDns.Msg, error) {
+	upstream transports.Transport, message *mDns.Msg,
+) (*mDns.Msg, error) {
 	if message == nil {
 		return nil, fmt.Errorf("nil message")
 	}

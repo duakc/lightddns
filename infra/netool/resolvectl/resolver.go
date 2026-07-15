@@ -9,6 +9,7 @@ import (
 
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+
 	"github.com/duakc/mt/debug"
 
 	mDns "github.com/miekg/dns"
@@ -183,13 +184,13 @@ func exchangeOnce(ctx context.Context,
 		}
 
 		if ce := logger.Check(zapcore.DebugLevel, "exchanged"); ce != nil {
-			ttl := transports.CalculateTTL(exchangeMessage)
+			ttl := transports.CalculateTTL(exchangedMessage)
 
 			fields := []zap.Field{
 				zap.Uint32("ttl", ttl),
 			}
 
-			if addresses := transports.MessageToAddresses(responseMessage); len(addresses) > 0 {
+			if addresses := transports.MessageToAddresses(exchangedMessage); len(addresses) > 0 {
 				fields = append(fields, zap.Stringers("addresses", addresses))
 			}
 
@@ -197,6 +198,10 @@ func exchangeOnce(ctx context.Context,
 		}
 		return exchangedMessage, nil
 	}), message)
+	if err != nil {
+		logger.Error("load from upstream failed", zap.Error(err))
+		return nil, err
+	}
 
 	// cow
 	copiedMessage := responseMessage.Copy()
