@@ -9,11 +9,13 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
 
 	mDns "github.com/miekg/dns"
+	"go.uber.org/zap"
 )
 
 type Transport interface {
@@ -178,4 +180,11 @@ func ReadMessage(r io.Reader) (*mDns.Msg, error) {
 	var message mDns.Msg
 	err = message.Unpack(buffer.Bytes())
 	return &message, err
+}
+
+func createLogger(logger *zap.Logger, transportType string) *zap.Logger {
+	if logger == nil || logger == zaplog.NOP {
+		return logger
+	}
+	return logger.WithLazy(zap.String("transport_type", transportType))
 }

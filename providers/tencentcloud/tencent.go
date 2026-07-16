@@ -11,14 +11,10 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/domains"
-	"github.com/duakc/lightddns/infra/netool/httpx"
-	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
+	"github.com/duakc/lightddns/options/castoption"
 	"github.com/duakc/lightddns/providers/tencentcloud/internal"
-
-	"github.com/duakc/mt"
 
 	"go.uber.org/zap"
 )
@@ -49,35 +45,23 @@ type TencentCloud struct {
 
 func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudProviderOption) (adapter.Provider, error) {
 	if option.SecretId == "" {
-		return nil, fmt.Errorf("tencentcloud(%s): secretId is empty", option.Name)
+		return nil, fmt.Errorf("secretId is empty")
 	}
 
 	if option.SecretKey == "" {
-		return nil, fmt.Errorf("tencentcloud(%s): secretKey is empty", option.Name)
+		return nil, fmt.Errorf("secretKey is empty")
 	}
 
-	dialerOptions, err := option.ConnectOption.Options()
+	_, _, httpClient, err := castoption.BuildHTTPClientFromScratch(
+		logger, option.Connect, option.DNS, option.HTTP)
 	if err != nil {
 		return nil, err
 	}
-
-	clientOptions, err := option.HTTPOption.Options()
-	if err != nil {
-		return nil, err
-	}
-
-	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
-	resolveDialer := resolvectl.NewDialer(connectDialer,
-		mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
-		resolvectl.NewResolver(logger))
-
-	clientOptions = append(clientOptions,
-		httpx.ClientOptionWithDialer(resolveDialer))
 
 	return &TencentCloud{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
 		client: internal.NewClient(ctx, logger, option.Name,
-			httpx.NewClient(clientOptions...), option.SecretId, option.SecretKey),
+			httpClient, option.SecretId, option.SecretKey),
 		logger: logger.Named("client"),
 	}, nil
 }

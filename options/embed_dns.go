@@ -1,15 +1,11 @@
 package options
 
 import (
-	"context"
-	"crypto/tls"
 	"fmt"
-	"net"
 	urlpkg "net/url"
 	"strconv"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
 
 	"github.com/duakc/mt"
@@ -50,16 +46,4 @@ func (do *DNSOption) UnmarshalYAML(data []byte) error {
 		return fmt.Errorf("unknown dns: `%s`", unquoted)
 	}
 	return nil
-}
-
-func (do *DNSOption) NewTransport(ctx context.Context, dialer dialerx.Dialer) (transports.Transport, error) {
-	switch do.Type {
-	case transports.TransportTypeSystem, "":
-		return &transports.SystemTransport{}, nil
-	case transports.TransportTypeTLS:
-		return transports.NewTLS(ctx, dialer,
-			net.JoinHostPort(do.Server, strconv.FormatUint(uint64(do.Port), 10)), &tls.Config{})
-	default:
-		return nil, fmt.Errorf("unknown dns type: %s", do.Type)
-	}
 }

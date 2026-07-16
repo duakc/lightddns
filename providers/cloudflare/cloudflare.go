@@ -7,14 +7,10 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
-	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/domains"
-	"github.com/duakc/lightddns/infra/netool/httpx"
-	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
+	"github.com/duakc/lightddns/options/castoption"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
-
-	"github.com/duakc/mt"
 
 	"go.uber.org/zap"
 )
@@ -31,30 +27,19 @@ func init() {
 
 func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProviderOption) (adapter.Provider, error) {
 	if option.Token == "" {
-		return nil, fmt.Errorf("cloudflare(%s): token is empty", option.Name)
+		return nil, fmt.Errorf("token is empty")
 	}
 
-	dialerOptions, err := option.ConnectOption.Options()
+	_, _, httpClient, err := castoption.BuildHTTPClientFromScratch(
+		logger, option.Connect, option.DNS, option.HTTP)
 	if err != nil {
 		return nil, err
 	}
-	clientOptions, err := option.HTTPOption.Options()
-	if err != nil {
-		return nil, err
-	}
-
-	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
-	resolveDialer := resolvectl.NewDialer(connectDialer,
-		mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
-		resolvectl.NewResolver(logger))
-
-	clientOptions = append(clientOptions,
-		httpx.ClientOptionWithDialer(resolveDialer))
 
 	return &Cloudflare{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
 		client: internal.NewClient(ctx, logger, option.Name,
-			httpx.NewClient(clientOptions...), option.Token),
+			httpClient, option.Token),
 
 		proxied: option.Proxy,
 		logger:  logger.Named("client"),

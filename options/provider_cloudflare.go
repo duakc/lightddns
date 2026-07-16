@@ -6,8 +6,10 @@ import (
 
 type CloudflareProviderOption struct {
 	AbstractProviderOption `yaml:",inline"`
-	ConnectOption          `yaml:",inline"`
-	HTTPOption             `yaml:",inline"`
+
+	Connect ConnectOption `json:"connect,omitempty" yaml:"connect,omitempty"`
+	HTTP    HTTPOption    `json:"http,omitempty"    yaml:"http,omitempty"`
+	DNS     DNSOption     `json:"dns,omitempty"     yaml:"dns,omitempty"`
 
 	Token string `json:"token" yaml:"token"`
 

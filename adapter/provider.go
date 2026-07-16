@@ -18,14 +18,6 @@ type (
 
 var ProviderRegister = NewRegister[Provider]()
 
-func LookupAllProvider(manager ProviderManager, names []string) ([]Provider, error) {
-	all, err := manager.LookupAll(names)
-	if err != nil {
-		return nil, &ProviderNotFoundError{err}
-	}
-	return all, nil
-}
-
 type ProviderNotFoundError struct {
 	Err error
 }

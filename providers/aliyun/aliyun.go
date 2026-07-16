@@ -10,14 +10,10 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/domains"
-	"github.com/duakc/lightddns/infra/netool/httpx"
-	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
+	"github.com/duakc/lightddns/options/castoption"
 	"github.com/duakc/lightddns/providers/aliyun/internal"
-
-	"github.com/duakc/mt"
 
 	"go.uber.org/zap"
 )
@@ -36,35 +32,22 @@ func init() {
 
 func New(ctx context.Context, logger *zap.Logger, option options.AliyunProviderOption) (adapter.Provider, error) {
 	if option.AccessKeyId == "" {
-		return nil, fmt.Errorf("aliyun(%s): accessKeyId is empty", option.Name)
+		return nil, fmt.Errorf("accessKeyId is empty")
 	}
 	if option.AccessKeySecret == "" {
-		return nil, fmt.Errorf("aliyun(%s): accessKeySecret is empty", option.Name)
+		return nil, fmt.Errorf("accessKeySecret is empty")
 	}
 
-	dialerOptions, err := option.ConnectOption.Options()
+	_, _, httpClient, err := castoption.BuildHTTPClientFromScratch(
+		logger, option.Connect, option.DNS, option.HTTP)
 	if err != nil {
 		return nil, err
 	}
-
-	clientOptions, err := option.HTTPOption.Options()
-	if err != nil {
-		return nil, err
-	}
-
-	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
-	resolveDialer := resolvectl.NewDialer(connectDialer,
-		mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
-		resolvectl.NewResolver(logger))
-
-	clientOptions = append(clientOptions,
-		httpx.ClientOptionWithDialer(resolveDialer))
 
 	return &Aliyun{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
 		client: internal.NewClient(ctx, logger, option.Name,
-			httpx.NewClient(clientOptions...),
-			option.AccessKeyId, option.AccessKeySecret, ""),
+			httpClient, option.AccessKeyId, option.AccessKeySecret, ""),
 		logger: logger.Named("client"),
 	}, nil
 }
@@ -164,6 +147,7 @@ func (a *Aliyun) Update(ctx context.Context, domain string, ttl uint32, addr []n
 	if err != nil {
 		return false, fmt.Errorf("diff: %w", err)
 	}
+
 	if len(diffs) == 0 {
 		logger.Info("no difference since last updated, skip")
 		return false, nil

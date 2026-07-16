@@ -19,10 +19,8 @@ import (
 	"github.com/duakc/lightddns/infra/netool/dialerx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
-	"github.com/duakc/lightddns/infra/netool/resolvectl"
 	"github.com/duakc/lightddns/options"
-
-	"github.com/duakc/mt"
+	"github.com/duakc/lightddns/options/castoption"
 
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
@@ -42,6 +40,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	if option.Method == "" {
 		option.Method = http.MethodGet
 	}
+
 	v4URL, v6URL := option.URL.IPv4, option.URL.IPv6
 	if v4URL.Raw == "" && v6URL.Raw == "" {
 		return nil, fmt.Errorf("url: at least one of ipv4 or ipv6 must be specified")
@@ -64,25 +63,26 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	needDNS := (v4URL.Raw != "" && domains.IsDomainName(v4URL.URL.Host)) ||
 		(v6URL.Raw != "" && domains.IsDomainName(v6URL.URL.Host))
 
-	dialerOptions, err := option.ConnectOption.Options()
-	if err != nil {
-		return nil, fmt.Errorf("dialer: %w", err)
-	}
-	httpOptions, err := option.HTTPOption.Options()
-	if err != nil {
-		return nil, fmt.Errorf("http: %w", err)
-	}
-
 	var v4, v6 *requestContext
 
-	connectDialer := dialerx.NewDialerWithOption(dialerOptions...)
+	connectDialer, err := castoption.BuildDialer(option.Connect)
+	if err != nil {
+		return nil, err
+	}
 	if needDNS {
-		connectDialer = resolvectl.NewDialer(connectDialer,
-			mt.Must(option.DNS.NewTransport(ctx, connectDialer)),
-			resolvectl.NewResolver(logger))
+		resolveDialer, err := castoption.BuildResolveDialer(logger, connectDialer, option.DNS)
+		if err != nil {
+			return nil, err
+		}
+		connectDialer = resolveDialer
 	}
 
-	if v4URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv6 {
+	httpOptions, err := castoption.HTTPOptionToHTTPXOptions(option.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("building http options: %w", err)
+	}
+
+	if v4URL.Raw != "" && option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
 		httpClient := httpx.NewClient(append(httpOptions,
 			httpx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
 		v4, err = newRequestContext(string(option.Method), v4URL.Raw,
@@ -92,7 +92,8 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 			return nil, err
 		}
 	}
-	if v6URL.Raw != "" && option.DialStrategy != dialerx.DialOnlyIPv4 {
+
+	if v6URL.Raw != "" && option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
 		httpClient := httpx.NewClient(append(httpOptions,
 			httpx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
 		v6, err = newRequestContext(string(option.Method), v6URL.Raw,
@@ -102,6 +103,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 			return nil, err
 		}
 	}
+
 	httpds := &Httpds{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 
@@ -124,9 +126,6 @@ func (c *Httpds) IPv4(ctx context.Context) ([]netip.Addr, error) {
 	if c.v4 == nil {
 		return []netip.Addr{}, nil
 	}
-	logger := c.logger
-
-	logger.Debug("ipv4 request")
 	return c.v4.Handle(ctx)
 }
 
@@ -134,9 +133,6 @@ func (c *Httpds) IPv6(ctx context.Context) ([]netip.Addr, error) {
 	if c.v6 == nil {
 		return []netip.Addr{}, nil
 	}
-	logger := c.logger
-
-	logger.Debug("ipv6 request")
 	return c.v6.Handle(ctx)
 }
 

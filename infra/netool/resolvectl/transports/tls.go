@@ -3,14 +3,16 @@ package transports
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt/common/generic"
 
@@ -37,12 +39,20 @@ type TLSTransport struct {
 	closed      atomic.Bool
 }
 
-func NewTLS(ctx context.Context, dialer dialerx.Dialer, server string, tlsConfig *tls.Config) (*TLSTransport, error) {
-	logger := zaplog.FromOrPackage(ctx, "netool", "resolvectl", "transports")
+func NewTLS(logger *zap.Logger, dialer dialerx.Dialer, server string, serverPort uint16, tlsConfig *tls.Config) (*TLSTransport, error) {
+	if serverPort == 0 {
+		serverPort = 853
+	}
+	if server == "" {
+		return nil, errors.New("tls: empty server address")
+	}
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	}
 	return &TLSTransport{
-		logger:      logger.With(zap.String("dns_transport_type", "tls")),
+		logger:      createLogger(logger, TransportTypeTLS),
 		dialer:      dialer,
-		server:      server,
+		server:      net.JoinHostPort(server, strconv.Itoa(int(serverPort))),
 		tlsConfig:   tlsConfig,
 		tlsSessions: generic.NewList[*tlsTransportConn](),
 	}, nil
@@ -58,7 +68,7 @@ func (t *TLSTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.M
 		var err error
 		tlsSession, err = t.createSession(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("create tls session: %w", err)
+			return nil, fmt.Errorf("tls: create tls session: %w", err)
 		}
 	}
 	t.access.Unlock()
@@ -70,12 +80,12 @@ func (t *TLSTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.M
 	tlsSession.queryID++
 	if err := WriteMessage(tlsSession.conn, tlsSession.queryID, message); err != nil {
 		_ = tlsSession.conn.Close()
-		return nil, fmt.Errorf("write: %w", err)
+		return nil, fmt.Errorf("tls: write: %w", err)
 	}
 	exchangedMessage, err := ReadMessage(tlsSession.conn)
 	if err != nil {
 		_ = tlsSession.conn.Close()
-		return nil, fmt.Errorf("read: %w", err)
+		return nil, fmt.Errorf("tls: read: %w", err)
 	}
 	exchangedMessage.Id = messageID
 	_ = tlsSession.conn.SetDeadline(time.Time{})

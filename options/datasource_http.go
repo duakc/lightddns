@@ -7,8 +7,10 @@ import (
 
 type HTTPDatasourceOption struct {
 	AbstractDatasourceOption `yaml:",inline"`
-	ConnectOption            `yaml:",inline"`
-	HTTPOption               `yaml:",inline"`
+
+	Connect ConnectOption `json:"connect,omitempty" yaml:"connect,omitempty"`
+	HTTP    HTTPOption    `json:"http,omitempty"    yaml:"http,omitempty"`
+	DNS     DNSOption     `json:"dns,omitempty"     yaml:"dns,omitempty"`
 
 	URL badyaml.DualStack[badyaml.URL] `json:"url" yaml:"url"`
 
