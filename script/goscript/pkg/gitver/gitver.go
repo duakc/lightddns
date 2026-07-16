@@ -3,25 +3,37 @@ package gitver
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 )
 
+var (
+	gitVersionOnce, gitBranchOnce sync.Once
+
+	gitVersion, gitBranch string
+)
+
 func Version(ctx context.Context) string {
-	if tags := git(ctx, "tag", "--points-at", "HEAD"); tags != "" {
-		return strings.SplitN(tags, "\n", 2)[0] // first tag if several
-	}
-	if hash := git(ctx, "rev-parse", "--short", "HEAD"); hash != "" {
-		return hash
-	}
-	return unknown
+	gitVersionOnce.Do(func() {
+		gitVersion = unknown
+		if tags := git(ctx, "tag", "--points-at", "HEAD"); tags != "" {
+			gitVersion = strings.SplitN(tags, "\n", 2)[0] // first tag if several
+		} else if hash := git(ctx, "rev-parse", "--short", "HEAD"); hash != "" {
+			gitVersion = hash
+		}
+	})
+	return gitVersion
 }
 
 func Branch(ctx context.Context) string {
-	if b := git(ctx, "branch", "--show-current"); b != "" {
-		return b
-	}
-	return unknown
+	gitBranchOnce.Do(func() {
+		gitBranch = unknown
+		if b := git(ctx, "branch", "--show-current"); b != "" {
+			gitBranch = b
+		}
+	})
+	return gitBranch
 }
 
 const unknown = "(unknown)"

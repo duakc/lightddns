@@ -6,6 +6,7 @@ import (
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/options"
 
@@ -29,9 +30,9 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	datasources, err := adapter.LookupAllDatasource(
+	datasources, err := datasourcex.Lookup(
 		services.Lookup[adapter.DatasourceManager](ctx),
-		option.Datasources,
+		option.Datasources...,
 	)
 	if err != nil {
 		return nil, err
@@ -87,5 +88,5 @@ func (s *Sum) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (s *Sum) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, error) {
-	return adapter.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
+	return datasourcex.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
 }

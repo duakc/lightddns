@@ -13,6 +13,7 @@ import (
 	"regexp"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/netool"
@@ -137,7 +138,7 @@ func (c *Httpds) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (c *Httpds) IP(ctx context.Context) ([]netip.Addr, error) {
-	return adapter.MergeDualStackDatasourceIP(ctx, c)
+	return datasourcex.MergeDualStackDatasourceIP(ctx, c)
 }
 
 type requestContext struct {

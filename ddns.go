@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
+	"github.com/duakc/lightddns/adapter/metricx"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -26,7 +26,7 @@ import (
 )
 
 // Root-level metric names (no subsystem). Final name composed with
-// prometheus.BuildFQName(ddnsmetric.Namespace, "", <leaf>).
+// prometheus.BuildFQName(metricx.Namespace, "", <leaf>).
 const (
 	metricBuildInfo = "build_info"
 )
@@ -54,9 +54,9 @@ func New(ctx context.Context, option options.Options) (*LightDDNS, error) {
 	metricsRegistry := metrics.New(prometheusEnabled(option.Services))
 	services.Store[metrics.Registry](ctx, metricsRegistry)
 
-	services.Store[ddnsmetric.DataSourceFactory](ctx, ddnsmetric.NewDatasourceFactory(metricsRegistry))
-	services.Store[ddnsmetric.ProviderFactory](ctx, ddnsmetric.NewProviderFactory(metricsRegistry))
-	services.Store[ddnsmetric.ServiceFactory](ctx, ddnsmetric.NewServiceFactory(metricsRegistry))
+	services.Store[metricx.DataSourceFactory](ctx, metricx.NewDatasourceFactory(metricsRegistry))
+	services.Store[metricx.ProviderFactory](ctx, metricx.NewProviderFactory(metricsRegistry))
+	services.Store[metricx.ServiceFactory](ctx, metricx.NewServiceFactory(metricsRegistry))
 
 	providerManager := adapter.NewManager[adapter.Provider](adapter.ProviderRegister)
 	services.Store[adapter.ProviderManager](ctx, providerManager)
@@ -144,7 +144,7 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 
 func (ld *LightDDNS) setupPrometheus(reg metrics.Registry) {
 	reg.GaugeVec(
-		prometheus.BuildFQName(ddnsmetric.Namespace, "", metricBuildInfo),
+		prometheus.BuildFQName(metricx.Namespace, "", metricBuildInfo),
 		"Build information. Value is always 1.",
 		[]string{constpkg.MetricLabelVersion, constpkg.MetricLabelBranch},
 	).With(constpkg.Version, constpkg.Branch).Set(1)

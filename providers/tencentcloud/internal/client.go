@@ -7,8 +7,8 @@ import (
 	"net/http"
 	urlpkg "net/url"
 
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
-	"github.com/duakc/lightddns/adapter/ddnsprovider"
+	"github.com/duakc/lightddns/adapter/metricx"
+	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
@@ -51,11 +51,11 @@ const (
 const ContentTypeJSON = "application/json; charset=utf-8"
 
 const (
-	opDescribeDomains = ddnsprovider.OpDescribeDomains
-	opListRecords     = ddnsprovider.OpListRecords
-	opCreateRecord    = ddnsprovider.OpCreateRecord
-	opModifyRecord    = ddnsprovider.OpUpdateRecord
-	opDeleteRecord    = ddnsprovider.OpDeleteRecord
+	opDescribeDomains = providerx.OpDescribeDomains
+	opListRecords     = providerx.OpListRecords
+	opCreateRecord    = providerx.OpCreateRecord
+	opModifyRecord    = providerx.OpUpdateRecord
+	opDeleteRecord    = providerx.OpDeleteRecord
 )
 
 var TencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
@@ -66,15 +66,15 @@ type Client struct {
 	logger *zap.Logger
 	do     httpx.HTTPRequester
 
-	metricsRouter *ddnsprovider.ApiMetricsRouter
+	metricsRouter *providerx.ApiMetricsRouter
 }
 
 func NewClient(ctx context.Context, logger *zap.Logger,
 	providerName string,
 	do httpx.HTTPRequester, secretId, secretKey string,
 ) *Client {
-	router := ddnsprovider.NewMetricsRouter(
-		services.Lookup[ddnsmetric.ProviderFactory](ctx), providerName)
+	router := providerx.NewMetricsRouter(
+		services.Lookup[metricx.ProviderFactory](ctx), providerName)
 	router.RegisterDefault()
 
 	return &Client{

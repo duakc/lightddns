@@ -1,9 +1,9 @@
-package ddnsprovider
+package providerx
 
 import (
 	"time"
 
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
+	"github.com/duakc/lightddns/adapter/metricx"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -15,13 +15,13 @@ type apiMetricsSet struct {
 }
 
 type ApiMetricsRouter struct {
-	factory      ddnsmetric.ProviderFactory
+	factory      metricx.ProviderFactory
 	providerName string
 
 	sets map[string]apiMetricsSet
 }
 
-func NewMetricsRouter(factory ddnsmetric.ProviderFactory, providerName string) *ApiMetricsRouter {
+func NewMetricsRouter(factory metricx.ProviderFactory, providerName string) *ApiMetricsRouter {
 	return &ApiMetricsRouter{
 		sets:         make(map[string]apiMetricsSet),
 		factory:      factory,
@@ -50,7 +50,7 @@ func (r *ApiMetricsRouter) Register(ops ...string) {
 func (r *ApiMetricsRouter) RecordAPI(op string) func(errp *error) {
 	set, ok := r.sets[op]
 	if !ok {
-		panic("ddnsmetric: unknown provider op: " + op)
+		panic("metricx: unknown provider op: " + op)
 	}
 	start := time.Now()
 	return func(errp *error) {

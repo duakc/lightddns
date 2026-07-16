@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
@@ -87,7 +88,7 @@ type Command struct {
 }
 
 func (c *Command) IP(ctx context.Context) ([]netip.Addr, error) {
-	return adapter.MergeDualStackDatasourceIP(ctx, c)
+	return datasourcex.MergeDualStackDatasourceIP(ctx, c)
 }
 
 func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {

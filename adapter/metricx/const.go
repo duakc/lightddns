@@ -1,4 +1,4 @@
-package ddnsmetric
+package metricx
 
 import constpkg "github.com/duakc/lightddns/constant"
 

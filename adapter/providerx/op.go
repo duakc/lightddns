@@ -1,4 +1,4 @@
-package ddnsprovider
+package providerx
 
 const (
 	OpDescribeDomains = "describe_domains"

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
+	"github.com/duakc/lightddns/adapter/datasourcex"
+	"github.com/duakc/lightddns/adapter/metricx"
+	"github.com/duakc/lightddns/adapter/providerx"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/options"
@@ -84,19 +86,23 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 		logger.Warn("timeout too short, consider to increase the timeout")
 	}
 
-	provider, providerFound := providerManager.LookupDefault(opt.Provider)
-	if !providerFound {
-		return nil, &adapter.ProviderNotFoundError{Err: adapter.NewManagedNotFoundError(opt.Provider)}
+	var (
+		provider   []adapter.Provider
+		datasource []adapter.Datasource
+		err        error
+	)
+
+	if provider, err = providerx.Lookup(providerManager, opt.Provider); err != nil {
+		return nil, err
 	}
-	datasource, datasourceFound := datasourceManager.LookupDefault(opt.Datasource)
-	if !datasourceFound {
-		return nil, &adapter.DatasourceNotFoundError{Err: adapter.NewManagedNotFoundError(opt.Datasource)}
+	if datasource, err = datasourcex.Lookup(datasourceManager, opt.Datasource); err != nil {
+		return nil, err
 	}
 
 	d := &Domain{
 		logger:         logger,
-		provider:       provider,
-		datasource:     datasource,
+		provider:       provider[0],
+		datasource:     datasource[0],
 		domainName:     string(opt.Domain),
 		updateInterval: updateInterval,
 		timeout:        timeout,
@@ -106,7 +112,7 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 	}
 
 	d.RegisterMetrics(metrics.NewNameFactory(services.Lookup[metrics.Registry](ctx),
-		ddnsmetric.Namespace, ddnsmetric.SubsystemDomain))
+		metricx.Namespace, metricx.SubsystemDomain))
 
 	return d, nil
 }
@@ -176,11 +182,12 @@ func (o *Domain) Update(ctx context.Context) (err error) {
 	cancelContext, cancel := context.WithTimeout(ctx, o.timeout)
 	defer cancel()
 
-	netips, err := adapter.MergeDatasources(cancelContext,
-		[]adapter.Datasource{o.datasource}, o.ipv4, o.ipv6, true)
+	datasourceIPs, err := datasourcex.NewLimited(o.datasource, o.ipv4, o.ipv6, true).IP(ctx)
 	if err != nil {
 		return err
-	} else if len(netips) == 0 {
+	}
+
+	if len(datasourceIPs) == 0 {
 		o.noIpAddressCounter.Inc()
 		if debug.Enabled {
 			return fmt.Errorf("no available IP address found")
@@ -190,9 +197,9 @@ func (o *Domain) Update(ctx context.Context) (err error) {
 		return nil
 	}
 
-	logger.Debug("found ip", zap.Stringers("ip", netips))
+	logger.Debug("found ip", zap.Stringers("ip", datasourceIPs))
 
-	changed, err := o.provider.Update(cancelContext, o.domainName, o.ttl, netips)
+	changed, err := o.provider.Update(cancelContext, o.domainName, o.ttl, datasourceIPs)
 	if err != nil {
 		return fmt.Errorf("update domain(%s) failed: %w", o.domainName, err)
 	}

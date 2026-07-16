@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/options"
@@ -33,9 +34,9 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		return nil, &adapter.EmptyGroupError{Type: DatasourceType, Name: option.Name}
 	}
 
-	datasources, err := adapter.LookupAllDatasource(
+	datasources, err := datasourcex.Lookup(
 		services.Lookup[adapter.DatasourceManager](ctx),
-		option.Datasources,
+		option.Datasources...,
 	)
 	if err != nil {
 		return nil, err

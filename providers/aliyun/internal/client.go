@@ -8,8 +8,8 @@ import (
 	"net/http"
 	urlpkg "net/url"
 
-	"github.com/duakc/lightddns/adapter/ddnsmetric"
-	"github.com/duakc/lightddns/adapter/ddnsprovider"
+	"github.com/duakc/lightddns/adapter/metricx"
+	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
@@ -37,11 +37,11 @@ const (
 )
 
 const (
-	opDescribeDomains = ddnsprovider.OpDescribeDomains
-	opListRecords     = ddnsprovider.OpListRecords
-	opCreateRecord    = ddnsprovider.OpCreateRecord
-	opUpdateRecord    = ddnsprovider.OpUpdateRecord
-	opDeleteRecord    = ddnsprovider.OpDeleteRecord
+	opDescribeDomains = providerx.OpDescribeDomains
+	opListRecords     = providerx.OpListRecords
+	opCreateRecord    = providerx.OpCreateRecord
+	opUpdateRecord    = providerx.OpUpdateRecord
+	opDeleteRecord    = providerx.OpDeleteRecord
 )
 
 var AliyunDNSEndpoint = mt.Must(urlpkg.Parse("https://alidns.aliyuncs.com"))
@@ -52,7 +52,7 @@ type Client struct {
 	logger *zap.Logger
 	do     httpx.HTTPRequester
 
-	metricsRouter *ddnsprovider.ApiMetricsRouter
+	metricsRouter *providerx.ApiMetricsRouter
 }
 
 func NewClient(ctx context.Context, logger *zap.Logger,
@@ -60,8 +60,8 @@ func NewClient(ctx context.Context, logger *zap.Logger,
 	do httpx.HTTPRequester,
 	secretAccessKeyId, secretAccessKeySecret, secretSecurityToken string,
 ) *Client {
-	router := ddnsprovider.NewMetricsRouter(
-		services.Lookup[ddnsmetric.ProviderFactory](ctx), providerName)
+	router := providerx.NewMetricsRouter(
+		services.Lookup[metricx.ProviderFactory](ctx), providerName)
 	router.RegisterDefault()
 
 	return &Client{
