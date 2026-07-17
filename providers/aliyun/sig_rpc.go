@@ -1,4 +1,4 @@
-package internal
+package aliyun
 
 import (
 	"crypto/hmac"

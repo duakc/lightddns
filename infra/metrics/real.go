@@ -2,6 +2,9 @@ package metrics
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/duakc/mt/services"
@@ -15,24 +18,41 @@ type defaultRegistry struct {
 	reg *prometheus.Registry
 
 	mu         sync.Mutex
-	counters   map[string]CounterVec
-	gauges     map[string]GaugeVec
-	histograms map[string]HistogramVec
-	summaries  map[string]SummaryVec
+	counters   map[string]registeredMetric[CounterVec]
+	gauges     map[string]registeredMetric[GaugeVec]
+	histograms map[string]registeredMetric[HistogramVec]
+	summaries  map[string]registeredMetric[SummaryVec]
+}
+
+type registeredMetric[T any] struct {
+	metric T
+	opts   any
+	labels []string
 }
 
 func newDefaultRegistry() Registry {
 	return &defaultRegistry{
 		reg:        prometheus.NewRegistry(),
-		counters:   make(map[string]CounterVec),
-		gauges:     make(map[string]GaugeVec),
-		histograms: make(map[string]HistogramVec),
-		summaries:  make(map[string]SummaryVec),
+		counters:   make(map[string]registeredMetric[CounterVec]),
+		gauges:     make(map[string]registeredMetric[GaugeVec]),
+		histograms: make(map[string]registeredMetric[HistogramVec]),
+		summaries:  make(map[string]registeredMetric[SummaryVec]),
 	}
 }
 
 func (r *defaultRegistry) ContextInject(ctx context.Context) context.Context {
 	return services.InjectMe[Registry](ctx, r)
+}
+
+func metricKey(namespace, subsystem, name string) string {
+	return prometheus.BuildFQName(namespace, subsystem, name)
+}
+
+func registeredOrPanic[T any](registered registeredMetric[T], opts any, labels []string, name string) T {
+	if !reflect.DeepEqual(registered.opts, opts) || !slices.Equal(registered.labels, labels) {
+		panic(fmt.Sprintf("metrics: %s registered with a different schema", name))
+	}
+	return registered.metric
 }
 
 func (r *defaultRegistry) CounterVec(name, help string, labels []string) CounterVec {
@@ -48,14 +68,19 @@ func (r *defaultRegistry) CounterVecVerbose(opt prometheus.CounterOpts, labels [
 	if opt.Name == "" {
 		panic("CounterVecVerbose must have a name")
 	}
-	if existing, ok := r.counters[opt.Name]; ok {
-		return existing
+	key := metricKey(opt.Namespace, opt.Subsystem, opt.Name)
+	if existing, ok := r.counters[key]; ok {
+		return registeredOrPanic(existing, opt, labels, key)
 	}
 	vec := prometheus.NewCounterVec(opt, labels)
 	r.reg.MustRegister(vec)
-	c := &counterVec{vec: vec}
-	r.counters[opt.Name] = c
-	return c
+	counter := &counterVec{vec: vec}
+	r.counters[key] = registeredMetric[CounterVec]{
+		metric: counter,
+		opts:   opt,
+		labels: slices.Clone(labels),
+	}
+	return counter
 }
 
 func (r *defaultRegistry) GaugeVec(name, help string, labels []string) GaugeVec {
@@ -71,14 +96,19 @@ func (r *defaultRegistry) GaugeVecVerbose(opt prometheus.GaugeOpts, labels []str
 	if opt.Name == "" {
 		panic("GaugeVecVerbose must have a name")
 	}
-	if existing, ok := r.gauges[opt.Name]; ok {
-		return existing
+	key := metricKey(opt.Namespace, opt.Subsystem, opt.Name)
+	if existing, ok := r.gauges[key]; ok {
+		return registeredOrPanic(existing, opt, labels, key)
 	}
 	vec := prometheus.NewGaugeVec(opt, labels)
 	r.reg.MustRegister(vec)
-	g := &gaugeVec{vec: vec}
-	r.gauges[opt.Name] = g
-	return g
+	gauge := &gaugeVec{vec: vec}
+	r.gauges[key] = registeredMetric[GaugeVec]{
+		metric: gauge,
+		opts:   opt,
+		labels: slices.Clone(labels),
+	}
+	return gauge
 }
 
 func (r *defaultRegistry) HistogramVec(name, help string, labels []string, buckets []float64) HistogramVec {
@@ -96,17 +126,22 @@ func (r *defaultRegistry) HistogramVecVerbose(opt prometheus.HistogramOpts, labe
 	if opt.Name == "" {
 		panic("HistogramVecVerbose must have a name")
 	}
-	if existing, ok := r.histograms[opt.Name]; ok {
-		return existing
-	}
 	if len(opt.Buckets) == 0 {
 		opt.Buckets = prometheus.DefBuckets
 	}
+	key := metricKey(opt.Namespace, opt.Subsystem, opt.Name)
+	if existing, ok := r.histograms[key]; ok {
+		return registeredOrPanic(existing, opt, labels, key)
+	}
 	vec := prometheus.NewHistogramVec(opt, labels)
 	r.reg.MustRegister(vec)
-	h := &histogramVec{vec: vec}
-	r.histograms[opt.Name] = h
-	return h
+	histogram := &histogramVec{vec: vec}
+	r.histograms[key] = registeredMetric[HistogramVec]{
+		metric: histogram,
+		opts:   opt,
+		labels: slices.Clone(labels),
+	}
+	return histogram
 }
 
 func (r *defaultRegistry) SummaryVec(name, help string, labels []string, objectives map[float64]float64) SummaryVec {
@@ -124,14 +159,19 @@ func (r *defaultRegistry) SummaryVecVerbose(opt prometheus.SummaryOpts, labels [
 	if opt.Name == "" {
 		panic("SummaryVecVerbose must have a name")
 	}
-	if existing, ok := r.summaries[opt.Name]; ok {
-		return existing
+	key := metricKey(opt.Namespace, opt.Subsystem, opt.Name)
+	if existing, ok := r.summaries[key]; ok {
+		return registeredOrPanic(existing, opt, labels, key)
 	}
 	vec := prometheus.NewSummaryVec(opt, labels)
 	r.reg.MustRegister(vec)
-	s := &summaryVec{vec: vec}
-	r.summaries[opt.Name] = s
-	return s
+	summary := &summaryVec{vec: vec}
+	r.summaries[key] = registeredMetric[SummaryVec]{
+		metric: summary,
+		opts:   opt,
+		labels: slices.Clone(labels),
+	}
+	return summary
 }
 
 func (r *defaultRegistry) Gatherer() prometheus.Gatherer { return r.reg }

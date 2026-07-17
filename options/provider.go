@@ -35,8 +35,8 @@ func (po *ProviderOption) setName(name string) {
 }
 
 var (
-	_ nameSetter    = (*AbstractProviderOption)(nil)
-	_ VariantOption = (*AbstractProviderOption)(nil)
+	_ nameSetter      = (*AbstractProviderOption)(nil)
+	_ adapter.Variant = (*AbstractProviderOption)(nil)
 )
 
 type AbstractProviderOption struct {

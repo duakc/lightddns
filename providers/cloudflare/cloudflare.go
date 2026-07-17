@@ -3,14 +3,14 @@ package cloudflare
 import (
 	"context"
 	"fmt"
+	"net/netip"
 
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/ddnsx"
+	"github.com/duakc/lightddns/adapter/providerx"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/options/castoption"
-	"github.com/duakc/lightddns/providers/cloudflare/internal"
 
 	"go.uber.org/zap"
 )
@@ -25,6 +25,14 @@ func init() {
 	)
 }
 
+var _ adapter.Provider = (*Cloudflare)(nil)
+
+type Cloudflare struct {
+	adapter.AbstractManagedType
+
+	reconciler *ddnsx.Reconciler[DNSRecord]
+}
+
 func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProviderOption) (adapter.Provider, error) {
 	if option.Token == "" {
 		return nil, fmt.Errorf("token is empty")
@@ -36,37 +44,23 @@ func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProvi
 		return nil, err
 	}
 
+	client := NewClient(logger, httpClient, option.Token,
+		option.Proxy, false, constpkg.ThisRecordIsManagedByLightddns)
+	observed := providerx.NewMetricsClientFromContext(
+		ctx, option.Name, ProviderType, client,
+	)
 	return &Cloudflare{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		client: internal.NewClient(ctx, logger, option.Name,
-			httpClient, option.Token),
-
-		proxied: option.Proxy,
-		logger:  logger.Named("client"),
+		reconciler:          ddnsx.NewReconciler(logger.Named("client"), observed),
 	}, nil
-}
-
-type Cloudflare struct {
-	adapter.AbstractManagedType
-
-	logger *zap.Logger
-	client *internal.Client
-
-	zones ddnsx.DomainIdCache
-
-	proxied      bool
-	privateRoute bool
 }
 
 func (c *Cloudflare) Close() error { return nil }
 
-func (c *Cloudflare) getZoneID(ctx context.Context, domain string) (string, error) {
-	if !domains.IsDomainName(domain) {
-		return "", fmt.Errorf("bad domain name: %s", domain)
-	}
-	zoneID := c.zones.LoadOrStore(ctx, domain, c.client)
-	if zoneID == "" {
-		return "", fmt.Errorf("zone id for %s not found", domain)
-	}
-	return zoneID, nil
+func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
+	return c.reconciler.Diff(ctx, domain, addr)
+}
+
+func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
+	return c.reconciler.Update(ctx, domain, ttl, addr)
 }

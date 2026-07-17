@@ -1,20 +1,20 @@
-package internal
+package tencentcloud
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	urlpkg "net/url"
+	"strings"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
-	"github.com/duakc/lightddns/adapter/metricx"
-	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
-	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
@@ -50,36 +50,23 @@ const (
 
 const ContentTypeJSON = "application/json; charset=utf-8"
 
-const (
-	opDescribeDomains = providerx.OpDescribeDomains
-	opListRecords     = providerx.OpListRecords
-	opCreateRecord    = providerx.OpCreateRecord
-	opModifyRecord    = providerx.OpUpdateRecord
-	opDeleteRecord    = providerx.OpDeleteRecord
-)
-
 var TencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
 
-var _ ddnsx.DomainSearcher = (*Client)(nil)
+var (
+	_ ddnsx.DDNSClient[Record] = (*Client)(nil)
+	_ ddnsx.ZoneSearcher       = (*Client)(nil)
+)
 
 type Client struct {
 	logger *zap.Logger
 	do     httpx.HTTPRequester
 
-	metricsRouter *providerx.ApiMetricsRouter
+	zones ddnsx.ZoneCache
 }
 
-func NewClient(ctx context.Context, logger *zap.Logger,
-	providerName string,
-	do httpx.HTTPRequester, secretId, secretKey string,
-) *Client {
-	router := providerx.NewMetricsRouter(
-		services.Lookup[metricx.ProviderFactory](ctx), providerName)
-	router.RegisterDefault()
-
+func NewClient(logger *zap.Logger, do httpx.HTTPRequester, secretId, secretKey string) *Client {
 	return &Client{
-		logger:        logger,
-		metricsRouter: router,
+		logger: logger,
 		do: &TencentSignHTTPRequester{
 			HTTPRequester: do,
 			Logger:        logger,
@@ -94,7 +81,6 @@ func NewClient(ctx context.Context, logger *zap.Logger,
 func (c *Client) DescribeDomainFilterList(ctx context.Context,
 	req DescribeDomainFilterListRequest,
 ) (resp DescribeDomainFilterListResponse, err error) {
-	defer c.metricsRouter.RecordAPI(opDescribeDomains)(&err)
 	return doAction[DescribeDomainFilterListResponse](ctx, c, DNSPodActionDescribeDomainFilterList, req)
 }
 
@@ -102,7 +88,6 @@ func (c *Client) DescribeDomainFilterList(ctx context.Context,
 func (c *Client) DescribeRecordList(ctx context.Context,
 	req DescribeRecordListRequest,
 ) (resp DescribeRecordListResponse, err error) {
-	defer c.metricsRouter.RecordAPI(opListRecords)(&err)
 	return doAction[DescribeRecordListResponse](ctx, c, DNSPodActionDescribeRecordList, req)
 }
 
@@ -110,7 +95,6 @@ func (c *Client) DescribeRecordList(ctx context.Context,
 func (c *Client) CreateRecord(ctx context.Context,
 	req CreateRecordRequest,
 ) (resp CreateRecordResponse, err error) {
-	defer c.metricsRouter.RecordAPI(opCreateRecord)(&err)
 	return doAction[CreateRecordResponse](ctx, c, DNSPodActionCreateRecord, req)
 }
 
@@ -118,7 +102,6 @@ func (c *Client) CreateRecord(ctx context.Context,
 func (c *Client) ModifyRecord(ctx context.Context,
 	req ModifyRecordRequest,
 ) (resp ModifyRecordResponse, err error) {
-	defer c.metricsRouter.RecordAPI(opModifyRecord)(&err)
 	return doAction[ModifyRecordResponse](ctx, c, DNSPodActionModifyRecord, req)
 }
 
@@ -126,40 +109,152 @@ func (c *Client) ModifyRecord(ctx context.Context,
 func (c *Client) DeleteRecord(ctx context.Context,
 	req DeleteRecordRequest,
 ) (resp DeleteRecordResponse, err error) {
-	defer c.metricsRouter.RecordAPI(opDeleteRecord)(&err)
 	return doAction[DeleteRecordResponse](ctx, c, DNSPodActionDeleteRecord, req)
 }
 
-func (c *Client) SearchDomain(ctx context.Context, keyword string) map[string]string {
+func (c *Client) ResolveZone(ctx context.Context, fqdn string) (ddnsx.Zone, error) {
+	return c.zones.Resolve(ctx, fqdn, c)
+}
+
+func (c *Client) SearchZones(ctx context.Context, keyword ddnsx.ZoneName) ([]ddnsx.Zone, error) {
 	const pageSize = 100
 
 	logger := c.actionLogger(DNSPodActionDescribeDomainFilterList).
-		With(zap.String("keyword", keyword))
+		With(zap.Stringer("keyword", keyword))
 	logger.Info("search domain id from upstream")
 
-	result := make(map[string]string)
+	var zones []ddnsx.Zone
 	for offset := 0; ; {
 		page, err := c.DescribeDomainFilterList(ctx, DescribeDomainFilterListRequest{
 			Type:    "ALL",
 			Limit:   pageSize,
 			Offset:  offset,
-			Keyword: keyword,
+			Keyword: keyword.String(),
 		})
 		if err != nil {
-			logger.Warn("list domains failed", zap.Error(err))
-			return nil
+			return nil, fmt.Errorf("DescribeDomainFilterList: %w", err)
 		}
-		for _, di := range page.DomainList {
-			if !domains.IsDomainName(di.Name) {
+		for _, domain := range page.DomainList {
+			if !domains.IsDomainName(domain.Name) {
 				continue
 			}
-			result[di.Name] = di.Name
+			zones = append(zones, ddnsx.Zone{Name: ddnsx.ZoneName(domain.Name)})
 		}
 		offset += len(page.DomainList)
 		if len(page.DomainList) == 0 || offset >= page.DomainCountInfo.DomainTotal {
-			return result
+			return zones, nil
 		}
 	}
+}
+
+func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Existing[Record], error) {
+	const pageSize = 100
+
+	subdomain, err := relativeSubDomain(key.FQDN, key.Zone.Name.String())
+	if err != nil {
+		return nil, err
+	}
+
+	var records []ddnsx.Existing[Record]
+	for offset := 0; ; {
+		page, err := c.DescribeRecordList(ctx, DescribeRecordListRequest{
+			Domain:     key.Zone.Name.String(),
+			Subdomain:  subdomain,
+			RecordType: key.Type.String(),
+			Limit:      pageSize,
+			Offset:     offset,
+		})
+		if err != nil {
+			var apiErr *APIError
+			if errors.As(err, &apiErr) && apiErr.Code == DNSPodErrCodeNoDataOfRecord {
+				return records, nil
+			}
+			return nil, fmt.Errorf("DescribeRecordList: %w", err)
+		}
+		for _, record := range page.RecordList {
+			if record.Type != key.Type.String() {
+				continue
+			}
+			address, err := netip.ParseAddr(record.Value)
+			if err != nil {
+				return nil, fmt.Errorf("record %d: not an address: %s: %w", record.RecordId, record.Value, err)
+			}
+			records = append(records, ddnsx.Existing[Record]{
+				Addr:   address.Unmap(),
+				Record: record,
+			})
+		}
+		offset += len(page.RecordList)
+		if len(page.RecordList) == 0 || offset >= page.RecordCountInfo.TotalCount {
+			return records, nil
+		}
+	}
+}
+
+func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
+	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Name.String())
+	if err != nil {
+		return err
+	}
+	_, err = c.CreateRecord(ctx, CreateRecordRequest{
+		Domain:     target.Zone.Name.String(),
+		SubDomain:  subdomain,
+		RecordType: target.Type.String(),
+		RecordLine: DefaultRecordLine,
+		Value:      target.Address.Unmap().String(),
+		TTL:        target.TTL,
+	})
+	return err
+}
+
+func (c *Client) Update(ctx context.Context, target ddnsx.RecordTarget, record Record) error {
+	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Name.String())
+	if err != nil {
+		return err
+	}
+	_, err = c.ModifyRecord(ctx, ModifyRecordRequest{
+		Domain:     target.Zone.Name.String(),
+		RecordId:   record.RecordId,
+		SubDomain:  subdomain,
+		RecordType: target.Type.String(),
+		RecordLine: lineOrDefault(record.Line),
+		Value:      target.Address.Unmap().String(),
+		TTL:        target.TTL,
+	})
+	return err
+}
+
+func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record Record) error {
+	_, err := c.DeleteRecord(ctx, DeleteRecordRequest{
+		Domain:   key.Zone.Name.String(),
+		RecordId: record.RecordId,
+	})
+	return err
+}
+
+func lineOrDefault(line string) string {
+	if line == "" {
+		return DefaultRecordLine
+	}
+	return line
+}
+
+func relativeSubDomain(fqdn, zone string) (string, error) {
+	fqdn, err := ddnsx.NormalizeFQDN(fqdn)
+	if err != nil {
+		return "", err
+	}
+	zone, err = ddnsx.NormalizeFQDN(zone)
+	if err != nil {
+		return "", err
+	}
+	if fqdn == zone {
+		return "@", nil
+	}
+	if subdomain, found := strings.CutSuffix(fqdn, "."+zone); found {
+		return subdomain, nil
+	}
+	return "", fmt.Errorf("fqdn %q is not within zone %q", fqdn, zone)
 }
 
 func (c *Client) actionLogger(action string) *zap.Logger {

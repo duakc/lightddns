@@ -1,4 +1,4 @@
-package internal
+package tencentcloud
 
 // https://cloud.tencent.com/document/api/1427/56189
 

@@ -78,7 +78,11 @@ func preRun(cmd *cobra.Command, args []string) {
 
 func main() {
 	defer func() {
-		if err := errors.Join(closeManager.Close(), closeme.Default.Close()); err != nil {
+		var closeErr error
+		if closeManager != nil {
+			closeErr = closeManager.Close()
+		}
+		if err := errors.Join(closeErr, closeme.Default.Close()); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "close resources failed:\n%v", err)
 		}
 	}()

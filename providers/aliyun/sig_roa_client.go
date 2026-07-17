@@ -1,9 +1,7 @@
-package internal
+package aliyun
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/duakc/lightddns/infra/netool/httpx"
@@ -37,27 +35,14 @@ func (c *AliyunROASignClient) Do(r *http.Request) (resp *http.Response, err erro
 		r.Header.Set("Host", host)
 	}
 
-	// Drain the request body into a Go-owned []byte for the V3 signature.
-	// We must not back r.Body / GetBody with a pooled buffer: the HTTP
-	// transport may still be writing the body in a goroutine after Do
-	// returns (HTTP/2 streams, retries via GetBody), and recycling the
-	// backing slice underneath the transport produces a corrupted request
-	// → server resets the stream → caller sees io.EOF on resp.Body. See
-	// tencentcloud's sig_client.go for the same fix.
-	var bodyBytes []byte
-	if r.Body != nil {
-		bodyBytes, err = io.ReadAll(r.Body)
-		if err != nil {
-			return nil, fmt.Errorf("aliyun sign: read body: %w", err)
-		}
-		_ = r.Body.Close()
+	bodyBytes, err := httpx.ReadAndReplayBody(r)
+	if err != nil {
+		return nil, fmt.Errorf("aliyun sign: %w", err)
 	}
 
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	r.ContentLength = int64(len(bodyBytes))
-	r.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
-	}
+	// X-Acs-Content-Sha256 belongs to the signed header set, so it must be
+	// present before CanonicalRequest builds the canonical headers.
+	r.Header.Set(HeaderContentSha256, sha256Hex(bodyBytes))
 
 	sig := ROASigContext{
 		Method:  r.Method,
@@ -70,15 +55,10 @@ func (c *AliyunROASignClient) Do(r *http.Request) (resp *http.Response, err erro
 		SecretAccessKeySecret: c.SecretAccessKeySecret,
 	}
 
-	canonicalRequest, signedHeaders, hashedRequestPayload, err := sig.CanonicalRequest()
+	canonicalRequest, signedHeaders, _, err := sig.CanonicalRequest()
 	if err != nil {
 		return nil, fmt.Errorf("aliyun sign: canonical request: %w", err)
 	}
-
-	// x-acs-content-sha256 is part of the signed header set. It must be set
-	// on the request before computing the signature, otherwise the server's
-	// recomputed canonical headers (which include it) won't match ours.
-	r.Header.Set(HeaderContentSha256, hashedRequestPayload)
 
 	stringToSign := sig.StringToSign(canonicalRequest)
 	r.Header.Set(HeaderAuthorization, sig.BuildAuthorization(stringToSign, signedHeaders))

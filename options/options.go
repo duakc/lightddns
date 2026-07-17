@@ -2,6 +2,7 @@ package options
 
 import (
 	"github.com/duakc/lightddns/adapter"
+
 	goyaml "github.com/goccy/go-yaml"
 )
 
@@ -22,13 +23,13 @@ func (O *Options) UnmarshalYAML(data []byte) error {
 
 	for i := range O.Datasources {
 		cur := &O.Datasources[i]
-		if cur.Name != "" {
+		if cur.Name == "" {
 			cur.setName(adapter.AutoName(&cur.AbstractDatasourceOption, i))
 		}
 	}
 	for i := range O.Providers {
 		cur := &O.Providers[i]
-		if cur.Name != "" {
+		if cur.Name == "" {
 			cur.setName(adapter.AutoName(&cur.AbstractProviderOption, i))
 		}
 	}

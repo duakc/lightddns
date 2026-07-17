@@ -2,6 +2,8 @@ package httpx
 
 import "net/http"
 
+const HeaderAuthorization = "Authorization"
+
 type HTTPRequester interface {
 	// Do send an HTTP request defined in the r
 	// Response can not be nil if err is nil
@@ -16,7 +18,7 @@ type TokenClient struct {
 
 func (tc *TokenClient) Do(r *http.Request) (*http.Response, error) {
 	if tc.Token != "" {
-		r.Header.Add("Authorization", "Bearer "+tc.Token)
+		r.Header.Set(HeaderAuthorization, "Bearer "+tc.Token)
 	}
 
 	return tc.HTTPRequester.Do(r)

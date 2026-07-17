@@ -1,4 +1,4 @@
-package internal
+package cloudflare
 
 import (
 	"net/http"
@@ -18,6 +18,8 @@ type CloudflareHTTPRequester struct {
 func (c *CloudflareHTTPRequester) Do(req *http.Request) (resp *http.Response, err error) {
 	defer httpx.NewHTTPRequestRecorder(c.Logger, req, &resp, &err).Record()
 
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-	return c.HTTPRequester.Do(req)
+	return (&httpx.TokenClient{
+		HTTPRequester: c.HTTPRequester,
+		Token:         c.Token,
+	}).Do(req)
 }

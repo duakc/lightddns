@@ -2,6 +2,8 @@ package httpx
 
 import (
 	"net/http"
+	urlpkg "net/url"
+	"strings"
 	"time"
 
 	"github.com/duakc/mt/debug"
@@ -48,6 +50,42 @@ func (r *HTTPRequestRecorder) Stop() {
 	r.End = time.Now()
 }
 
+const redactedValue = "[REDACTED]"
+
+func RedactQuery(query urlpkg.Values) urlpkg.Values {
+	redacted := make(urlpkg.Values, len(query))
+	for key, values := range query {
+		if isSensitiveName(key) {
+			redacted.Set(key, redactedValue)
+			continue
+		}
+		redacted[key] = append([]string(nil), values...)
+	}
+	return redacted
+}
+
+func RedactHeader(header http.Header) http.Header {
+	redacted := header.Clone()
+	for key := range redacted {
+		if isSensitiveName(key) {
+			redacted.Set(key, redactedValue)
+		}
+	}
+	return redacted
+}
+
+func isSensitiveName(name string) bool {
+	name = strings.ToLower(name)
+	return strings.Contains(name, "authorization") ||
+		strings.Contains(name, "accesskey") ||
+		strings.Contains(name, "api-key") ||
+		strings.Contains(name, "apikey") ||
+		strings.Contains(name, "credential") ||
+		strings.Contains(name, "secret") ||
+		strings.Contains(name, "signature") ||
+		strings.Contains(name, "token")
+}
+
 func (r *HTTPRequestRecorder) Record() {
 	if r.End.IsZero() {
 		r.End = time.Now()
@@ -78,7 +116,7 @@ func (r *HTTPRequestRecorder) Record() {
 		if r.Request != nil {
 			if debug.Enabled {
 				fields = append(fields,
-					zap.String("http_request_query", r.Request.URL.RawQuery),
+					zap.String("http_request_query", RedactQuery(r.Request.URL.Query()).Encode()),
 				)
 			}
 			fields = append(fields,
@@ -95,7 +133,7 @@ func (r *HTTPRequestRecorder) Record() {
 			)
 			if debug.Enabled {
 				fields = append(fields,
-					zap.Any("http_response_header", (*r.Response).Header),
+					zap.Any("http_response_header", RedactHeader((*r.Response).Header)),
 				)
 			}
 		}

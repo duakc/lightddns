@@ -35,8 +35,8 @@ func (so *ServiceOption) setName(name string) {
 }
 
 var (
-	_ nameSetter    = (*AbstractServiceOption)(nil)
-	_ VariantOption = (*AbstractServiceOption)(nil)
+	_ nameSetter      = (*AbstractServiceOption)(nil)
+	_ adapter.Variant = (*AbstractServiceOption)(nil)
 )
 
 type AbstractServiceOption struct {

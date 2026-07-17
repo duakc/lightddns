@@ -1,84 +1,140 @@
-package internal
+package cloudflare
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	urlpkg "net/url"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
-	"github.com/duakc/lightddns/adapter/metricx"
 	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 
 	"github.com/duakc/mt"
-	"github.com/duakc/mt/services"
 
 	"go.uber.org/zap"
 )
 
 const (
-	opDescribeDomains = providerx.OpDescribeDomains
-	opListRecords     = providerx.OpListRecords
-	opCreateRecord    = providerx.OpCreateRecord
-	opUpdateRecord    = providerx.OpUpdateRecord
-	opDeleteRecord    = providerx.OpDeleteRecord
+	opDescribeDomains = providerx.OperationResolveZone
+	opListRecords     = providerx.OperationListRecords
+	opCreateRecord    = providerx.OperationCreateRecord
+	opUpdateRecord    = providerx.OperationUpdateRecord
+	opDeleteRecord    = providerx.OperationDeleteRecord
 )
 
-var _ ddnsx.DomainSearcher = (*Client)(nil)
+var (
+	_ ddnsx.DDNSClient[DNSRecord] = (*Client)(nil)
+	_ ddnsx.ZoneSearcher          = (*Client)(nil)
+)
 
 var cloudflareApiEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
-
-func NewClient(ctx context.Context, logger *zap.Logger, providerName string,
-	do httpx.HTTPRequester, token string,
-) *Client {
-	router := providerx.NewMetricsRouter(
-		services.Lookup[metricx.ProviderFactory](ctx), providerName)
-	router.RegisterDefault()
-
-	return &Client{
-		logger:        logger,
-		metricsRouter: router,
-		do: &CloudflareHTTPRequester{
-			HTTPRequester: do,
-			Logger:        logger,
-			Token:         token,
-		},
-	}
-}
 
 type Client struct {
 	logger *zap.Logger
 	do     httpx.HTTPRequester
 
-	metricsRouter *providerx.ApiMetricsRouter
+	zones ddnsx.ZoneCache
+
+	proxied        bool
+	privateRouting bool
+	comment        string
 }
 
-func (c *Client) SearchDomain(ctx context.Context, search string) map[string]string {
-	logger := c.actionLogger(opDescribeDomains)
+func NewClient(logger *zap.Logger, do httpx.HTTPRequester, token string,
+	proxied, privateRouting bool, comment string,
+) *Client {
+	return &Client{
+		logger: logger,
+		do: &CloudflareHTTPRequester{
+			HTTPRequester: do,
+			Logger:        logger,
+			Token:         token,
+		},
+		proxied:        proxied,
+		privateRouting: privateRouting,
+		comment:        comment,
+	}
+}
+
+func (c *Client) ResolveZone(ctx context.Context, fqdn string) (ddnsx.Zone, error) {
+	return c.zones.Resolve(ctx, fqdn, c)
+}
+
+func (c *Client) SearchZones(ctx context.Context, keyword ddnsx.ZoneName) ([]ddnsx.Zone, error) {
+	logger := c.actionLogger(opDescribeDomains).With(zap.Stringer("keyword", keyword))
 	logger.Info("search zone id from upstream")
 
-	pager := c.ListZoneName(search)
-	result := make(map[string]string)
-
-	for page, perr := pager.Next(ctx); perr != io.EOF; page, perr = pager.Next(ctx) {
-		if perr != nil {
-			logger.Warn("list zones failed", zap.Error(perr))
-			return nil
+	pager := c.ListZoneName(keyword.String())
+	var zones []ddnsx.Zone
+	for page, err := pager.Next(ctx); err != io.EOF; page, err = pager.Next(ctx) {
+		if err != nil {
+			return nil, fmt.Errorf("list zones: %w", err)
 		}
-		for i := 0; i < len(page); i++ {
-			zone := page[i]
+		for _, zone := range page {
 			if !domains.IsDomainName(zone.Name) {
-				logger.Warn("upstream returned a bad zone name",
-					zap.String("zone_name", zone.Name))
+				logger.Warn("upstream returned a bad zone name", zap.String("zone_name", zone.Name))
 				continue
 			}
-			result[zone.Name] = zone.ID
+			zones = append(zones, ddnsx.Zone{
+				Name: ddnsx.ZoneName(zone.Name),
+				ID:   ddnsx.ZoneID(zone.ID),
+			})
 		}
 	}
-	return result
+	return zones, nil
+}
+
+func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Existing[DNSRecord], error) {
+	pager, err := c.ListDNSRecords(key.FQDN, key.Zone.ID.String(), key.Type.String())
+	if err != nil {
+		return nil, fmt.Errorf("list DNS records: %w", err)
+	}
+
+	var existing []ddnsx.Existing[DNSRecord]
+	for page, err := pager.Next(ctx); err != io.EOF; page, err = pager.Next(ctx) {
+		if err != nil {
+			return nil, fmt.Errorf("list DNS records: %w", err)
+		}
+		for _, record := range page {
+			address, err := netip.ParseAddr(record.Content)
+			if err != nil {
+				return nil, fmt.Errorf("record %s: not an address: %s: %w", record.ID, record.Content, err)
+			}
+			existing = append(existing, ddnsx.Existing[DNSRecord]{
+				Addr:   address.Unmap(),
+				Record: record,
+			})
+		}
+	}
+	return existing, nil
+}
+
+func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
+	return c.CreateDNSRecords(ctx, target.Zone.ID.String(), c.recordRequest(target))
+}
+
+func (c *Client) Update(ctx context.Context, target ddnsx.RecordTarget, record DNSRecord) error {
+	return c.UpdateDNSRecords(ctx, target.Zone.ID.String(), record.ID, c.recordRequest(target))
+}
+
+func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record DNSRecord) error {
+	return c.DeleteDNSRecord(ctx, key.Zone.ID.String(), record.ID)
+}
+
+func (c *Client) recordRequest(target ddnsx.RecordTarget) UpdateDNSRecordRequest {
+	return UpdateDNSRecordRequest{
+		Name:           target.FQDN,
+		Ttl:            target.TTL,
+		Type:           target.Type.String(),
+		Comment:        c.comment,
+		Content:        target.Address.Unmap().String(),
+		PrivateRouting: c.privateRouting,
+		Proxied:        c.proxied,
+	}
 }
 
 func (c *Client) NewRequestConfig(method string) httpx.ReqConfig {
@@ -86,17 +142,15 @@ func (c *Client) NewRequestConfig(method string) httpx.ReqConfig {
 }
 
 func (c *Client) ListZones() *PageConfig[Zone] {
-	r := c.NewRequestConfig(http.MethodGet)
-	r.Query.Set("status", "active")
-	return NewPaging[Zone](c, opDescribeDomains, r)
+	return c.ListZoneName("")
 }
 
 func (c *Client) ListZoneName(name string) *PageConfig[Zone] {
 	r := c.NewRequestConfig(http.MethodGet)
 	r.Query.Set("status", "active")
-	//if len(name) > 0 {
-	//	r.Query.Set("name", "contain:"+name)
-	//}
+	if name != "" {
+		r.Query.Set("name", name)
+	}
 	return NewPaging[Zone](c, opDescribeDomains, r)
 }
 
@@ -111,8 +165,6 @@ func (c *Client) ListDNSRecords(name string, zoneID string, qtype string) (*Page
 func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 	content UpdateDNSRecordRequest,
 ) (err error) {
-	defer c.metricsRouter.RecordAPI(opCreateRecord)(&err)
-
 	logger := c.actionLogger(opCreateRecord).With(zap.String("zone_id", zoneID))
 	logger.Debug("api call start")
 	r := c.NewRequestConfig(http.MethodPost)
@@ -135,8 +187,6 @@ func (c *Client) CreateDNSRecords(ctx context.Context, zoneID string,
 func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID string,
 	content UpdateDNSRecordRequest,
 ) (err error) {
-	defer c.metricsRouter.RecordAPI(opUpdateRecord)(&err)
-
 	logger := c.actionLogger(opUpdateRecord).With(
 		zap.String("zone_id", zoneID),
 		zap.String("record_id", recordID),
@@ -159,8 +209,6 @@ func (c *Client) UpdateDNSRecords(ctx context.Context, zoneID string, recordID s
 }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID string) (err error) {
-	defer c.metricsRouter.RecordAPI(opDeleteRecord)(&err)
-
 	logger := c.actionLogger(opDeleteRecord).With(
 		zap.String("zone_id", zoneID),
 		zap.String("record_id", dnsRecordID),
@@ -186,9 +234,7 @@ func (c *Client) DeleteDNSRecord(ctx context.Context, zoneID string, dnsRecordID
 
 	if resp != nil && resp.StatusCode != http.StatusOK {
 		logger.Warn("delete bad status", zap.Int("status", resp.StatusCode))
-		err = &httpx.BadStatusCodeError{
-			Got: resp.StatusCode,
-		}
+		err = &httpx.BadStatusCodeError{Got: resp.StatusCode}
 		return err
 	}
 	return nil

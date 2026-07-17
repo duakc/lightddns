@@ -1,4 +1,4 @@
-package internal
+package cloudflare
 
 import (
 	"context"
@@ -40,8 +40,6 @@ func (pc *PageConfig[T]) Next(ctx context.Context) (_ []T, err error) {
 	if pc.done {
 		return nil, io.EOF
 	}
-	defer pc.owner.metricsRouter.RecordAPI(pc.op)(&err)
-
 	logger := pc.owner.actionLogger(pc.op).With(zap.Int("page", pc.page+1))
 	logger.Debug("api call start")
 
@@ -62,7 +60,7 @@ func (pc *PageConfig[T]) Next(ctx context.Context) (_ []T, err error) {
 	}
 
 	pc.resultInfo = result.ResultInfo
-	pc.done = result.ResultInfo.Page == result.ResultInfo.TotalPages
+	pc.done = len(result.Result) == 0 || result.ResultInfo.Page >= result.ResultInfo.TotalPages
 	return result.Result, nil
 }
 

@@ -29,12 +29,12 @@ linters:
           json: camel
           yaml: camel
         overrides:
-          - pkg: "providers/cloudflare/internal"
+          - pkg: "providers/cloudflare"
             rules:
               json: snake
-          - pkg: "providers/tencentcloud/internal"
+          - pkg: "providers/tencentcloud"
             ignore: true
-          - pkg: "providers/aliyun/internal"
+          - pkg: "providers/aliyun"
             ignore: true
           - pkg: "services/ipserver"
             rules:

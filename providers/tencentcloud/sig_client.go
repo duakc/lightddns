@@ -1,9 +1,7 @@
-package internal
+package tencentcloud
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -41,25 +39,9 @@ func (tc *TencentSignHTTPRequester) Do(r *http.Request) (resp *http.Response, er
 
 	httpx.ExtendHeadersOverride(r.Header, common.Headers())
 
-	// Drain the request body into a Go-owned []byte for the TC3 signature.
-	// We must not back r.Body / GetBody with a pooled buffer: the HTTP
-	// transport may still be writing the body in a goroutine after Do
-	// returns (HTTP/2 streams, retries via GetBody), and recycling the
-	// backing slice underneath the transport produces a corrupted request
-	// → server resets the stream → caller sees io.EOF on resp.Body.
-	var bodyBytes []byte
-	if r.Body != nil {
-		bodyBytes, err = io.ReadAll(r.Body)
-		if err != nil {
-			return nil, fmt.Errorf("tencentcloud sign: read body: %w", err)
-		}
-		_ = r.Body.Close()
-	}
-
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	r.ContentLength = int64(len(bodyBytes))
-	r.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+	bodyBytes, err := httpx.ReadAndReplayBody(r)
+	if err != nil {
+		return nil, fmt.Errorf("tencentcloud sign: %w", err)
 	}
 
 	sig := SigContext{
