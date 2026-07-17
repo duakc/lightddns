@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter"
+	"github.com/duakc/lightddns/adapter/ddnsx"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/options"

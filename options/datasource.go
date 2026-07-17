@@ -35,8 +35,8 @@ func (do *DatasourceOption) setName(name string) {
 }
 
 var (
-	_ nameSetter    = (*AbstractDatasourceOption)(nil)
-	_ VariantOption = (*AbstractDatasourceOption)(nil)
+	_ nameSetter      = (*AbstractDatasourceOption)(nil)
+	_ adapter.Variant = (*AbstractDatasourceOption)(nil)
 )
 
 type AbstractDatasourceOption struct {

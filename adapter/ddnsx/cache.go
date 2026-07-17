@@ -70,7 +70,13 @@ func (cache *DomainIdCache) LoadOrStore(ctx context.Context,
 		return found
 	}
 
-	for _, keyword := range append(domains.CutFromHead(domain), "") {
+	// Most users don't directly use root domain when using DDNS,
+	// so we skip one level to speed up the lookup process.
+	//
+	// For example, most users would use home.example.com instead of example.com.
+	const skipHead = 1
+
+	for _, keyword := range append(domains.CutFromHead(domain), "")[skipHead:] {
 		listed := fetch.SearchDomain(ctx, keyword)
 		if listed == nil {
 			return ""

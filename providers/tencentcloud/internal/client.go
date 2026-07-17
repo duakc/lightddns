@@ -7,9 +7,9 @@ import (
 	"net/http"
 	urlpkg "net/url"
 
+	"github.com/duakc/lightddns/adapter/ddnsx"
 	"github.com/duakc/lightddns/adapter/metricx"
 	"github.com/duakc/lightddns/adapter/providerx"
-	"github.com/duakc/lightddns/infra/ddnsx"
 	"github.com/duakc/lightddns/infra/netool/domains"
 	"github.com/duakc/lightddns/infra/netool/httpx"
 

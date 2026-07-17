@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/netip"
 
-	"github.com/duakc/lightddns/infra/ddnsx"
+	"github.com/duakc/lightddns/adapter/ddnsx"
 	"github.com/duakc/lightddns/providers/cloudflare/internal"
 )
 

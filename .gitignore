@@ -17,22 +17,7 @@ vendor/
 go.work
 go.work.sum
 
-# env file
-.env
-.venv/
-.direnv/
-
-# Editor/IDE
-.idea/
-.vscode/
-
 *.ignore
-
-# Ai
-CLAUDE.md
-skills/
-hooks/
-.claude/
 
 # Other
 config.d/
@@ -40,7 +25,6 @@ build/
 bin/
 site/
 .wrangler/
-.DS_Store/
 .cache/
 
 *.secret.go
