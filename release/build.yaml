@@ -1,9 +1,6 @@
 ---
 enabled: true
 defaultTags: [
-  "provider_with_cloudflare",
-  "provider_with_tencentcloud",
-  "provider_with_aliyun",
   # uncomment below to enable some tags
   #"freebuf_low_mem"
   #"debug"

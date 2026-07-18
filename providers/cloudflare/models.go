@@ -30,71 +30,36 @@ type ResultInfo struct {
 	TotalPages int `json:"total_pages"`
 }
 
+// Response is the common Cloudflare API response envelope.
 type Response struct {
 	Success  bool           `json:"success"`
 	Errors   []MessageError `json:"errors"`
 	Messages []MessageError `json:"messages"`
 }
 
-func (r *Response) Error() error {
+func (r Response) Error() error {
 	return errors.Join(mt.Map(r.Errors, func(s MessageError) error {
 		return &s
 	})...)
 }
 
-func (r *Response) JoinError(err error) error {
-	E := r.Error()
-	return errors.Join(err, E)
-}
-
-type ResponseWithResult[T any] struct {
-	Response `json:",inline"`
-
-	Result T `json:"result"`
-}
-
-type ResponseWithPage[T any] struct {
-	Response `json:",inline"`
-
-	Result     []T        `json:"result"`
-	ResultInfo ResultInfo `json:"result_info"`
+func (r Response) JoinError(err error) error {
+	return errors.Join(err, r.Error())
 }
 
 // Zone is one zone returned by ListZones.
 type Zone struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-
-	// uncomment when needed.
-	// Status              string   `json:"status"`
-	// Paused              bool     `json:"paused"`
-	// Type                string   `json:"type"`
-	// NameServers         []string `json:"name_servers"`
-	// OriginalNameServers []string `json:"original_name_servers"`
-	// CreatedOn           string   `json:"created_on"`
-	// ModifiedOn          string   `json:"modified_on"`
-	// ActivatedOn         string   `json:"activated_on"`
 }
 
-// DNSRecord is one DNS record returned by ListDNSRecords.
-type DNSRecord struct {
+// Record is one DNS record returned by ListDNSRecords.
+type Record struct {
 	ID      string `json:"id"`
 	Content string `json:"content"`
-
-	// uncomment when needed.
-	// Name       string `json:"name"`
-	// Type       string `json:"type"`
-	// TTL        int    `json:"ttl"`
-	// Proxied    bool   `json:"proxied"`
-	// Proxiable  bool   `json:"proxiable"`
-	// ZoneID     string `json:"zone_id"`
-	// ZoneName   string `json:"zone_name"`
-	// Comment    string `json:"comment"`
-	// CreatedOn  string `json:"created_on"`
-	// ModifiedOn string `json:"modified_on"`
 }
 
-type UpdateDNSRecordRequest struct {
+type DNSRecordRequest struct {
 	Name           string `json:"name"`
 	Ttl            uint32 `json:"ttl"`
 	Type           string `json:"type"`
@@ -102,4 +67,72 @@ type UpdateDNSRecordRequest struct {
 	Content        string `json:"content"`
 	PrivateRouting bool   `json:"private_routing"`
 	Proxied        bool   `json:"proxied"`
+}
+
+type ListZonesRequest struct {
+	Status  string
+	Name    string
+	Page    int
+	PerPage int
+}
+
+type ListZonesResponse struct {
+	Response
+
+	Result     []Zone     `json:"result"`
+	ResultInfo ResultInfo `json:"result_info"`
+}
+
+type ListDNSRecordsRequest struct {
+	ZoneID string
+	Name   string
+	Type   string
+
+	Page    int
+	PerPage int
+}
+
+type ListDNSRecordsResponse struct {
+	Response
+
+	Result     []Record   `json:"result"`
+	ResultInfo ResultInfo `json:"result_info"`
+}
+
+type CreateDNSRecordRequest struct {
+	ZoneID string
+	Body   DNSRecordRequest
+}
+
+type CreateDNSRecordResponse struct {
+	Response
+
+	Result Record `json:"result"`
+}
+
+type UpdateDNSRecordRequest struct {
+	ZoneID   string
+	RecordID string
+	Body     DNSRecordRequest
+}
+
+type UpdateDNSRecordResponse struct {
+	Response
+
+	Result Record `json:"result"`
+}
+
+type DeleteDNSRecordRequest struct {
+	ZoneID   string
+	RecordID string
+}
+
+type DeleteDNSRecordResult struct {
+	ID string `json:"id"`
+}
+
+type DeleteDNSRecordResponse struct {
+	Response
+
+	Result DeleteDNSRecordResult `json:"result"`
 }

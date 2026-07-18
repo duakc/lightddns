@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/duakc/lightddns/infra/zaplog"
+
+	mDns "github.com/miekg/dns"
 	"go.uber.org/zap"
 )
 
@@ -14,11 +17,8 @@ type Reconciler[R any] struct {
 }
 
 func NewReconciler[R any](logger *zap.Logger, client DDNSClient[R]) *Reconciler[R] {
-	if logger == nil {
-		logger = zap.NewNop()
-	}
 	return &Reconciler[R]{
-		logger: logger,
+		logger: zaplog.DoNotPanic(logger).Named("reconciler"),
 		client: client,
 	}
 }
@@ -33,7 +33,9 @@ func (r *Reconciler[R]) Diff(ctx context.Context, fqdn string, addr []netip.Addr
 
 func (r *Reconciler[R]) Update(ctx context.Context, fqdn string, ttl uint32, addr []netip.Addr) (bool, error) {
 	logger := r.logger.With(zap.String("domain", fqdn))
-	logger.Debug("new update request", zap.Stringers("addresses", addr))
+	logger.Debug("new update request",
+		zap.Stringers("addresses", addr),
+	)
 
 	key, err := r.resolve(ctx, fqdn)
 	if err != nil {
@@ -68,10 +70,8 @@ func (r *Reconciler[R]) diffs(ctx context.Context, fqdn string, addr []netip.Add
 }
 
 func (r *Reconciler[R]) resolve(ctx context.Context, fqdn string) (RecordKey, error) {
-	fqdn, err := NormalizeFQDN(fqdn)
-	if err != nil {
-		return RecordKey{}, err
-	}
+	fqdn = mDns.Fqdn(fqdn)
+
 	zone, err := r.client.ResolveZone(ctx, fqdn)
 	if err != nil {
 		return RecordKey{}, fmt.Errorf("resolve zone for %s: %w", fqdn, err)

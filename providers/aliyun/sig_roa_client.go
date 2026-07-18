@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type AliyunROASignClient struct {
+type RoaSignRequester struct {
 	httpx.HTTPRequester
 
 	Logger *zap.Logger
@@ -19,7 +19,7 @@ type AliyunROASignClient struct {
 	SecretSecurityToken   string
 }
 
-func (c *AliyunROASignClient) Do(r *http.Request) (resp *http.Response, err error) {
+func (c *RoaSignRequester) Do(r *http.Request) (resp *http.Response, err error) {
 	defer httpx.NewHTTPRequestRecorder(c.Logger, r, &resp, &err).Record()
 
 	common := ROACommon{SecretSecurityToken: c.SecretSecurityToken}

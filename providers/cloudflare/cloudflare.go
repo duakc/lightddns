@@ -30,7 +30,7 @@ var _ adapter.Provider = (*Cloudflare)(nil)
 type Cloudflare struct {
 	adapter.AbstractManagedType
 
-	reconciler *ddnsx.Reconciler[DNSRecord]
+	reconciler *ddnsx.Reconciler[Record]
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProviderOption) (adapter.Provider, error) {
@@ -44,14 +44,16 @@ func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProvi
 		return nil, err
 	}
 
-	client := NewClient(logger, httpClient, option.Token,
-		option.Proxy, false, constpkg.ThisRecordIsManagedByLightddns)
-	observed := providerx.NewMetricsClientFromContext(
+	apiClient := NewAPIClient(logger, httpClient, option.Token)
+	client := NewClient(logger, apiClient,
+		option.Proxy, false)
+	observedClient := providerx.NewMetricsClientFromContext[Record](
 		ctx, option.Name, ProviderType, client,
 	)
+
 	return &Cloudflare{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		reconciler:          ddnsx.NewReconciler(logger.Named("client"), observed),
+		reconciler:          ddnsx.NewReconciler[Record](logger.Named("client"), observedClient),
 	}, nil
 }
 

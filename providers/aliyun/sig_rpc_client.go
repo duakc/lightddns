@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// AliyunRPCSignClient signs outgoing requests with the Aliyun RPC v1
+// RpcSignRequester signs outgoing requests with the Aliyun RPC v1
 // scheme: all public params (AccessKeyId, Timestamp, SignatureNonce,
 // SignatureMethod, SignatureVersion, Format) are injected into the URL
 // query, the canonical string is HMAC-SHA1'd with (AccessKeySecret + "&"),
@@ -18,7 +18,7 @@ import (
 //
 // The caller is expected to have already placed Action and Version on the
 // URL query (see client.go's newRequest).
-type AliyunRPCSignClient struct {
+type RpcSignRequester struct {
 	httpx.HTTPRequester
 
 	Logger *zap.Logger
@@ -28,7 +28,7 @@ type AliyunRPCSignClient struct {
 	SecretSecurityToken   string
 }
 
-func (c *AliyunRPCSignClient) Do(r *http.Request) (resp *http.Response, err error) {
+func (c *RpcSignRequester) Do(r *http.Request) (resp *http.Response, err error) {
 	defer httpx.NewHTTPRequestRecorder(c.Logger, r, &resp, &err).Record()
 
 	q := r.URL.Query()

@@ -28,7 +28,7 @@ func TestAliyunROASignClientSignsContentHashHeader(t *testing.T) {
 	require.NoError(t, err)
 	request.Header.Set("Content-Type", "application/json")
 
-	client := &AliyunROASignClient{
+	client := &RoaSignRequester{
 		HTTPRequester: requesterFunc(func(request *http.Request) (*http.Response, error) {
 			require.NotEmpty(t, request.Header.Get(HeaderContentSha256))
 			authorization := request.Header.Get(HeaderAuthorization)

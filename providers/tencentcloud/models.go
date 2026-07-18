@@ -86,13 +86,13 @@ type Record struct {
 
 // DomainInfo is one domain returned by DescribeDomainFilterList.
 type DomainInfo struct {
-	Name string `json:"Name"`
+	Name     string `json:"Name"`
+	DomainId uint64 `json:"DomainId"`
 
 	// uncomment when needed.
 	// CNAMESpeedup     string   `json:"CNAMESpeedup"`
 	// CreatedOn        string   `json:"CreatedOn"`
 	// DNSStatus        string   `json:"DNSStatus"`
-	// DomainId         int      `json:"DomainId"`
 	// EffectiveDNS     []string `json:"EffectiveDNS"`
 	// Grade            string   `json:"Grade"`
 	// GradeLevel       int      `json:"GradeLevel"`

@@ -10,16 +10,20 @@ import (
 )
 
 type reconcileClient struct {
-	existing   []Existing[int]
-	deleteErr  error
-	deleteCall int
+	existing     []Existing[int]
+	deleteErr    error
+	deleteCall   int
+	resolvedFQDN string
+	recordFQDN   string
 }
 
-func (c *reconcileClient) ResolveZone(context.Context, string) (Zone, error) {
-	return Zone{Name: "example.com"}, nil
+func (c *reconcileClient) ResolveZone(_ context.Context, fqdn string) (Zone, error) {
+	c.resolvedFQDN = fqdn
+	return Zone{Fqdn: "example.com.", ID: "zone-id"}, nil
 }
 
-func (c *reconcileClient) Records(context.Context, RecordKey) ([]Existing[int], error) {
+func (c *reconcileClient) Records(_ context.Context, key RecordKey) ([]Existing[int], error) {
+	c.recordFQDN = key.FQDN
 	return c.existing, nil
 }
 
@@ -57,4 +61,6 @@ func TestReconcilerReportsPartialSuccess(t *testing.T) {
 	require.True(t, changed)
 	require.ErrorIs(t, err, mutationErr)
 	require.Equal(t, 2, client.deleteCall)
+	require.Equal(t, "Host.Example.COM.", client.resolvedFQDN)
+	require.Equal(t, "Host.Example.COM.", client.recordFQDN)
 }

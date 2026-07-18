@@ -8,14 +8,14 @@ import (
 	"go.uber.org/zap"
 )
 
-type CloudflareHTTPRequester struct {
+type apiRequester struct {
 	httpx.HTTPRequester
 
 	Logger *zap.Logger
 	Token  string
 }
 
-func (c *CloudflareHTTPRequester) Do(req *http.Request) (resp *http.Response, err error) {
+func (c *apiRequester) Do(req *http.Request) (resp *http.Response, err error) {
 	defer httpx.NewHTTPRequestRecorder(c.Logger, req, &resp, &err).Record()
 
 	return (&httpx.TokenClient{

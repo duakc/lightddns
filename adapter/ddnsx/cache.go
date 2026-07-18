@@ -4,89 +4,77 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/duakc/lightddns/infra/netool/domains"
 
+	"github.com/duakc/mt"
 	"github.com/duakc/mt/common/generic"
+
+	mDns "github.com/miekg/dns"
 )
 
-var (
-	ErrInvalidDomainName = errors.New("invalid domain name")
-	ErrZoneNotFound      = errors.New("zone not found")
-)
-
-type ZoneName string
-
-func (n ZoneName) String() string {
-	return string(n)
-}
-
-type ZoneID string
-
-func (id ZoneID) String() string {
-	return string(id)
-}
+var ErrZoneNotFound = errors.New("zone not found")
 
 type Zone struct {
-	Name ZoneName
-	ID   ZoneID
+	Fqdn string
+	ID   string
 }
 
 func (z Zone) Valid() bool {
-	return z.Name != ""
+	return z.Fqdn != "" && z.ID != ""
 }
 
 type ZoneSearcher interface {
-	SearchZones(ctx context.Context, keyword ZoneName) ([]Zone, error)
+	SearchZones(ctx context.Context, keyword string) ([]Zone, error)
 }
 
 type ZoneCache struct {
-	byZoneName generic.SyncMap[ZoneName, Zone]
-	byFQDN     generic.SyncMap[string, Zone]
+	byFQDN generic.SyncMap[string, Zone]
 
 	access sync.Mutex
 }
 
 func (cache *ZoneCache) Resolve(ctx context.Context, fqdn string, searcher ZoneSearcher) (Zone, error) {
-	fqdn, err := NormalizeFQDN(fqdn)
-	if err != nil {
-		return Zone{}, err
+	if mt.Done(ctx) {
+		return Zone{}, ctx.Err()
 	}
-	if err := ctx.Err(); err != nil {
-		return Zone{}, err
-	}
+
+	fqdn = mDns.Fqdn(fqdn)
+
 	if zone, found := cache.byFQDN.Load(fqdn); found {
 		return zone, nil
 	}
 
 	cache.access.Lock()
 	defer cache.access.Unlock()
-
-	if err := ctx.Err(); err != nil {
-		return Zone{}, err
+	if mt.Done(ctx) {
+		return Zone{}, ctx.Err()
 	}
+
 	if zone, found := cache.searchOnce(fqdn); found {
 		cache.byFQDN.Store(fqdn, zone)
 		return zone, nil
 	}
 
 	candidates := domains.CutFromHead(fqdn)
-	candidates = append(candidates, "")
+
+	// most of the user ues their own ddns.example.com instead of example.com.
+	const skipSearchHeader = 1
+	candidates = append(candidates, "")[skipSearchHeader:]
 	for _, candidate := range candidates {
-		listed, err := searcher.SearchZones(ctx, ZoneName(candidate))
+		listed, err := searcher.SearchZones(ctx, candidate)
 		if err != nil {
 			return Zone{}, err
 		}
 		for _, zone := range listed {
-			name, err := NormalizeFQDN(zone.Name.String())
-			if err != nil {
+			if !zone.Valid() {
 				continue
 			}
-			zone.Name = ZoneName(name)
-			cache.byZoneName.Store(zone.Name, zone)
+			zone.Fqdn = mDns.Fqdn(zone.Fqdn)
+			cache.byFQDN.Store(zone.Fqdn, zone)
 		}
+
 		if zone, found := cache.searchOnce(fqdn); found {
 			cache.byFQDN.Store(fqdn, zone)
 			return zone, nil
@@ -97,24 +85,11 @@ func (cache *ZoneCache) Resolve(ctx context.Context, fqdn string, searcher ZoneS
 }
 
 func (cache *ZoneCache) searchOnce(fqdn string) (Zone, bool) {
-	if zone, ok := cache.byFQDN.Load(fqdn); ok && zone.Valid() {
-		return zone, true
-	}
 	for _, suffix := range domains.CutFromHead(fqdn) {
-		if zone, found := cache.byZoneName.Load(ZoneName(suffix)); found {
+		if zone, found := cache.byFQDN.Load(suffix); found {
+			cache.byFQDN.Store(fqdn, zone)
 			return zone, true
 		}
 	}
 	return Zone{}, false
-}
-
-func NormalizeFQDN(name string) (string, error) {
-	if !domains.IsDomainName(name) {
-		return "", fmt.Errorf("%w: %q", ErrInvalidDomainName, name)
-	}
-	normalized := strings.TrimSuffix(strings.ToLower(name), ".")
-	if normalized == "" {
-		return "", fmt.Errorf("%w: %q", ErrInvalidDomainName, name)
-	}
-	return normalized, nil
 }

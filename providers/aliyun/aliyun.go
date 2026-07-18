@@ -47,14 +47,17 @@ func New(ctx context.Context, logger *zap.Logger, option options.AliyunProviderO
 		return nil, err
 	}
 
-	client := NewClient(logger, httpClient,
-		option.AccessKeyId, option.AccessKeySecret, "")
-	observed := providerx.NewMetricsClientFromContext(
-		ctx, option.Name, ProviderType, client,
+	apiClient := NewAPIClient(logger, httpClient,
+		option.AccessKeyId, option.AccessKeySecret, "",
 	)
+
+	observedClient := providerx.NewMetricsClientFromContext[Record](
+		ctx, option.Name, ProviderType, NewClient(logger, apiClient),
+	)
+
 	return &Aliyun{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		reconciler:          ddnsx.NewReconciler(logger.Named("client"), observed),
+		reconciler:          ddnsx.NewReconciler[Record](logger.Named("client"), observedClient),
 	}, nil
 }
 

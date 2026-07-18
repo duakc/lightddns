@@ -48,13 +48,14 @@ func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudPro
 		return nil, err
 	}
 
-	client := NewClient(logger, httpClient, option.SecretId, option.SecretKey)
-	observed := providerx.NewMetricsClientFromContext(
+	apiClient := NewAPIClient(logger, httpClient, option.SecretId, option.SecretKey)
+	client := NewClient(logger, apiClient)
+	observed := providerx.NewMetricsClientFromContext[Record](
 		ctx, option.Name, ProviderType, client,
 	)
 	return &TencentCloud{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		reconciler:          ddnsx.NewReconciler(logger.Named("client"), observed),
+		reconciler:          ddnsx.NewReconciler[Record](logger, observed),
 	}, nil
 }
 

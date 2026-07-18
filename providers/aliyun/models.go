@@ -33,9 +33,9 @@ func (e *APIError) Error() string {
 // Domain is one zone returned by DescribeDomains.
 type Domain struct {
 	DomainName string `json:"DomainName"`
+	DomainId   string `json:"DomainId"`
 
 	// uncomment when needed.
-	// DomainId    string `json:"DomainId"`
 	// AliDomain   bool   `json:"AliDomain"`
 	// RecordCount int    `json:"RecordCount"`
 	// CreateTime  string `json:"CreateTime"`

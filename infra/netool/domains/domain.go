@@ -1,6 +1,10 @@
 package domains
 
-import "strings"
+import (
+	"strings"
+
+	mDns "github.com/miekg/dns"
+)
 
 // CutFromHead cut the domain from head to end
 // Example:
@@ -35,10 +39,7 @@ func CutFromEnd(dn string) []string {
 }
 
 func IsSubDomain(target string, suffix string) bool {
-	lowerT := strings.ToLower(target)
-	lowerA := strings.ToLower(suffix)
-
-	return lowerT == lowerA || strings.HasSuffix(lowerT, "."+lowerA)
+	return mDns.IsSubDomain(suffix, target)
 }
 
 // IsDomainName , copied from golang official net lib
@@ -99,4 +100,11 @@ func IsDomainName(s string) bool {
 	}
 
 	return nonNumeric
+}
+
+func NormalizeFQDN(name string) string {
+	if mDns.IsFqdn(name) {
+		return strings.TrimSuffix(name, ".")
+	}
+	return name
 }
