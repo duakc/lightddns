@@ -2,10 +2,13 @@ NAME="lightddns"
 MAIN_WORKDIR=$(shell cd cmd/$(NAME) && pwd)
 SCRIPT_WORKDIR=$(shell cd script/goscript && pwd)
 
-BUILD_DIR="./build"
-RELEASE_FILE_DIR="./release"
+BUILD_DIR="build"
+RELEASE_FILE_DIR="release"
 
-GO_SCRIPT=go run $(SCRIPT_WORKDIR)/run.go
+GO_SCRIPT=GOSCRIPT_DRAFT_SUB_DIR="draft" \
+		GOSCRIPT_BUILD_DIR=$(BUILD_DIR) \
+		GOSCRIPT_RELEASE_DIR=$(RELEASE_FILE_DIR) \
+		go run $(SCRIPT_WORKDIR)/run.go
 
 GO_BUILD=$(GO_SCRIPT) build --verbose \
 			--workdir $(MAIN_WORKDIR) --binary $(NAME)

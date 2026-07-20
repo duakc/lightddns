@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/script/goscript/build"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
+	"github.com/duakc/lightddns/script/goscript/pkg/gobuild"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
 
@@ -138,7 +138,7 @@ func pack(ctx context.Context, tgt target.Target) (string, error) {
 	if err := packing.ProcessAll(workdirFileHelper, packingFileList, subSet); err != nil {
 		return "", err
 	}
-	if _, err := build.Plain(ctx, tgt, filepath.Join(workdir, "pkgroot", "usr", "bin"), buildVersion, buildBranch); err != nil {
+	if _, err := gobuild.Plain(ctx, tgt, filepath.Join(workdir, "pkgroot", "usr", "bin"), buildVersion, buildBranch); err != nil {
 		return "", err
 	}
 

@@ -1,14 +1,11 @@
----
-enabled: true
-defaultTags: [
-  # uncomment below to enable some tags
-  #"freebuf_low_mem"
-  #"debug"
-]
-
-# empty for default, output in build/bin
-# if set, output build result to build/build_<buildName>/bin
-# Note: multi build configuration can not be duplicated.
+workingDir: "./cmd/lightddns/"
+outputDir: "build/bin"
+binaryName: "lightddns"
+qualified: true
 buildName: ""
----
-# another configuration below.
+tags:
+  # uncomment below to enable some tags
+  # - "freebuf_low_mem"
+  # - "debug"
+env:
+  # CGO_ENABLED: "0"
