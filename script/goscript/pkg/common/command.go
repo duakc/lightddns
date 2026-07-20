@@ -14,6 +14,7 @@ type Cmd struct {
 	Name string
 	Args []string
 	Env  []string // extra variables, appended to os.Environ()
+	Dir  string
 }
 
 func CommandStream(ctx context.Context, c Cmd) error {
@@ -33,6 +34,9 @@ func (c Cmd) prepare(ctx context.Context) *exec.Cmd {
 		_, _ = fmt.Fprintf(os.Stderr, "$ %s\n", c)
 	}
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
+	if c.Dir != "" {
+		cmd.Dir = c.Dir
+	}
 	if len(c.Env) > 0 {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}

@@ -14,12 +14,12 @@ const (
 
 var color = colorSupported()
 
-func Infof(format string, a ...any) { logln(colGreen, "(info): "+format, a...) }
+func Infof(format string, a ...any) { logln(colGreen, "(goscript:info): "+format, a...) }
 
-func Warnf(format string, a ...any) { logln(colYellow, "(warn): "+format, a...) }
+func Warnf(format string, a ...any) { logln(colYellow, "(goscript:warn): "+format, a...) }
 
 func Fatalf(format string, a ...any) {
-	logln(colRed, "(fatal): "+format, a...)
+	logln(colRed, "(goscript:fatal): "+format, a...)
 	os.Exit(1)
 }
 

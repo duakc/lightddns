@@ -1,14 +1,15 @@
 // Package target is the single source of truth for cross-compilation targets:
 // the GOOS/GOARCH matrix, how each target's binary is named, and - declared
-// right in the table - whether each target ships as a .deb / .rpm.
+// right in the table - whether each target ships as a .deb / .rpm / Arch Linux package.
 //
 // Both the builder (script/goscript/build) and the packaging scripts consume
 // it, so adding an architecture in ONE place flows everywhere, and callers can
 // enumerate exactly the targets a given package format ships (on-demand builds).
 //
-// The Deb/RPM flags are filled in for every row we know about - including the
-// commented-out, not-yet-enabled ones - so whoever enables a rare OS/arch later
-// does not have to figure out its packaging support: it is already decided here.
+// The Deb/RPM/ArchLinux flags are filled in for every row we know about -
+// including the commented-out, not-yet-enabled ones - so whoever enables a rare
+// OS/arch later does not have to figure out its packaging support: it is already
+// decided here.
 package target
 
 import (
@@ -36,12 +37,13 @@ type Target struct {
 	// mips
 	SoftFloat bool
 
-	// Whether this row ships as a .deb / .rpm. Only ONE variant per arch is
-	// marked (e.g. baseline amd64, hardfloat mips); microarch/softfloat
-	// duplicates stay false. The arch NAME is derived by archName(), not
-	// repeated per row.
-	Deb bool
-	RPM bool
+	// Whether this row ships as a .deb / .rpm / Arch Linux package. Only ONE
+	// variant per arch is marked (e.g. baseline amd64, hardfloat mips);
+	// microarch/softfloat duplicates stay false. The arch NAME is derived by the
+	// package-specific mapping method, not repeated per row.
+	Deb       bool
+	RPM       bool
+	ArchLinux bool
 }
 
 // all is the full target matrix. Commented-out entries are kept for the record
@@ -74,7 +76,7 @@ var all = []Target{
 	//{GOOS: "freebsd", GOARCH: "mipsle", SoftFloat: false},
 
 	// linux-amd64 (only the baseline ships; microarch levels are extra builds)
-	{GOOS: "linux", GOARCH: "amd64", Deb: true, RPM: true},
+	{GOOS: "linux", GOARCH: "amd64", Deb: true, RPM: true, ArchLinux: true},
 	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 1},
 	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 2},
 	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 3},
@@ -200,4 +202,11 @@ func (t Target) RPMArchName() string {
 		// riscv64/ppc64/ppc64le/s390x all map straight through.
 		return t.GOARCH
 	}
+}
+
+func (t Target) ArchLinuxArchName() string {
+	if !t.ArchLinux || t.GOOS != "linux" || t.GOARCH != "amd64" || t.GOAMD64Version != 0 {
+		return ""
+	}
+	return "x86_64"
 }

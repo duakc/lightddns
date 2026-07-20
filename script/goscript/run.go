@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/duakc/lightddns/infra/gos"
+	"github.com/duakc/lightddns/script/goscript/archlinux"
 	"github.com/duakc/lightddns/script/goscript/build"
 	"github.com/duakc/lightddns/script/goscript/deb"
 	"github.com/duakc/lightddns/script/goscript/gendoc"
@@ -38,6 +39,8 @@ func main() {
 		deb.Run(ctx)
 	case "rpm":
 		rpm.Run(ctx)
+	case "archlinux":
+		archlinux.Run(ctx)
 	default:
 		panic("unknown command: " + command)
 	}

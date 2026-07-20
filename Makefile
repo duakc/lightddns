@@ -91,6 +91,14 @@ build-rpm:
 build-rpm-all:
 	$(GO_SCRIPT) rpm --all --verbose
 
+.PHONY: build-archlinux
+build-archlinux:
+	$(GO_SCRIPT) archlinux --verbose
+
+.PHONY: build-archlinux-all
+build-archlinux-all:
+	$(GO_SCRIPT) archlinux --all --verbose
+
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
 # the package for the host system. The result lands under build/nix/result.
 .PHONY: build-nix
