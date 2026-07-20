@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/duakc/lightddns/infra/netool/domains"
+	"github.com/duakc/lightddns/infra/netx/domains"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/common/generic"

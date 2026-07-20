@@ -11,18 +11,17 @@ import (
 )
 
 var (
-	defaultLevel  = zap.NewAtomicLevelAt(zap.DebugLevel)
+	defaultLevel  = zap.NewAtomicLevelAt(zap.ErrorLevel)
 	defaultLogger = createDefault(defaultLevel)
 )
 
 func createDefault(lvl zapcore.LevelEnabler) *zap.Logger {
-	if debug.IsTestEnv() || !debug.Enabled {
-		// omit log message on test
-		defaultLevel.SetLevel(zap.ErrorLevel)
+	if debug.Enabled {
+		DefaultLevel(zapcore.DebugLevel)
 	}
 
 	var options []zap.Option
-	if debug.Enabled {
+	if debug.Enabled || debug.IsTestEnv() {
 		options = append(options, zap.Development())
 	}
 	options = append(options, zap.AddCallerSkip(1))

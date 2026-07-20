@@ -4,8 +4,8 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/duakc/lightddns/infra/netool/control"
-	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/lightddns/infra/netx/control"
+	"github.com/duakc/lightddns/infra/netx/internal"
 )
 
 type bindDialer struct {

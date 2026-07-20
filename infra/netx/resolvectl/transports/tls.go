@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
 
 	"github.com/duakc/mt/common/generic"
 

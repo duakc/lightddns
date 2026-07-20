@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/lightddns/infra/netx/internal"
 )
 
 var (

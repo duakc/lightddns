@@ -22,7 +22,7 @@ type RecordKey struct {
 	Type RecordType
 }
 
-type RecordTarget struct {
+type RecordSpec struct {
 	RecordKey
 
 	Address netip.Addr
@@ -38,8 +38,8 @@ type RecordReader[R any] interface {
 }
 
 type RecordWriter[R any] interface {
-	Create(ctx context.Context, target RecordTarget) error
-	Update(ctx context.Context, target RecordTarget, record R) error
+	Create(ctx context.Context, target RecordSpec) error
+	Update(ctx context.Context, target RecordSpec, record R) error
 	Delete(ctx context.Context, key RecordKey, record R) error
 }
 

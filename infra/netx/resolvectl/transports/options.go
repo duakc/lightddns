@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/internal"
 
 	"go.uber.org/zap"
 )

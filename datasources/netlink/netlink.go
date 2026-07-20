@@ -8,8 +8,8 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/netool/control"
+	"github.com/duakc/lightddns/infra/netx"
+	"github.com/duakc/lightddns/infra/netx/control"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -58,7 +58,7 @@ func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 		return nil, err
 	}
 	return mt.Filter(ip, func(addr netip.Addr) bool {
-		return n.allowBogon || !netool.IsBogon(addr)
+		return n.allowBogon || !netx.IsBogon(addr)
 	}), nil
 }
 

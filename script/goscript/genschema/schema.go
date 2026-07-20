@@ -7,7 +7,7 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/script/goscript/pkg/jsonschema"
 

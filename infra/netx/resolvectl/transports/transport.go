@@ -8,7 +8,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/netool/internal"
+	"github.com/duakc/lightddns/infra/netx/internal"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"

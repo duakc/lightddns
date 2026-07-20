@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 
 	"github.com/duakc/mt"
 )

@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/duakc/lightddns/infra/netool/control"
+	"github.com/duakc/lightddns/infra/netx/control"
 )
 
 type DialerOption interface {

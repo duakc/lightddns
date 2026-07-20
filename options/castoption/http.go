@@ -3,12 +3,19 @@ package castoption
 import (
 	"fmt"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/netool/httpx"
+	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/options"
+
+	"go.uber.org/zap"
 )
 
-func BuildHTTPClient(underlay dialerx.Dialer, rawOption options.HTTPOption) (httpx.HTTPRequester, error) {
+func BuildHTTPClient(
+	rawOption options.HTTPOption,
+	underlay dialerx.Dialer,
+	logger *zap.Logger,
+) (httpx.HTTPRequester, error) {
 	httpClientOptions, err := HTTPOptionToHTTPXOptions(rawOption)
 	if err != nil {
 		return nil, fmt.Errorf("build http client option: %w", err)
@@ -16,8 +23,16 @@ func BuildHTTPClient(underlay dialerx.Dialer, rawOption options.HTTPOption) (htt
 	if underlay == nil {
 		underlay = dialerx.NewDialerWithOption()
 	}
-	httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithDialer(underlay))
-	return httpx.NewClient(httpClientOptions...), nil
+
+	// Add User-Agent
+	httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithHeader(
+		httpx.HeaderUserAgent, constpkg.HTTPUserAgent))
+
+	if rawOption.HTTPDebug && logger.Level().Enabled(zap.DebugLevel) {
+		httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithDebugLogger(logger))
+	}
+
+	return httpx.NewClient(underlay, httpClientOptions...), nil
 }
 
 func HTTPOptionToHTTPXOptions(rawOption options.HTTPOption) ([]httpx.HTTPClientOption, error) {

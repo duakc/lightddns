@@ -10,7 +10,7 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netx"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -121,7 +121,7 @@ func (f *FailOver) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, e
 			}
 		} else {
 			ips, err = succeedDatasource.IP(ctx)
-			ips = netool.FilterAddress(ips, ipv4, ipv6)
+			ips = netx.FilterAddress(ips, ipv4, ipv6)
 		}
 		if err == nil {
 			f.lastSuccess = (f.lastSuccess + walked) % len(f.datasources)

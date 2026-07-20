@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
-	"github.com/duakc/lightddns/infra/netool/domains"
+	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	mDns "github.com/miekg/dns"
@@ -112,7 +112,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 	}
 }
 
-func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
+func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
 	rr, err := relativeRR(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
 		return err
@@ -121,25 +121,28 @@ func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
 		DomainName: domains.NormalizeFQDN(target.Zone.Fqdn),
 		RR:         rr,
 		Type:       target.Type.String(),
-		Value:      target.Address.Unmap().String(),
-		Line:       DefaultRecordLine,
+		Value:      target.Address.String(),
 		TTL:        target.TTL,
+
+		Line: DefaultRecordLine,
 	})
 	return err
 }
 
-func (c *Client) Update(ctx context.Context, target ddnsx.RecordTarget, record Record) error {
+func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, record Record) error {
 	rr, err := relativeRR(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
 		return err
 	}
 	_, err = c.api.UpdateDomainRecord(ctx, UpdateDomainRecordRequest{
 		RecordId: record.RecordId,
-		RR:       rr,
-		Type:     target.Type.String(),
-		Value:    target.Address.Unmap().String(),
-		Line:     cmp.Or(record.Line, DefaultRecordLine),
-		TTL:      target.TTL,
+
+		Type:  target.Type.String(),
+		Value: target.Address.String(),
+		TTL:   target.TTL,
+		RR:    rr,
+
+		Line: cmp.Or(record.Line, DefaultRecordLine),
 	})
 	return err
 }

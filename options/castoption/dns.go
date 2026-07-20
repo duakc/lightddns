@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/netool/resolvectl"
-	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/resolvectl"
+	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 	"github.com/duakc/lightddns/options"
 
 	"go.uber.org/zap"
 )
 
-func BuildResolveDialer(logger *zap.Logger, underlay dialerx.Dialer, DNS options.DNSOption) (dialerx.Dialer, error) {
+func BuildResolveDialer(DNS options.DNSOption, underlay dialerx.Dialer, logger *zap.Logger) (dialerx.Dialer, error) {
 	if DNS.Type == "" {
 		DNS.Type = transports.TransportTypeSystem
 	}

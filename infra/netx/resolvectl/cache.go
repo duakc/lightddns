@@ -7,7 +7,7 @@ import (
 	"hash/maphash"
 	"time"
 
-	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/common/generic"

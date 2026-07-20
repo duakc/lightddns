@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/netip"
 	urlpkg "net/url"
@@ -16,10 +17,10 @@ import (
 	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/netool"
-	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/netool/domains"
-	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/netx"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/domains"
+	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/options/castoption"
 
@@ -56,7 +57,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 		if err != nil {
 			return nil, fmt.Errorf("url.%s: unknown address: %w: %w", stack, err, dialerx.ErrNoAddressToDialer)
 		}
-		if (stack == "ipv4") != netool.IsIPv4(addr) {
+		if (stack == "ipv4") != netx.IsIPv4(addr) {
 			return nil, fmt.Errorf("url.%s: address family mismatch: %s", stack, addr)
 		}
 	}
@@ -64,14 +65,15 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	needDNS := (v4URL.Raw != "" && domains.IsDomainName(v4URL.URL.Host)) ||
 		(v6URL.Raw != "" && domains.IsDomainName(v6URL.URL.Host))
 
-	var v4, v6 *requestContext
+	var ipv4RequestContext, ipv6RequestContent *requestContext
 
 	connectDialer, err := castoption.BuildDialer(option.Connect)
 	if err != nil {
 		return nil, err
 	}
+
 	if needDNS {
-		resolveDialer, err := castoption.BuildResolveDialer(logger, connectDialer, option.DNS)
+		resolveDialer, err := castoption.BuildResolveDialer(option.DNS, connectDialer, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -82,11 +84,23 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	if err != nil {
 		return nil, fmt.Errorf("building http options: %w", err)
 	}
+	customHeaders := maps.Clone(option.Headers.Header)
+
+	if len(customHeaders) == 0 {
+		customHeaders = http.Header{}
+	}
+
+	if customHeaders.Get("User-Agent") == "" {
+		customHeaders.Set("User-Agent", constpkg.HTTPUserAgent)
+	}
+
+	// the custom header must have on element (User-Agent)
+	httpOptions = append(httpOptions, httpx.ClientOptionWithHeaders(customHeaders))
 
 	if v4URL.Raw != "" && option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
-		httpClient := httpx.NewClient(append(httpOptions,
-			httpx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer}))...)
-		v4, err = newRequestContext(string(option.Method), v4URL.Raw,
+		httpClient := httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer},
+			httpOptions...)
+		ipv4RequestContext, err = newRequestContext(string(option.Method), v4URL.Raw,
 			option.Headers.Header, httpClient,
 			option.JSON.IPv4, option.Regex.IPv4)
 		if err != nil {
@@ -95,9 +109,9 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	}
 
 	if v6URL.Raw != "" && option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
-		httpClient := httpx.NewClient(append(httpOptions,
-			httpx.ClientOptionWithDialer(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer}))...)
-		v6, err = newRequestContext(string(option.Method), v6URL.Raw,
+		httpClient := httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer},
+			httpOptions...)
+		ipv6RequestContent, err = newRequestContext(string(option.Method), v6URL.Raw,
 			option.Headers.Header, httpClient,
 			option.JSON.IPv6, option.Regex.IPv6)
 		if err != nil {
@@ -109,8 +123,8 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 
 		logger: logger,
-		v4:     v4,
-		v6:     v6,
+		v4:     ipv4RequestContext,
+		v6:     ipv6RequestContent,
 	}
 	return httpds, nil
 }

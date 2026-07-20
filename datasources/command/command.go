@@ -13,7 +13,7 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netx"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -97,7 +97,7 @@ func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return netool.FilterAddress(ip, true, false), nil
+	return netx.FilterAddress(ip, true, false), nil
 }
 
 func (c *Command) IPv6(ctx context.Context) ([]netip.Addr, error) {
@@ -106,7 +106,7 @@ func (c *Command) IPv6(ctx context.Context) ([]netip.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return netool.FilterAddress(ip, false, true), nil
+	return netx.FilterAddress(ip, false, true), nil
 }
 
 func (c *Command) Close() error {

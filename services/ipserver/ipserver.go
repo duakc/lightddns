@@ -15,7 +15,7 @@ import (
 
 	"github.com/duakc/lightddns/adapter"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netx"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/freebuf"
@@ -175,7 +175,7 @@ func (s *IPServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
 	respObj := &Response{
 		IP:      ip,
-		IsBogon: netool.IsBogon(netipAddr),
+		IsBogon: netx.IsBogon(netipAddr),
 	}
 	buffer := freebuf.NewSerial()
 	respObj.writeJSON(buffer)
@@ -187,7 +187,7 @@ func (s *IPServer) serverHTTPJson(resp http.ResponseWriter, req *http.Request, i
 func (s *IPServer) serverHTTPYaml(resp http.ResponseWriter, req *http.Request, ip string, netipAddr netip.Addr) error {
 	respObj := &Response{
 		IP:      ip,
-		IsBogon: netool.IsBogon(netipAddr),
+		IsBogon: netx.IsBogon(netipAddr),
 	}
 	buffer := freebuf.NewSerial()
 	respObj.writeYAML(buffer)

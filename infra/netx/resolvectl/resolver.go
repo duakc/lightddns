@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/infra/gos"
-	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 
 	"github.com/duakc/mt/debug"
 

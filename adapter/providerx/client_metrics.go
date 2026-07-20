@@ -16,6 +16,8 @@ type operationMetrics struct {
 	duration interface{ Observe(float64) }
 }
 
+var _ ddnsx.DDNSClient[int] = (*MetricsClient[int])(nil)
+
 type MetricsClient[R any] struct {
 	next ddnsx.DDNSClient[R]
 
@@ -26,22 +28,26 @@ type MetricsClient[R any] struct {
 	delete      operationMetrics
 }
 
-func NewMetricsClientFromContext[R any](ctx context.Context, providerName, providerType string,
+func NewMetricsClientFromContext[R any](
+	ctx context.Context,
+	clientName, clientType string,
 	next ddnsx.DDNSClient[R],
 ) *MetricsClient[R] {
 	return NewMetricsClient(
-		services.Lookup[metricx.ProviderFactory](ctx), providerName, providerType, next,
+		services.Lookup[metricx.ProviderFactory](ctx), clientName, clientType, next,
 	)
 }
 
-func NewMetricsClient[R any](factory metricx.ProviderFactory, providerName, providerType string,
+func NewMetricsClient[R any](
+	factory metricx.ProviderFactory,
+	clientName, clientType string,
 	next ddnsx.DDNSClient[R],
 ) *MetricsClient[R] {
 	operation := func(name string) operationMetrics {
 		return operationMetrics{
-			total:    factory.OperationTotal(providerName, providerType, name),
-			failure:  factory.OperationFailure(providerName, providerType, name),
-			duration: factory.OperationDuration(providerName, providerType, name, nil),
+			total:    factory.OperationTotal(clientName, clientType, name),
+			failure:  factory.OperationFailure(clientName, clientType, name),
+			duration: factory.OperationDuration(clientName, clientType, name, nil),
 		}
 	}
 	return &MetricsClient[R]{
@@ -66,13 +72,13 @@ func (c *MetricsClient[R]) Records(ctx context.Context, key ddnsx.RecordKey) (re
 	return c.next.Records(ctx, key)
 }
 
-func (c *MetricsClient[R]) Create(ctx context.Context, target ddnsx.RecordTarget) (err error) {
+func (c *MetricsClient[R]) Create(ctx context.Context, target ddnsx.RecordSpec) (err error) {
 	done := c.record(c.create)
 	defer done(&err)
 	return c.next.Create(ctx, target)
 }
 
-func (c *MetricsClient[R]) Update(ctx context.Context, target ddnsx.RecordTarget, record R) (err error) {
+func (c *MetricsClient[R]) Update(ctx context.Context, target ddnsx.RecordSpec, record R) (err error) {
 	done := c.record(c.update)
 	defer done(&err)
 	return c.next.Update(ctx, target, record)

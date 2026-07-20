@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/netx/httpx"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"

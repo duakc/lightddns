@@ -8,9 +8,9 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/netool/internal"
-	"github.com/duakc/lightddns/infra/netool/resolvectl/transports"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/internal"
+	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 )
 
 type ResolveDialer struct {

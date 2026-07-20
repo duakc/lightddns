@@ -6,21 +6,14 @@ import (
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
-	"github.com/duakc/lightddns/adapter/providerx"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netool/domains"
+	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"go.uber.org/zap"
 )
 
 const (
-	opDescribeDomains = providerx.OperationResolveZone
-	opListRecords     = providerx.OperationListRecords
-	opCreateRecord    = providerx.OperationCreateRecord
-	opUpdateRecord    = providerx.OperationUpdateRecord
-	opDeleteRecord    = providerx.OperationDeleteRecord
-
 	pageSize = 50
 )
 
@@ -56,9 +49,6 @@ func (c *Client) ResolveZone(ctx context.Context, fqdn string) (ddnsx.Zone, erro
 }
 
 func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone, error) {
-	logger := c.actionLogger(opDescribeDomains).With(zap.String("keyword", keyword))
-	logger.Info("search zone id from upstream")
-
 	var zones []ddnsx.Zone
 	for pageNumber := 1; ; pageNumber++ {
 		// Cloudflare's name filter won't work for zone discovery, so deliberately
@@ -73,7 +63,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 		}
 		for _, zone := range page.Result {
 			if !domains.IsDomainName(zone.Name) {
-				logger.Warn("upstream returned a bad zone name", zap.String("zone_name", zone.Name))
+				c.logger.Warn("upstream returned a bad zone name", zap.String("zone_name", zone.Name))
 				continue
 			}
 			zones = append(zones, ddnsx.Zone{Fqdn: zone.Name, ID: zone.ID})
@@ -115,7 +105,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 	}
 }
 
-func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
+func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
 	body, err := c.recordRequest(target)
 	if err != nil {
 		return err
@@ -127,7 +117,7 @@ func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
 	return err
 }
 
-func (c *Client) Update(ctx context.Context, target ddnsx.RecordTarget, record Record) error {
+func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, record Record) error {
 	body, err := c.recordRequest(target)
 	if err != nil {
 		return err
@@ -148,13 +138,14 @@ func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record Record)
 	return err
 }
 
-func (c *Client) recordRequest(target ddnsx.RecordTarget) (DNSRecordRequest, error) {
+func (c *Client) recordRequest(target ddnsx.RecordSpec) (DNSRecordRequest, error) {
 	name := domains.NormalizeFQDN(target.FQDN)
 
 	return DNSRecordRequest{
 		Comment: constpkg.ThisRecordIsManagedByLightddns,
 
-		Name:    name,
+		Name: name,
+
 		Ttl:     target.TTL,
 		Type:    target.Type.String(),
 		Content: target.Address.Unmap().String(),
@@ -172,8 +163,4 @@ func pageDone(info ResultInfo, pageNumber, resultCount int) bool {
 		return pageNumber >= info.TotalPages
 	}
 	return resultCount < pageSize
-}
-
-func (c *Client) actionLogger(action string) *zap.Logger {
-	return c.logger.With(zap.String("action", action))
 }

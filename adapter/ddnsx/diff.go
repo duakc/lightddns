@@ -7,7 +7,7 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/duakc/lightddns/infra/netool"
+	"github.com/duakc/lightddns/infra/netx"
 
 	"github.com/duakc/mt"
 )
@@ -106,7 +106,7 @@ func BuildDiffs[R any](ctx context.Context, key RecordKey,
 		normalized[i] = addr.Unmap()
 	}
 
-	ipv4, ipv6 := netool.SplitIPv4AndIPv6(normalized)
+	ipv4, ipv6 := netx.SplitIPv4AndIPv6(normalized)
 	var diffs []Diff[R]
 	if len(ipv4) > 0 || len(target) == 0 {
 		key.Type = RecordTypeA

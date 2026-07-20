@@ -3,8 +3,8 @@ package castoption
 import (
 	"fmt"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
-	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/options"
 
 	"go.uber.org/zap"
@@ -21,12 +21,12 @@ func BuildHTTPClientFromScratch(
 		err = fmt.Errorf("building raw dialer: %w", err)
 		return
 	}
-	resolveDialer, err = BuildResolveDialer(logger, rawDialer, dnsOption)
+	resolveDialer, err = BuildResolveDialer(dnsOption, rawDialer, logger)
 	if err != nil {
 		err = fmt.Errorf("building resolve dialer: %w", err)
 		return
 	}
-	httpClient, err = BuildHTTPClient(resolveDialer, httpOption)
+	httpClient, err = BuildHTTPClient(httpOption, resolveDialer, logger)
 	if err != nil {
 		err = fmt.Errorf("building http client: %w", err)
 		return

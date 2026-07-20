@@ -2,7 +2,7 @@ package options
 
 import (
 	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
 )
 
 type ConnectOption struct {

@@ -1,13 +1,13 @@
 package httpx
 
 import (
-	"net"
 	"net/http"
 	urlpkg "net/url"
 	"time"
 
-	"github.com/duakc/lightddns/infra/netool/dialerx"
+	"github.com/duakc/lightddns/infra/netx/dialerx"
 
+	"go.uber.org/zap"
 	"golang.org/x/net/http/httpproxy"
 )
 
@@ -24,14 +24,11 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return c.HTTPRequester.Do(req)
 }
 
-func NewClient(opt ...HTTPClientOption) *Client {
+func NewClient(dialer dialerx.Dialer, opt ...HTTPClientOption) *Client {
 	// modified from http.DefaultTransport
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
+			DialContext:           dialer.DialContext,
 			ForceAttemptHTTP2:     true,
 			MaxIdleConns:          100,
 			IdleConnTimeout:       90 * time.Second,
@@ -44,6 +41,7 @@ func NewClient(opt ...HTTPClientOption) *Client {
 		Client:        httpClient,
 		HTTPRequester: httpClient,
 	}
+
 	for _, o := range opt {
 		o.Apply(c)
 	}
@@ -61,7 +59,6 @@ func (fn FuncHTTPClientOption) Apply(c *Client) {
 	fn(c)
 }
 
-// Deprecated: use TokenClient directly
 func ClientOptionWithToken(token string) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
 		c.HTTPRequester = &TokenClient{
@@ -71,21 +68,12 @@ func ClientOptionWithToken(token string) HTTPClientOption {
 	})
 }
 
-func ClientOptionWithRoundTripper(t http.RoundTripper) HTTPClientOption {
-	return FuncHTTPClientOption(func(c *Client) {
-		c.Client.Transport = t
-	})
-}
-
 // ClientOptionWithProxy configures the proxy on the underlying *http.Transport.
 // It is a no-op if a custom RoundTripper has replaced the default transport
 // (see ClientOptionWithRoundTripper).
 func ClientOptionWithProxy(httpProxyURL, httpsProxyURL, noProxyURL string) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
-		t, ok := c.Client.Transport.(*http.Transport)
-		if !ok {
-			return
-		}
+		t := getClientTransport(c)
 		cfg := httpproxy.Config{
 			HTTPProxy:  httpProxyURL,
 			HTTPSProxy: httpsProxyURL,
@@ -102,10 +90,7 @@ func ClientOptionWithProxy(httpProxyURL, httpsProxyURL, noProxyURL string) HTTPC
 // replaced the default transport (see ClientOptionWithRoundTripper).
 func ClientOptionEnableProxy() HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
-		t, ok := c.Client.Transport.(*http.Transport)
-		if !ok {
-			return
-		}
+		t := getClientTransport(c)
 		t.Proxy = http.ProxyFromEnvironment
 	})
 }
@@ -115,10 +100,71 @@ func ClientOptionEnableProxy() HTTPClientOption {
 // (see ClientOptionWithRoundTripper).
 func ClientOptionWithDialer(d dialerx.Dialer) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
-		t, ok := c.Client.Transport.(*http.Transport)
-		if !ok {
-			return
-		}
+		t := getClientTransport(c)
 		t.DialContext = d.DialContext
 	})
+}
+
+func ClientOptionWithHeader(key, value string) HTTPClientOption {
+	return FuncHTTPClientOption(func(c *Client) {
+		if len(key) == 0 { // empty value is allowed.
+			return
+		}
+
+		if headerRequester, isHeaderRequester := c.HTTPRequester.(*HeaderClient); isHeaderRequester {
+			headerRequester.Headers.Add(key, value)
+			return
+		}
+		c.HTTPRequester = &HeaderClient{
+			HTTPRequester: c.HTTPRequester,
+			Headers: http.Header{
+				key: []string{value},
+			},
+		}
+	})
+}
+
+func ClientOptionWithHeaders(header http.Header) HTTPClientOption {
+	return FuncHTTPClientOption(func(c *Client) {
+		if len(header) == 0 {
+			return
+		}
+
+		if headerRequester, isHeaderRequester := c.HTTPRequester.(*HeaderClient); isHeaderRequester {
+			ExtendHeaders(headerRequester.Headers, header)
+			return
+		}
+		c.HTTPRequester = &HeaderClient{
+			HTTPRequester: c.HTTPRequester,
+			Headers:       header,
+		}
+	})
+}
+
+func ClientOptionWithDebug() HTTPClientOption {
+	return FuncHTTPClientOption(func(c *Client) {
+		c.HTTPRequester = &DebugClient{
+			HTTPRequester: c.HTTPRequester,
+			Logger:        defaultLogger,
+		}
+	})
+}
+
+func ClientOptionWithDebugLogger(logger *zap.Logger) HTTPClientOption {
+	return FuncHTTPClientOption(func(c *Client) {
+		if logger == nil {
+			logger = defaultLogger
+		}
+		c.HTTPRequester = &DebugClient{
+			HTTPRequester: c.HTTPRequester,
+			Logger:        logger,
+		}
+	})
+}
+
+func getClientTransport(c *Client) *http.Transport {
+	if httpTransport, isHttpTransport := c.Transport.(*http.Transport); isHttpTransport {
+		return httpTransport
+	}
+	panic("http client transport is not an http transport")
 }

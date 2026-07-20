@@ -1,6 +1,6 @@
-package netool
+package netx
 
-import "github.com/duakc/lightddns/infra/netool/internal"
+import "github.com/duakc/lightddns/infra/netx/internal"
 
 var (
 	IsIPv4           = internal.IsIPv4

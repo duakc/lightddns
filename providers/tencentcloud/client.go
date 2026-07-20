@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
-	"github.com/duakc/lightddns/infra/netool/domains"
+	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	mDns "github.com/miekg/dns"
@@ -116,7 +116,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 	}
 }
 
-func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
+func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
 	domain := domains.NormalizeFQDN(target.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
@@ -133,7 +133,7 @@ func (c *Client) Create(ctx context.Context, target ddnsx.RecordTarget) error {
 	return err
 }
 
-func (c *Client) Update(ctx context.Context, target ddnsx.RecordTarget, record Record) error {
+func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, record Record) error {
 	domain := domains.NormalizeFQDN(target.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Fqdn)
 	if err != nil {

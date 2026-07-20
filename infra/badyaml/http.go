@@ -6,7 +6,7 @@ import (
 	urlpkg "net/url"
 	"strings"
 
-	"github.com/duakc/lightddns/infra/netool/domains"
+	"github.com/duakc/lightddns/infra/netx/domains"
 )
 
 type HTTPMethod string

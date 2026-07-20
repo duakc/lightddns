@@ -102,16 +102,16 @@ func (r *Reconciler[R]) applyDiff(ctx context.Context, logger *zap.Logger,
 	switch diff.Action {
 	case DDNSActionCreate:
 		logger.Info("create")
-		err = r.client.Create(ctx, RecordTarget{
+		err = r.client.Create(ctx, RecordSpec{
 			RecordKey: key,
-			Address:   diff.Target,
+			Address:   diff.Target.Unmap(),
 			TTL:       ttl,
 		})
 	case DDNSActionUpdate:
 		logger.Info("update")
-		err = r.client.Update(ctx, RecordTarget{
+		err = r.client.Update(ctx, RecordSpec{
 			RecordKey: key,
-			Address:   diff.Target,
+			Address:   diff.Target.Unmap(),
 			TTL:       ttl,
 		}, diff.Record)
 	case DDNSActionDelete:

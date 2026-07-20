@@ -142,7 +142,7 @@ func TestServeHTTP_FormatJSON(t *testing.T) {
 		"response body must be valid JSON: %s", rec.Body.String())
 
 	assert.Equal(t, "203.0.113.5", got.IP)
-	assert.False(t, got.IsBogon, "TEST-NET-3 is publicly-routable per netool.IsBogon")
+	assert.False(t, got.IsBogon, "TEST-NET-3 is publicly-routable per netx.IsBogon")
 }
 
 func TestServeHTTP_FormatJSONCaseInsensitive(t *testing.T) {

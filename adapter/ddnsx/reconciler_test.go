@@ -27,11 +27,11 @@ func (c *reconcileClient) Records(_ context.Context, key RecordKey) ([]Existing[
 	return c.existing, nil
 }
 
-func (c *reconcileClient) Create(context.Context, RecordTarget) error {
+func (c *reconcileClient) Create(context.Context, RecordSpec) error {
 	return nil
 }
 
-func (c *reconcileClient) Update(context.Context, RecordTarget, int) error {
+func (c *reconcileClient) Update(context.Context, RecordSpec, int) error {
 	return nil
 }
 

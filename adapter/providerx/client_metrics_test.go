@@ -24,11 +24,11 @@ func (metricsTestClient) Records(context.Context, ddnsx.RecordKey) ([]ddnsx.Exis
 	return nil, nil
 }
 
-func (metricsTestClient) Create(context.Context, ddnsx.RecordTarget) error {
+func (metricsTestClient) Create(context.Context, ddnsx.RecordSpec) error {
 	return nil
 }
 
-func (metricsTestClient) Update(context.Context, ddnsx.RecordTarget, int) error {
+func (metricsTestClient) Update(context.Context, ddnsx.RecordSpec, int) error {
 	return nil
 }
 

@@ -6,8 +6,9 @@ import (
 	"net/http"
 	urlpkg "net/url"
 	"strconv"
+	"strings"
 
-	"github.com/duakc/lightddns/infra/netool/httpx"
+	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"github.com/duakc/mt"
@@ -42,9 +43,7 @@ func NewAPIClient(logger *zap.Logger, do httpx.HTTPRequester, token string) APIC
 func (c *defaultAPIClient) ListZones(ctx context.Context, request ListZonesRequest) (ListZonesResponse, error) {
 	req := c.newRequest(http.MethodGet)
 	setQuery(req.Query, "status", request.Status)
-	// Cloudflare's List Zones name filter won't work for this provider's zone discovery.
-	// SearchZones deliberately omits it and paginates the complete active-zone list.
-	if len(request.Name) > 0 {
+	if len(request.Name) > 0 && strings.TrimSuffix(request.Name, ".") != "" {
 		name := dns.Fqdn(request.Name)
 		setQuery(req.Query, "name", "contains:"+name)
 	}
