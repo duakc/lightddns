@@ -102,6 +102,37 @@ build-archlinux:
 build-archlinux-all:
 	$(GO_SCRIPT) archlinux --all --verbose
 
+# nfpm-based builders (no native tool). deb/rpm/archlinux are the migration
+# target for the native-tool targets above (kept until nfpm is proven); openwrt
+# (.ipk + *.openwrt.apk) is nfpm-only.
+.PHONY: build-nfpm
+build-nfpm:
+	$(GO_SCRIPT) nfpm --format all --verbose
+
+.PHONY: build-nfpm-all
+build-nfpm-all:
+	$(GO_SCRIPT) nfpm --format all --all --verbose
+
+.PHONY: build-nfpm-deb
+build-nfpm-deb:
+	$(GO_SCRIPT) nfpm --format deb --verbose
+
+.PHONY: build-nfpm-rpm
+build-nfpm-rpm:
+	$(GO_SCRIPT) nfpm --format rpm --verbose
+
+.PHONY: build-nfpm-archlinux
+build-nfpm-archlinux:
+	$(GO_SCRIPT) nfpm --format archlinux --verbose
+
+.PHONY: build-openwrt
+build-openwrt:
+	$(GO_SCRIPT) nfpm --format openwrt --verbose
+
+.PHONY: build-openwrt-all
+build-openwrt-all:
+	$(GO_SCRIPT) nfpm --format openwrt --all --verbose
+
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
 # the package for the host system. The result lands under build/nix/result.
 .PHONY: build-nix

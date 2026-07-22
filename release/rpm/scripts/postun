@@ -1,0 +1,11 @@
+#!/bin/sh
+# %postun: $1 -ge 1 is an upgrade.
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    if [ "$1" -ge 1 ]; then
+        systemctl try-restart lightddns.service || true
+    fi
+fi
+# Per Fedora guidelines the system user/group is intentionally left behind on
+# erase so any files it still owns keep a valid owner.
+exit 0

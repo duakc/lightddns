@@ -31,6 +31,8 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb // indirect
+	github.com/cavaliergopher/cpio v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
@@ -41,6 +43,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.1 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	github.com/google/rpmpack v0.7.1 // indirect
 	github.com/goreleaser/chglog v0.7.4 // indirect
 	github.com/goreleaser/fileglob v1.4.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
@@ -63,6 +66,7 @@ require (
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	gitlab.com/digitalxero/go-conventional-commit v1.0.7 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect

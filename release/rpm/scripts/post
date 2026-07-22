@@ -1,0 +1,32 @@
+#!/bin/sh
+# %post: $1 is the installed-package count (>=2 on upgrade).
+# Config + secrets: readable by the service group, not world.
+for f in /etc/lightddns.yaml /etc/default/lightddns; do
+    if [ -e "$f" ]; then
+        chown lightddns:lightddns "$f"
+        chmod 0600 "$f"
+    fi
+done
+
+if [ -d /etc/lightddns.d ]; then
+    chown lightddns:lightddns /etc/lightddns.d
+    chmod 0700 /etc/lightddns.d
+fi
+
+# State/working dir for `-D` (created here so non-systemd setups work too).
+if [ ! -d /var/lib/lightddns ]; then
+    mkdir -p /var/lib/lightddns
+fi
+chown lightddns:lightddns /var/lib/lightddns
+chmod 0700 /var/lib/lightddns
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    systemctl enable lightddns.service || true
+    # On upgrade ($1 -ge 2) restart to pick up the new binary. On a fresh
+    # install we leave it stopped so the admin can fill in the config.
+    if [ "$1" -ge 2 ]; then
+        systemctl try-restart lightddns.service || true
+    fi
+fi
+exit 0

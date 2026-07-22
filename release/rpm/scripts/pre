@@ -1,0 +1,8 @@
+#!/bin/sh
+# %pre: dedicated system group/user (no home, no login shell).
+getent group lightddns >/dev/null || groupadd --system lightddns
+getent passwd lightddns >/dev/null || \
+    useradd --system --gid lightddns --no-create-home \
+        --home-dir /var/lib/lightddns --shell /sbin/nologin \
+        --comment "lightddns DDNS daemon" lightddns
+exit 0

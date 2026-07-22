@@ -1,0 +1,7 @@
+#!/bin/sh
+# %preun: $1 == 0 is the final erase (not an upgrade).
+if [ "$1" -eq 0 ] && [ -d /run/systemd/system ]; then
+    systemctl --no-reload disable lightddns.service || true
+    systemctl stop lightddns.service || true
+fi
+exit 0
