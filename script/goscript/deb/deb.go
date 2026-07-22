@@ -95,13 +95,12 @@ func Run(ctx context.Context) {
 		"https://raw.githubusercontent.com/%s/%s/release/schema.json",
 		constpkg.Repo, buildVersion)
 
-	built := 0
+	targets := target.DEBTargets(buildAll)
+	if len(targets) == 0 {
+		common.Fatalf("no deb built with GOARCH=%s GOOS=%s", runtime.GOARCH, runtime.GOOS)
+	}
 
-	for _, tgt := range target.All() {
-		if !tgt.Deb || (!buildAll && (runtime.GOARCH != tgt.GOARCH || runtime.GOOS != tgt.GOOS)) {
-			continue
-		}
-
+	for _, tgt := range targets {
 		common.Infof("GOOS=%s GOARCH=%s TARGET_GOOS=%s TARGET_GOARCH=%s",
 			runtime.GOOS, runtime.GOARCH, tgt.GOOS, tgt.GOARCH)
 
@@ -110,13 +109,8 @@ func Run(ctx context.Context) {
 			common.Fatalf("package: %s", err)
 		}
 		common.Infof("built %s", deb)
-		built++
 	}
-
-	if built == 0 {
-		common.Fatalf("no deb built with GOARCH=%s GOOS=%s", runtime.GOARCH, runtime.GOOS)
-	}
-	common.Infof("done, built %d package(s)", built)
+	common.Infof("done, built %d package(s)", len(targets))
 }
 
 // pack stages one arch under build/draft and runs dpkg-deb, writing the

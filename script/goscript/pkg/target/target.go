@@ -14,6 +14,7 @@ package target
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 )
 
@@ -33,6 +34,9 @@ type Target struct {
 
 	// arm
 	GOARMVersion int
+
+	// 386
+	GO386 string
 
 	// mips
 	SoftFloat bool
@@ -137,6 +141,118 @@ var all = []Target{
 
 func All() []Target {
 	return append([]Target(nil), all...)
+}
+
+// Host returns the baseline target for the current runtime GOOS/GOARCH.
+func Host() (Target, bool) {
+	for _, t := range all {
+		if t.GOOS == runtime.GOOS && t.GOARCH == runtime.GOARCH {
+			return t, true
+		}
+	}
+	return Target{}, false
+}
+
+// Filter returns every target matching goos and goarch; an empty string matches
+// any value for that dimension.
+func Filter(goos, goarch string) []Target {
+	var out []Target
+	for _, t := range all {
+		if (goos == "" || t.GOOS == goos) && (goarch == "" || t.GOARCH == goarch) {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// DEBTargets, RPMTargets and ArchLinuxTargets return the targets that ship as
+// the respective package format. When buildAll is false the set is narrowed to
+// the host GOOS/GOARCH (0 or 1 target).
+func DEBTargets(buildAll bool) []Target {
+	return shipping(buildAll, func(t Target) bool { return t.Deb })
+}
+
+func RPMTargets(buildAll bool) []Target {
+	return shipping(buildAll, func(t Target) bool { return t.RPM })
+}
+
+func ArchLinuxTargets(buildAll bool) []Target {
+	return shipping(buildAll, func(t Target) bool { return t.ArchLinux })
+}
+
+func shipping(buildAll bool, ships func(Target) bool) []Target {
+	var out []Target
+	for _, t := range all {
+		if !ships(t) {
+			continue
+		}
+		if !buildAll && (t.GOOS != runtime.GOOS || t.GOARCH != runtime.GOARCH) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// OpenWrtTarget is one compile variant and the OpenWrt subtarget arch labels
+// that share its binary. OpenWrt ships far more arch labels than Go has arch
+// variants: e.g. every arm64 board flavour reuses the single linux/arm64 build.
+type OpenWrtTarget struct {
+	Target
+
+	// Archs are the OpenWrt package architecture labels (e.g. aarch64_cortex-a53)
+	// this binary is published under. One .ipk / .apk is emitted per label.
+	Archs []string
+}
+
+// openwrtTargets mirrors the sing-box OpenWrt matrix: comprehensive coverage of
+// the OpenWrt arch labels, grouped by the Go build variant that produces each.
+var openwrtTargets = []OpenWrtTarget{
+	{Target{GOOS: "linux", GOARCH: "amd64"}, []string{"x86_64"}},
+	{Target{GOOS: "linux", GOARCH: "arm64"}, []string{
+		"aarch64_cortex-a53", "aarch64_cortex-a72", "aarch64_cortex-a76", "aarch64_generic",
+	}},
+	// GO386=sse2 is the toolchain default.
+	{Target{GOOS: "linux", GOARCH: "386"}, []string{"i386_pentium4"}},
+	{Target{GOOS: "linux", GOARCH: "386", GO386: "softfloat"}, []string{"i386_pentium-mmx"}},
+	{Target{GOOS: "linux", GOARCH: "arm", GOARMVersion: 7}, []string{
+		"arm_cortex-a5_vfpv4", "arm_cortex-a7_neon-vfpv4", "arm_cortex-a7_vfpv4",
+		"arm_cortex-a8_vfpv3", "arm_cortex-a9_neon", "arm_cortex-a9_vfpv3-d16",
+		"arm_cortex-a15_neon-vfpv4",
+	}},
+	{Target{GOOS: "linux", GOARCH: "arm", GOARMVersion: 6}, []string{"arm_arm1176jzf-s_vfp"}},
+	{Target{GOOS: "linux", GOARCH: "arm", GOARMVersion: 5}, []string{
+		"arm_arm926ej-s", "arm_cortex-a7", "arm_cortex-a9", "arm_fa526", "arm_xscale",
+	}},
+	{Target{GOOS: "linux", GOARCH: "mipsle", SoftFloat: true}, []string{
+		"mipsel_24kc", "mipsel_74kc", "mipsel_mips32",
+	}},
+	{Target{GOOS: "linux", GOARCH: "mipsle"}, []string{"mipsel_24kc_24kf"}}, // hardfloat
+	{Target{GOOS: "linux", GOARCH: "mips", SoftFloat: true}, []string{
+		"mips_24kc", "mips_4kec", "mips_mips32",
+	}},
+	{Target{GOOS: "linux", GOARCH: "mips64", SoftFloat: true}, []string{
+		"mips64_mips64r2", "mips64_octeonplus",
+	}},
+	{Target{GOOS: "linux", GOARCH: "mips64le", SoftFloat: true}, []string{"mips64el_mips64r2"}},
+	{Target{GOOS: "linux", GOARCH: "riscv64"}, []string{"riscv64_generic"}},
+	{Target{GOOS: "linux", GOARCH: "loong64"}, []string{"loongarch64_generic"}},
+}
+
+// OpenWrtTargets returns the OpenWrt build variants. Since every variant is a
+// linux cross-build, buildAll=false narrows by the host GOARCH only (GOOS is
+// irrelevant), so the command is usable from a non-linux dev host.
+func OpenWrtTargets(buildAll bool) []OpenWrtTarget {
+	if buildAll {
+		return append([]OpenWrtTarget(nil), openwrtTargets...)
+	}
+	var out []OpenWrtTarget
+	for _, t := range openwrtTargets {
+		if t.GOARCH == runtime.GOARCH {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func (t Target) variantParts() []string {

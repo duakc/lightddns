@@ -10,6 +10,7 @@ import (
 	"github.com/duakc/lightddns/script/goscript/deb"
 	"github.com/duakc/lightddns/script/goscript/gendoc"
 	"github.com/duakc/lightddns/script/goscript/genschema"
+	"github.com/duakc/lightddns/script/goscript/openwrt"
 	"github.com/duakc/lightddns/script/goscript/rpm"
 )
 
@@ -41,6 +42,8 @@ func main() {
 		rpm.Run(ctx)
 	case "archlinux":
 		archlinux.Run(ctx)
+	case "openwrt":
+		openwrt.Run(ctx)
 	default:
 		panic("unknown command: " + command)
 	}

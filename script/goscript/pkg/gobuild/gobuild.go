@@ -73,11 +73,17 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	if tgt.GOAMD64Version != 0 && goarch == "amd64" {
 		env = append(env, fmt.Sprintf("GOAMD64=v%d", tgt.GOAMD64Version))
 	}
-	if tgt.SoftFloat && goarch == "mips" {
+	if tgt.SoftFloat && (goarch == "mips" || goarch == "mipsle") {
 		env = append(env, "GOMIPS=softfloat")
+	}
+	if tgt.SoftFloat && (goarch == "mips64" || goarch == "mips64le") {
+		env = append(env, "GOMIPS64=softfloat")
 	}
 	if tgt.GOARMVersion > 0 && goarch == "arm" {
 		env = append(env, fmt.Sprintf("GOARM=%d", tgt.GOARMVersion))
+	}
+	if tgt.GO386 != "" && goarch == "386" {
+		env = append(env, "GO386="+tgt.GO386)
 	}
 
 	args := []string{"build", "-C", main}

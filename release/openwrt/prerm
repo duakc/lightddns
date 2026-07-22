@@ -1,0 +1,10 @@
+#!/bin/sh
+# Stop and disable the service before removal.
+[ -n "${IPKG_INSTROOT}" ] && exit 0
+
+if [ -x /etc/init.d/lightddns ]; then
+	/etc/init.d/lightddns stop
+	/etc/init.d/lightddns disable
+fi
+
+exit 0

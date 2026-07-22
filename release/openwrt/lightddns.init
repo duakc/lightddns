@@ -1,0 +1,37 @@
+#!/bin/sh /etc/rc.common
+# procd init script for lightddns on OpenWrt.
+
+USE_PROCD=1
+
+# Start late (after network is up), stop early.
+START=95
+STOP=01
+
+PROG=/usr/bin/lightddns
+CONF=/etc/lightddns.yaml
+WORKDIR=/var/lib/lightddns
+
+start_service() {
+	# Optional secrets / extra args, mirroring the systemd EnvironmentFile.
+	# The config reads secrets via {{ .Env.KEY }}; ARG appends flags to "run".
+	ARG=""
+	if [ -f /etc/default/lightddns ]; then
+		set -a
+		. /etc/default/lightddns
+		set +a
+	fi
+
+	mkdir -p "$WORKDIR"
+
+	procd_open_instance
+	procd_set_param command "$PROG" -D "$WORKDIR" run -c "$CONF" $ARG
+	procd_set_param respawn
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	[ -f /etc/default/lightddns ] && procd_set_param file /etc/default/lightddns
+	procd_close_instance
+}
+
+service_triggers() {
+	procd_add_reload_trigger lightddns
+}

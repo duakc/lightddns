@@ -46,20 +46,13 @@ func Run(ctx context.Context) {
 
 	// Select targets: --os/--arch (or --all) filters the matrix; with no
 	// selection, default to the host's baseline target only.
-	hostOnly := !all && goos == "" && goarch == ""
 	var targets []target.Target
-	for _, t := range target.All() {
-		matches := (goos == "" || t.GOOS == goos) && (goarch == "" || t.GOARCH == goarch)
-		if hostOnly {
-			matches = t.GOOS == runtime.GOOS && t.GOARCH == runtime.GOARCH
+	if !all && goos == "" && goarch == "" {
+		if host, ok := target.Host(); ok {
+			targets = append(targets, host)
 		}
-		if !matches {
-			continue
-		}
-		targets = append(targets, t)
-		if hostOnly {
-			break
-		}
+	} else {
+		targets = target.Filter(goos, goarch)
 	}
 	if len(targets) == 0 {
 		common.Fatalf("no target matches --os %q --arch %q (host GOOS=%s GOARCH=%s)",

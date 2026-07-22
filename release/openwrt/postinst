@@ -1,0 +1,11 @@
+#!/bin/sh
+# Enable and (re)start the service on install/upgrade. Skipped inside the
+# OpenWrt image builder, which stages into $IPKG_INSTROOT and cannot run procd.
+[ -n "${IPKG_INSTROOT}" ] && exit 0
+
+if [ -x /etc/init.d/lightddns ]; then
+	/etc/init.d/lightddns enable
+	/etc/init.d/lightddns restart
+fi
+
+exit 0
