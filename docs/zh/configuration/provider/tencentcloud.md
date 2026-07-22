@@ -9,8 +9,12 @@ name: prov-tc
 secretId: "{{ .Env.TENCENTCLOUD_SECRET_ID }}"
 secretKey: "{{ .Env.TENCENTCLOUD_SECRET_KEY }}"
 
-# ... ConnectOption
-# ... HTTPOption
+# optional
+dns: system
+connect:
+  # ... ConnectOption
+http:
+  # ... HTTPOption
 ```
 
 ## `secretId`
@@ -29,10 +33,14 @@ secretKey: "{{ .Env.TENCENTCLOUD_SECRET_KEY }}"
 
 ---
 
-## `ConnectOption`
+## `connect`
 
 参见 [ConnectOption](../shared/connect.md)。
 
-## `HTTPOption`
+## `http`
 
 参见 [HTTPOption](../shared/http.md)。
+
+## `dns`
+
+参见 [DNSOption](../shared/dns.md)。

@@ -19,8 +19,11 @@ method: GET
 headers:
   User-Agent: Lightddns/stable
 
-# ... ConnectOption
-# ... HTTPOption
+dns: system
+connect:
+  # ... ConnectOption
+http:
+  # ... HTTPOption
 ```
 
 ??? note "行为说明"
@@ -131,10 +134,14 @@ headers:
 
 ---
 
-## `ConnectOption`
+## `connect`
 
 参见 [ConnectOption](../shared/connect.md)。
 
-## `HTTPOption`
+## `http`
 
 参见 [HTTPOption](../shared/http.md)。
+
+## `dns`
+
+参见 [DNSOption](../shared/dns.md)。

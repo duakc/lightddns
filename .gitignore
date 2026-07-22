@@ -26,6 +26,7 @@ bin/
 site/
 .wrangler/
 .cache/
+.direnv/
 
 *.secret.go
 *.secret_test.go

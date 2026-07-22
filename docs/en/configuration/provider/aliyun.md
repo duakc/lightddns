@@ -9,8 +9,12 @@ name: prov-ali
 accessKeyId: "{{ .Env.ALIYUN_ACCESS_KEY_ID }}"
 accessKeySecret: "{{ .Env.ALIYUN_ACCESS_KEY_SECRET }}"
 
-# ... ConnectOption
-# ... HTTPOption
+# optional
+dns: system
+connect:
+  # ... ConnectOption
+http:
+  # ... HTTPOption
 ```
 
 ## `accessKeyId`
@@ -29,10 +33,14 @@ Aliyun RAM access key secret.
 
 ---
 
-## `ConnectOption`
+## `connect`
 
 See [ConnectOption](../shared/connect.md).
 
-## `HTTPOption`
+## `http`
 
 See [HTTPOption](../shared/http.md).
+
+## `dns`
+
+See [DNSOption](../shared/dns.md).

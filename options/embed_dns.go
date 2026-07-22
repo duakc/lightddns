@@ -8,42 +8,53 @@ import (
 
 	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 
-	"github.com/duakc/mt"
+	goyaml "github.com/goccy/go-yaml"
 )
 
 type DNSOption struct {
-	Type   string `json:"type"           yaml:"type"`
-	Server string `json:"server"         yaml:"server"`
-	Port   uint16 `json:"port,omitempty" yaml:"port,omitempty"`
+	Enabled bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Type    string `json:"type,omitempty"    yaml:"type,omitempty"`
+	Server  string `json:"server,omitempty"  yaml:"server,omitempty"`
+	Port    uint16 `json:"port,omitempty"    yaml:"port,omitempty"`
 }
 
+type _DNSOption DNSOption
+
 func (do *DNSOption) UnmarshalYAML(data []byte) error {
-	unquoted := mt.UnquoteString(string(data))
-	lowerUnquoted := strings.ToLower(unquoted)
-	if lowerUnquoted == "system" || lowerUnquoted == "" {
+	// String form: `dns: system` or `dns: tls://8.8.8.8:853`.
+	var raw string
+	if err := goyaml.Unmarshal(data, &raw); err == nil {
+		return do.unmarshalString(raw)
+	}
+	// Object form: `dns: {type: tls, server: 8.8.8.8, port: 853}`.
+	return goyaml.Unmarshal(data, (*_DNSOption)(do))
+}
+
+// unmarshalString parses the shorthand string form. The string form is always
+// enabled; the default port is applied later, not here.
+func (do *DNSOption) unmarshalString(s string) error {
+	do.Enabled = true
+	if lower := strings.ToLower(strings.TrimSpace(s)); lower == "" || lower == transports.TransportTypeSystem {
 		do.Type = transports.TransportTypeSystem
 		return nil
 	}
-	if !strings.Contains(unquoted, "://") {
-		unquoted = "udp://" + unquoted
-	}
-	dnsURL, err := urlpkg.Parse(unquoted)
+	dnsURL, err := urlpkg.Parse(s)
 	if err != nil {
 		return fmt.Errorf("resolve DNSOption: %w", err)
 	}
 	switch dnsURL.Scheme {
 	case transports.TransportTypeTLS:
 		do.Type = transports.TransportTypeTLS
-		do.Server = dnsURL.Host
-		if dnsURL.Port() == "" {
-			do.Port = 853
-		} else if numPort, err := strconv.ParseUint(dnsURL.Port(), 10, 16); err != nil {
-			return fmt.Errorf("bad port: %w", err)
-		} else {
+		do.Server = dnsURL.Hostname()
+		if dnsURL.Port() != "" {
+			numPort, err := strconv.ParseUint(dnsURL.Port(), 10, 16)
+			if err != nil {
+				return fmt.Errorf("bad port: %w", err)
+			}
 			do.Port = uint16(numPort)
 		}
 	default:
-		return fmt.Errorf("unknown dns: `%s`", unquoted)
+		return fmt.Errorf("unknown dns: `%s`", s)
 	}
 	return nil
 }

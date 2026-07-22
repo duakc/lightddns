@@ -1,12 +1,15 @@
 # HTTPOption
 
-HTTP 客户端配置，被数据源和服务提供者复用。
+HTTP 客户端配置，被数据源和服务提供者复用。这些字段位于数据源或服务提供者的 `http:` 键下。
 
 ```yaml
-useSystemProxy: false
+http:
+  useSystemProxy: false
 
-httpProxy: ""
-httpsProxy: ""
+  httpProxy: ""
+  httpsProxy: ""
+
+  httpDebug: false
 ```
 
 ## `useSystemProxy`
@@ -20,4 +23,18 @@ httpsProxy: ""
 ```yaml
 httpProxy: "http://127.0.0.1:7890"
 httpsProxy: "http://127.0.0.1:7890"
+```
+
+## `httpDebug`
+
+设为 `true` 时，会记录完整的 HTTP 请求与响应（方法、URL、请求头、请求体）。默认关闭。
+
+!!! note
+    仅当全局日志 [`level`](../log.md) 为 `debug` 时，调试日志才会生效。
+
+!!! warning "敏感信息与性能"
+    HTTP 调试日志会暴露敏感信息 —— API 令牌、凭据以及请求/响应体都会被原样写入日志。同时它会导致**严重的性能下降**，因为每个请求和响应都会被完整缓冲并序列化。非必要请勿开启；确需调试时再打开，并且在把日志发送给他人之前，务必先检查其中是否包含隐私数据。
+
+```yaml
+httpDebug: true
 ```

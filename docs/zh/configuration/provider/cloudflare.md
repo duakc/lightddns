@@ -12,8 +12,11 @@ token: "your-cloudflare-api-token"
 # optional
 proxy: false
 
-# ... ConnectOption
-# ... HTTPOption
+dns: system
+connect:
+  # ... ConnectOption
+http:
+  # ... HTTPOption
 ```
 
 ## `token`
@@ -39,10 +42,14 @@ proxy: true
 
 ---
 
-## `ConnectOption`
+## `connect`
 
 参见 [ConnectOption](../shared/connect.md)。
 
-## `HTTPOption`
+## `http`
 
 参见 [HTTPOption](../shared/http.md)。
+
+## `dns`
+
+参见 [DNSOption](../shared/dns.md)。

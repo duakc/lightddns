@@ -1,15 +1,15 @@
 # ConnectOption
 
-Network connection configuration, shared by datasources and Service Providers.
+Network connection configuration, shared by datasources and Service Providers. These fields live under the `connect:` key of a datasource or provider.
 
 ```yaml
-fwmark: 0
-dns: system
+connect:
+  fwmark: 0
 
-bindAddress4: ""
-bindAddress6: ""
-bindInterface: ""
-dialStrategy: prefer_ipv6
+  bindAddress4: ""
+  bindAddress6: ""
+  bindInterface: ""
+  dialStrategy: prefer_ipv6
 ```
 
 ## `fwmark`
@@ -18,28 +18,6 @@ Linux SO_MARK firewall mark for policy routing.
 
 !!! warning "Only available on below platform"
     Linux
-
-## `dns`
-
-DNS resolution configuration.
-
-`system` uses the system DNS resolver.
-
-```yaml
-dns: system
-```
-
-Customize the upstream DNS server via DNS over TLS. `type` accepts `system | tls`.
-
-```yaml
-dns:
-  type: tls
-  server: 8.8.8.8
-  port: 853
-```
-
-!!! note
-    DNS config only takes effect when the target is a domain name. It is skipped when the target is an IP address.
 
 ## `bindAddress4` / `bindAddress6`
 

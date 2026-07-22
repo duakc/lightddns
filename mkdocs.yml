@@ -38,6 +38,7 @@ nav:
       - Shared:
           - ConnectOption: configuration/shared/connect.md
           - HTTPOption: configuration/shared/http.md
+          - DNSOption: configuration/shared/dns.md
 theme:
   name: material
   features:
@@ -116,6 +117,7 @@ plugins:
             Shared: 共享
             ConnectOption: ConnectOption
             HTTPOption: HTTPOption
+            DNSOption: DNSOption
 extra_css:
   - stylesheets/extra.css
 markdown_extensions:

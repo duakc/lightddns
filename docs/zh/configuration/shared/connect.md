@@ -1,15 +1,15 @@
 # ConnectOption
 
-网络连接配置，被数据源和服务提供者复用。
+网络连接配置，被数据源和服务提供者复用。这些字段位于数据源或服务提供者的 `connect:` 键下。
 
 ```yaml
-fwmark: 0
-dns: system
+connect:
+  fwmark: 0
 
-bindAddress4: ""
-bindAddress6: ""
-bindInterface: ""
-dialStrategy: prefer_ipv6
+  bindAddress4: ""
+  bindAddress6: ""
+  bindInterface: ""
+  dialStrategy: prefer_ipv6
 ```
 
 ## `fwmark`
@@ -18,28 +18,6 @@ Linux SO_MARK 防火墙标记，用于策略路由等场景。
 
 !!! warning "仅支持以下平台"
     Linux
-
-## `dns`
-
-DNS 解析配置。
-
-`system` 表示使用系统 DNS。
-
-```yaml
-dns: system
-```
-
-通过 DNS over TLS 自定义上游 DNS 服务器。`type` 可选值：`system | tls`。
-
-```yaml
-dns:
-  type: tls
-  server: 8.8.8.8
-  port: 853
-```
-
-!!! note
-    仅当目标地址为域名时 DNS 配置才会生效。若目标为 IP 地址，则跳过 DNS 解析。
 
 ## `bindAddress4` / `bindAddress6`
 

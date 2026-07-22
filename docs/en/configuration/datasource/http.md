@@ -19,8 +19,11 @@ method: GET
 headers:
   User-Agent: Lightddns/stable
 
-# ... ConnectOption
-# ... HTTPOption
+dns: system
+connect:
+  # ... ConnectOption
+http:
+  # ... HTTPOption
 ```
 
 ??? note "Behavior"
@@ -131,10 +134,14 @@ headers:
 
 ---
 
-## `ConnectOption`
+## `connect`
 
 See [ConnectOption](../shared/connect.md).
 
-## `HTTPOption`
+## `http`
 
 See [HTTPOption](../shared/http.md).
+
+## `dns`
+
+See [DNSOption](../shared/dns.md).

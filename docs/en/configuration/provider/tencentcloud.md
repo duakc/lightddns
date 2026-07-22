@@ -29,10 +29,14 @@ Tencent Cloud CAM secret key.
 
 ---
 
-## `ConnectOption`
+## `connect`
 
 See [ConnectOption](../shared/connect.md).
 
-## `HTTPOption`
+## `http`
 
 See [HTTPOption](../shared/http.md).
+
+## `dns`
+
+See [DNSOption](../shared/dns.md).
