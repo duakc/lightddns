@@ -2,10 +2,16 @@ workingDir: "./cmd/lightddns/"
 outputDir: "build/bin"
 binaryName: "lightddns"
 qualified: true
-buildName: ""
 tags:
   # uncomment below to enable some tags
   # - "freebuf_low_mem"
   # - "debug"
 env:
   # CGO_ENABLED: "0"
+# ${VAR} placeholders resolve from REPO_NAME, PARAM_BUILD_<FIELD> (build params),
+# TARGET_<FIELD> (target), or the environment. PARAM_BUILD_TAGS is the effective
+# build tags.
+ldflags:
+  - '-X "github.com/${REPO_NAME}/constant.Version=${PARAM_BUILD_VERSION}"'
+  - '-X "github.com/${REPO_NAME}/constant.Branch=${PARAM_BUILD_BRANCH}"'
+  - '-X "github.com/${REPO_NAME}/constant.Tags=${PARAM_BUILD_TAGS}"'

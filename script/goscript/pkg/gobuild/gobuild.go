@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
@@ -28,9 +31,10 @@ type Params struct {
 	ExtraTags []string          `yaml:"tags"`
 	ExtraEnv  map[string]string `yaml:"env"`
 
-	// BuildName names the output tree for the outer build command: empty ->
-	// build/bin, else build/build_<buildName>/bin.
-	BuildName string `yaml:"buildName"`
+	// LDFlags are the raw ldflag templates from the build profile. They may use
+	// ${VAR} placeholders (see buildVarExpander) so the linker symbol paths stay
+	// in the profile, not hard-coded in this builder.
+	LDFlags []string `yaml:"ldflags"`
 
 	// Qualified writes the platform-qualified name (lightddns-linux-amd64);
 	// otherwise the plain BinaryName is used (single-target build).
@@ -42,9 +46,6 @@ func DefaultParams() Params {
 	if err != nil {
 		common.Fatalf("load build profile: %s", err)
 	}
-	if p.BuildName != "" {
-		p.OutputDir = common.BuildDir("build_"+p.BuildName, "bin")
-	}
 	return p
 }
 
@@ -52,11 +53,9 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	const main = "."
 	goos, goarch := tgt.GOOS, tgt.GOARCH
 
-	// ldflags: target defaults + version/branch stamps.
+	// ldflags: target defaults + the stamps configured in the build profile.
 	ldflags := append([]string{}, tgt.LDFlags...)
-	ldflags = append(ldflags,
-		fmt.Sprintf(`-X "github.com/%s/constant.Version=%s"`, constant.Repo, p.Version),
-		fmt.Sprintf(`-X "github.com/%s/constant.Branch=%s"`, constant.Repo, p.Branch))
+	ldflags = append(ldflags, p.LDFlags...)
 
 	tags := append([]string{}, tgt.TAGS...)
 	tags = append(tags, p.ExtraTags...)
@@ -95,12 +94,15 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 		args = append(args, "-trimpath")
 	}
 
+	joinedTags := strings.Join(tags, ",")
 	if len(tags) > 0 {
-		joined := strings.Join(tags, ",")
-		args = append(args, "-tags", joined)
-		// Stamp the build tags so `version` can report what was compiled in.
-		ldflags = append(ldflags,
-			fmt.Sprintf(`-X "github.com/%s/constant.Tags=%s"`, constant.Repo, joined))
+		args = append(args, "-tags", joinedTags)
+	}
+
+	// Expand ${VAR} placeholders so the profile owns the symbol paths.
+	expand := buildVarExpander(p, tgt, joinedTags)
+	for i := range ldflags {
+		ldflags[i] = os.Expand(ldflags[i], expand)
 	}
 	if len(ldflags) > 0 {
 		args = append(args, "-ldflags", strings.Join(ldflags, " "))
@@ -134,6 +136,79 @@ func Plain(ctx context.Context, tgt target.Target, outputDir, version, branch st
 	p.Version = version
 	p.Branch = branch
 	return Binary(ctx, tgt, p)
+}
+
+// buildVarExpander resolves ${VAR} placeholders in the profile ldflags from the
+// exported fields of Params and Target (Version -> PARAM_BUILD_VERSION, GOARCH ->
+// TARGET_GOARCH), plus REPO_NAME and the effective PARAM_BUILD_TAGS. Unknown keys
+// fall back to the environment.
+func buildVarExpander(p Params, tgt target.Target, tags string) func(string) string {
+	vars := map[string]string{
+		"REPO_NAME":        constant.Repo,
+		"PARAM_BUILD_TAGS": tags,
+	}
+	for _, src := range []struct {
+		prefix string
+		val    reflect.Value
+	}{
+		{"PARAM_BUILD", reflect.ValueOf(p)},
+		{"TARGET", reflect.ValueOf(tgt)},
+	} {
+		t := src.val.Type()
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			var s string
+			switch fv := src.val.Field(i); fv.Kind() {
+			case reflect.String:
+				s = fv.String()
+			case reflect.Bool:
+				s = strconv.FormatBool(fv.Bool())
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				s = strconv.FormatInt(fv.Int(), 10)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				s = strconv.FormatUint(fv.Uint(), 10)
+			case reflect.Slice:
+				if fv.Type().Elem().Kind() != reflect.String {
+					continue
+				}
+				parts := make([]string, fv.Len())
+				for j := range parts {
+					parts[j] = fv.Index(j).String()
+				}
+				s = strings.Join(parts, ",")
+			default:
+				continue
+			}
+			vars[src.prefix+"_"+screamingSnake(f.Name)] = s
+		}
+	}
+	return func(key string) string {
+		if v, ok := vars[key]; ok {
+			return v
+		}
+		return os.Getenv(key)
+	}
+}
+
+// screamingSnake converts a Go field name to SCREAMING_SNAKE_CASE, keeping
+// acronyms intact: WorkingDir -> WORKING_DIR, GOAMD64Version -> GOAMD64_VERSION.
+func screamingSnake(s string) string {
+	var b strings.Builder
+	runes := []rune(s)
+	for i, r := range runes {
+		if i > 0 && unicode.IsUpper(r) {
+			prev := runes[i-1]
+			nextLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) || nextLower {
+				b.WriteByte('_')
+			}
+		}
+		b.WriteRune(unicode.ToUpper(r))
+	}
+	return b.String()
 }
 
 func loadBuildProfile() (Params, error) {

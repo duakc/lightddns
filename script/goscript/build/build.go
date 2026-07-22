@@ -44,42 +44,32 @@ func Run(ctx context.Context) {
 		params.ExtraTags = append(params.ExtraTags, strings.Split(tags, ",")...)
 	}
 
-	targets := resolveTargets(all, goos, goarch)
+	// Select targets: --os/--arch (or --all) filters the matrix; with no
+	// selection, default to the host's baseline target only.
+	hostOnly := !all && goos == "" && goarch == ""
+	var targets []target.Target
+	for _, t := range target.All() {
+		matches := (goos == "" || t.GOOS == goos) && (goarch == "" || t.GOARCH == goarch)
+		if hostOnly {
+			matches = t.GOOS == runtime.GOOS && t.GOARCH == runtime.GOARCH
+		}
+		if !matches {
+			continue
+		}
+		targets = append(targets, t)
+		if hostOnly {
+			break
+		}
+	}
 	if len(targets) == 0 {
 		common.Fatalf("no target matches --os %q --arch %q (host GOOS=%s GOARCH=%s)",
 			goos, goarch, runtime.GOOS, runtime.GOARCH)
 	}
 	params.Qualified = len(targets) > 1
 
-	buildTargets(ctx, targets, params)
-}
-
-func buildTargets(ctx context.Context, targets []target.Target, p gobuild.Params) {
 	for _, tgt := range targets {
-		if _, err := gobuild.Binary(ctx, tgt, p); err != nil {
+		if _, err := gobuild.Binary(ctx, tgt, params); err != nil {
 			common.Fatalf("%s", err.Error())
 		}
 	}
-}
-
-func resolveTargets(all bool, goos, goarch string) []target.Target {
-	if !all && goos == "" && goarch == "" {
-		return hostTargets()
-	}
-	var out []target.Target
-	for _, t := range target.All() {
-		if (goos == "" || t.GOOS == goos) && (goarch == "" || t.GOARCH == goarch) {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
-func hostTargets() []target.Target {
-	for _, t := range target.All() {
-		if t.GOOS == runtime.GOOS && t.GOARCH == runtime.GOARCH {
-			return []target.Target{t}
-		}
-	}
-	return nil
 }
