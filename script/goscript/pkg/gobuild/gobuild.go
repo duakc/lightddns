@@ -13,6 +13,7 @@ import (
 
 	"github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
+	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
 
 	goyaml "github.com/goccy/go-yaml"
@@ -28,8 +29,8 @@ type Params struct {
 	OutputDir  string `yaml:"outputDir"`  // directory the binary is written into
 	BinaryName string `yaml:"binaryName"` // base binary name
 
-	ExtraTags []string          `yaml:"tags"`
-	ExtraEnv  map[string]string `yaml:"env"`
+	ExtraTags []string `yaml:"tags"`
+	ExtraEnv  []string `yaml:"env"`
 
 	// LDFlags are the raw ldflag templates from the build profile. They may use
 	// ${VAR} placeholders (see buildVarExpander) so the linker symbol paths stay
@@ -67,9 +68,6 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 		cgo = "1"
 	}
 	env = append(env, "CGO_ENABLED="+cgo)
-	for k, v := range p.ExtraEnv {
-		env = append(env, k+"="+v)
-	}
 	if tgt.GOAMD64Version != 0 && goarch == "amd64" {
 		env = append(env, fmt.Sprintf("GOAMD64=v%d", tgt.GOAMD64Version))
 	}
@@ -117,30 +115,31 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	if !p.Qualified {
 		name = p.BinaryName
 	}
+
 	if goos == "windows" {
 		name += ".exe"
 	}
 
 	outPath := filepath.Join(p.OutputDir, name)
+
+	env = append(env, p.ExtraEnv...)
 	args = append(args, "-o", outPath, p.WorkingDir)
+
 	if err := common.CommandStream(ctx, common.Cmd{Name: "go", Args: args, Env: env}); err != nil {
 		return "", err
 	}
 	return outPath, nil
 }
 
-// Plain builds tgt's binary with the plain (unqualified) name into outputDir,
-// creating outputDir if needed. It is the shared "compile straight into a
-// staging tree" step used by the package builders.
-func Plain(ctx context.Context, tgt target.Target, outputDir, version, branch string) (string, error) {
+func Plain(ctx context.Context, tgt target.Target, outputDir string) (string, error) {
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return "", err
 	}
 	p := DefaultParams()
 	p.OutputDir = outputDir
 	p.Qualified = false
-	p.Version = version
-	p.Branch = branch
+	p.Version = gitver.Version(ctx)
+	p.Branch = gitver.Branch(ctx)
 	return Binary(ctx, tgt, p)
 }
 

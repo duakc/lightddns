@@ -16,32 +16,28 @@ func Run(ctx context.Context) {
 	params := gobuild.DefaultParams()
 	var (
 		tags    string
-		verbose bool
+		ldFlags string
 		all     bool
 		goos    string
 		goarch  string
 	)
-	flag.StringVar(&params.Version, "version", "", "version (default: git tag or short hash)")
-	flag.StringVar(&params.Branch, "branch", "", "branch (default: current git branch)")
-	flag.StringVar(&params.WorkingDir, "workdir", params.WorkingDir, "package to build")
-	flag.StringVar(&params.BinaryName, "binary", params.BinaryName, "binary name")
+
 	flag.StringVar(&tags, "tags", "", "extra build tags (comma separated)")
+	flag.StringVar(&ldFlags, "ldflags", "", "extra build flags (comma separated)")
 	flag.StringVar(&goos, "os", "", "GOOS to build (e.g. linux); empty matches every OS")
 	flag.StringVar(&goarch, "arch", "", "GOARCH to build (e.g. amd64); empty matches every arch")
 	flag.BoolVar(&all, "all", false, "build every target (all OS/arch)")
-	flag.BoolVar(&verbose, "verbose", false, "verbose output")
 	flag.Parse()
 
-	common.Verbose = verbose
-	if params.Version == "" {
-		params.Version = gitver.Version(ctx)
-	}
-	if params.Branch == "" {
-		params.Branch = gitver.Branch(ctx)
-	}
+	params.Version = gitver.Version(ctx)
+	params.Branch = gitver.Branch(ctx)
 
 	if tags != "" {
 		params.ExtraTags = append(params.ExtraTags, strings.Split(tags, ",")...)
+	}
+
+	if ldFlags != "" {
+		params.LDFlags = append(params.LDFlags, strings.Split(ldFlags, ",")...)
 	}
 
 	// Select targets: --os/--arch (or --all) filters the matrix; with no
@@ -54,10 +50,13 @@ func Run(ctx context.Context) {
 	} else {
 		targets = target.Filter(goos, goarch)
 	}
+
 	if len(targets) == 0 {
-		common.Fatalf("no target matches --os %q --arch %q (host GOOS=%s GOARCH=%s)",
+		common.Warnf("no target matches --os %q --arch %q (host GOOS=%s GOARCH=%s)",
 			goos, goarch, runtime.GOOS, runtime.GOARCH)
+		return
 	}
+
 	params.Qualified = len(targets) > 1
 
 	for _, tgt := range targets {

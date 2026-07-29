@@ -130,7 +130,7 @@ func pack(ctx context.Context, tgt target.Target) (string, error) {
 		subSchemaURLSubSet: schemaURL,
 		subArchSubSet:      arch,
 	}
-	if err := packing.ProcessAll(workdirFileHelper, packingFileList, subSet); err != nil {
+	if err := packing.RenderAll(workdirFileHelper, packingFileList, subSet); err != nil {
 		return "", err
 	}
 	if _, err := gobuild.Plain(ctx, tgt, filepath.Join(workdir, "pkgroot", "usr", "bin"), buildVersion, buildBranch); err != nil {

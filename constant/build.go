@@ -14,11 +14,6 @@ var (
 	Tags = unknown
 )
 
-const (
-	Project = "lightddns"
-	Repo    = "duakc/lightddns"
-)
-
 var (
 	tagSplitOnce sync.Once
 	tagsArray    []string

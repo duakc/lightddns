@@ -1,11 +1,14 @@
 if command -v systemd-sysusers >/dev/null 2>&1; then
 	systemd-sysusers lightddns.conf
 fi
+
 if command -v systemd-tmpfiles >/dev/null 2>&1; then
 	systemd-tmpfiles --create lightddns.conf
 fi
+
 if command -v systemctl >/dev/null 2>&1; then
 	systemctl daemon-reload
 fi
+
 printf '%s\n' 'Edit /etc/lightddns.yaml and /etc/default/lightddns, then enable the service with:'
 printf '%s\n' '  systemctl enable --now lightddns.service'

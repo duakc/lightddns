@@ -28,7 +28,7 @@ func buildRPM(p params) {
 	pkgVersion := sanitizeVersion(p.buildVersion, "~")
 
 	for _, tgt := range targets {
-		binPath, err := p.compile("rpm", tgt)
+		binPath, err := p.compileBinary("rpm", tgt)
 		if err != nil {
 			common.Fatalf("compile: %s", err)
 		}
@@ -46,7 +46,7 @@ func buildRPM(p params) {
 			License:       "GPL-2.0-only",
 			Overridables: nfpm.Overridables{
 				Depends:  []string{"shadow-utils"},
-				Contents: append(nfpmbuild.SystemdContents(p.configPath, p.manPath), nfpmbuild.Binary(binPath)),
+				Contents: append(nfpmbuild.ContentsSystemdService(p.configPath, p.manPath), nfpmbuild.Binary(binPath)),
 				Scripts: nfpm.Scripts{
 					PreInstall:  common.ReleaseDir("rpm", "scripts", "pre"),
 					PostInstall: common.ReleaseDir("rpm", "scripts", "post"),

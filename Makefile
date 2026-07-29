@@ -80,58 +80,58 @@ build-docker:
 
 .PHONY: build-deb
 build-deb:
-	$(GO_SCRIPT) deb --verbose
+	$(GO_SCRIPT) deb
 
 .PHONY: build-deb-all
 build-deb-all:
-	$(GO_SCRIPT) deb --all --verbose
+	$(GO_SCRIPT) deb --all
 
 .PHONY: build-rpm
 build-rpm:
-	$(GO_SCRIPT) rpm --verbose
+	$(GO_SCRIPT) rpm
 
 .PHONY: build-rpm-all
 build-rpm-all:
-	$(GO_SCRIPT) rpm --all --verbose
+	$(GO_SCRIPT) rpm --all
 
 .PHONY: build-archlinux
 build-archlinux:
-	$(GO_SCRIPT) archlinux --verbose
+	$(GO_SCRIPT) archlinux
 
 .PHONY: build-archlinux-all
 build-archlinux-all:
-	$(GO_SCRIPT) archlinux --all --verbose
+	$(GO_SCRIPT) archlinux --all
 
 # nfpm-based builders (no native tool). deb/rpm/archlinux are the migration
 # target for the native-tool targets above (kept until nfpm is proven); openwrt
 # (.ipk + *.openwrt.apk) is nfpm-only.
 .PHONY: build-nfpm
 build-nfpm:
-	$(GO_SCRIPT) nfpm --format all --verbose
+	$(GO_SCRIPT) nfpm --format all
 
 .PHONY: build-nfpm-all
 build-nfpm-all:
-	$(GO_SCRIPT) nfpm --format all --all --verbose
+	$(GO_SCRIPT) nfpm --format all --all
 
 .PHONY: build-nfpm-deb
 build-nfpm-deb:
-	$(GO_SCRIPT) nfpm --format deb --verbose
+	$(GO_SCRIPT) nfpm --format deb
 
 .PHONY: build-nfpm-rpm
 build-nfpm-rpm:
-	$(GO_SCRIPT) nfpm --format rpm --verbose
+	$(GO_SCRIPT) nfpm --format rpm
 
 .PHONY: build-nfpm-archlinux
 build-nfpm-archlinux:
-	$(GO_SCRIPT) nfpm --format archlinux --verbose
+	$(GO_SCRIPT) nfpm --format archlinux
 
 .PHONY: build-openwrt
 build-openwrt:
-	$(GO_SCRIPT) nfpm --format openwrt --verbose
+	$(GO_SCRIPT) nfpm --format openwrt
 
 .PHONY: build-openwrt-all
 build-openwrt-all:
-	$(GO_SCRIPT) nfpm --format openwrt --all --verbose
+	$(GO_SCRIPT) nfpm --format openwrt --all
 
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
 # the package for the host system. The result lands under build/nix/result.

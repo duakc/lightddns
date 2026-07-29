@@ -20,9 +20,13 @@ func subSetName(v string) string {
 	return fmt.Sprintf("__%s__", v)
 }
 
+func BuildSubSetVec(vv ...string) SubSetVec {
+	return SubSetVec(vv)
+}
+
 type SubSet map[string]string
 
-func (s SubSet) Process(vec SubSetVec, data []byte) ([]byte, error) {
+func (s SubSet) RenderContent(vec SubSetVec, data []byte) ([]byte, error) {
 	for _, k := range vec {
 		fullSubSetName := subSetName(k)
 
@@ -45,7 +49,7 @@ func (s SubSet) Process(vec SubSetVec, data []byte) ([]byte, error) {
 
 // File describes one file to pack: read From the FS root, optionally
 // placeholder-substituted, written To the stage tree as Mode. Declare it as a
-// plain literal; the source bytes are read lazily on first Process.
+// plain literal; the source bytes are read lazily on first Render.
 type File struct {
 	// FS is the source root; From is the path within it.
 	FS   filehelper.Helper
@@ -74,36 +78,35 @@ func (file *File) read() []byte {
 	return file.source
 }
 
-func (file *File) Process(stageFileHelper filehelper.Helper, subSet SubSet) error {
-	replacedBuffer, err := subSet.Process(file.SubSetVec, slices.Clone(file.read()))
+func (file *File) Render(stageFileHelper filehelper.Helper, subSet SubSet) (string, error) {
+	if file.To == "" {
+		file.To = file.From
+	}
+	if file.Mode == 0000 {
+		file.Mode = 0644
+	}
+
+	replacedBuffer, err := subSet.RenderContent(file.SubSetVec, slices.Clone(file.read()))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if file.Gzip {
 		if replacedBuffer, err = gzipBytes(replacedBuffer); err != nil {
-			return err
+			return "", err
 		}
+		file.To += ".gz"
 	}
 
 	if err := stageFileHelper.MkdirAll(filepath.Dir(file.To), 0o755); err != nil {
-		return err
+		return "", err
+	}
+	renderErr := stageFileHelper.WriteFile(file.To, replacedBuffer, file.Mode.Perm())
+	if renderErr != nil {
+		return "", renderErr
 	}
 
-	return stageFileHelper.WriteFile(file.To, replacedBuffer, file.Mode.Perm())
-}
-
-// ProcessAll writes every file into dst, substituting placeholders from subSet
-// (and gzipping where asked). Indexed so each File's lazy-read state isn't
-// copied. It is the shared "lay down the static files" step for the packagers.
-func ProcessAll(dst filehelper.Helper, files []File, subSet SubSet) error {
-	for i := range files {
-		pf := &files[i]
-		if err := pf.Process(dst, subSet); err != nil {
-			return fmt.Errorf("%s: %w", pf.To, err)
-		}
-	}
-	return nil
+	return stageFileHelper.Path(file.To), nil
 }
 
 func gzipBytes(data []byte) ([]byte, error) {

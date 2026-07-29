@@ -1,6 +1,7 @@
 package nfpmpkg
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 	"github.com/goreleaser/nfpm/v2"
 )
 
-func buildDeb(p params) {
+func buildDeb(ctx context.Context, targets target.Target, baseContents *FileContents) {
 	outputDir := common.BuildDir("nfpm", "deb")
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		common.Fatalf("%s", err)
@@ -24,7 +25,7 @@ func buildDeb(p params) {
 	pkgVersion := sanitizeVersion(p.buildVersion, "")
 
 	for _, tgt := range targets {
-		binPath, err := p.compile("deb", tgt)
+		binPath, err := p.compileBinary("deb", tgt)
 		if err != nil {
 			common.Fatalf("compile: %s", err)
 		}
@@ -43,7 +44,7 @@ func buildDeb(p params) {
 			License:       "GPL-2.0",
 			Overridables: nfpm.Overridables{
 				Depends:  []string{"adduser"},
-				Contents: append(nfpmbuild.SystemdContents(p.configPath, p.manPath), nfpmbuild.Binary(binPath)),
+				Contents: append(nfpmbuild.ContentsSystemdService(p.configPath, p.manPath), nfpmbuild.Binary(binPath)),
 				Scripts: nfpm.Scripts{
 					PostInstall: common.ReleaseDir("deb", "pkgroot", "DEBIAN", "postinst"),
 					PreRemove:   common.ReleaseDir("deb", "pkgroot", "DEBIAN", "prerm"),

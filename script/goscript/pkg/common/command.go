@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var Verbose bool
+var Verbose = os.Getenv("GOSCRIPT_VERBOSE") == "1"
 
 type Cmd struct {
 	Name string

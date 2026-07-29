@@ -151,7 +151,7 @@ func pack(ctx context.Context, tgt target.Target) (string, error) {
 
 	// Lay down the static files, then compile the binary straight into the
 	// staged tree under usr/bin.
-	if err := packing.ProcessAll(stageFileHelper, packingFileList, subSet); err != nil {
+	if err := packing.RenderAll(stageFileHelper, packingFileList, subSet); err != nil {
 		return "", err
 	}
 	if _, err := gobuild.Plain(ctx, tgt, filepath.Join(stage, "usr/bin"), buildVersion, buildBranch); err != nil {
@@ -209,7 +209,7 @@ func renderSpec(rpmArch string) (string, error) {
 	raw := rpmFileHelper.MustReadFile(specName)
 	rendered, err := packing.SubSet{
 		subVersion: pkgVersion,
-	}.Process(packing.SubSetVec{subVersion}, slices.Clone(raw))
+	}.RenderContent(packing.SubSetVec{subVersion}, slices.Clone(raw))
 	if err != nil {
 		return "", err
 	}

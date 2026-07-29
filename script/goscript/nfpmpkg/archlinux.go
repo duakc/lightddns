@@ -32,41 +32,45 @@ func buildArch(p params) {
 		if arch == "" {
 			common.Fatalf("unsupported Arch Linux target: GOOS=%s GOARCH=%s", tgt.GOOS, tgt.GOARCH)
 		}
-		binPath, err := p.compile("archlinux", tgt)
+		binPath, err := p.compileBinary("archlinux", tgt)
 		if err != nil {
 			common.Fatalf("compile: %s", err)
 		}
 
-		contents := append(nfpmbuild.SystemdContents(p.configPath, p.manPath), nfpmbuild.Binary(binPath))
+		contents := append(
+			nfpmbuild.ContentsSystemdService(p.configPath, p.manPath),
+			nfpmbuild.Binary(binPath))
 		contents = append(contents,
-			&files.Content{Source: common.ReleaseDir("systemd", "sysusers", "lightddns.conf"), Destination: "/usr/lib/sysusers.d/lightddns.conf", FileInfo: &files.ContentFileInfo{Mode: 0o644}},
-			&files.Content{Source: common.ReleaseDir("systemd", "tmpfiles", "lightddns.conf"), Destination: "/usr/lib/tmpfiles.d/lightddns.conf", FileInfo: &files.ContentFileInfo{Mode: 0o644}},
+			&files.Content{
+				Source:      common.ReleaseDir("systemd", "sysusers", "lightddns.conf"),
+				Destination: "/usr/lib/sysusers.d/lightddns.conf",
+				FileInfo:    &files.ContentFileInfo{Mode: 0o644}},
+			&files.Content{
+				Source:      common.ReleaseDir("systemd", "tmpfiles", "lightddns.conf"),
+				Destination: "/usr/lib/tmpfiles.d/lightddns.conf",
+				FileInfo:    &files.ContentFileInfo{Mode: 0o644}},
 		)
 
-		info := &nfpm.Info{
-			Name:          "lightddns",
-			Arch:          tgt.GOARCH,
-			Version:       pkgVersion,
-			VersionSchema: "none",
-			Release:       archRelease,
-			Maintainer:    "duakc <young@qeee.net>",
-			Description:   "Lightweight dynamic DNS (DDNS) updater",
-			Homepage:      "https://lightddns.duaky.com",
-			License:       "GPL-2.0-only",
-			Overridables: nfpm.Overridables{
-				Depends:  []string{"systemd"},
-				Contents: contents,
-				Scripts: nfpm.Scripts{
-					PostInstall: common.ReleaseDir("archlinux", "scripts", "post_install"),
-					PreRemove:   common.ReleaseDir("archlinux", "scripts", "pre_remove"),
-					PostRemove:  common.ReleaseDir("archlinux", "scripts", "post_remove"),
+		info := BaseInfo(tgt.GOARCH, pkgVersion)
+
+		info.Overridables = nfpm.Overridables{
+			Depends:  []string{"systemd"},
+			Contents: contents,
+			Scripts: nfpm.Scripts{
+				PostInstall: common.ReleaseDir("archlinux", "scripts", "post_install"),
+				PreRemove:   common.ReleaseDir("archlinux", "scripts", "pre_remove"),
+				PostRemove:  common.ReleaseDir("archlinux", "scripts", "post_remove"),
+			},
+			ArchLinux: nfpm.ArchLinux{
+				Arch: arch,
+				Scripts: nfpm.ArchLinuxScripts{
+					PostUpgrade: common.ReleaseDir("archlinux", "scripts", "post_upgrade"),
 				},
 			},
 		}
-		info.ArchLinux.Arch = arch
-		info.ArchLinux.Scripts.PostUpgrade = common.ReleaseDir("archlinux", "scripts", "post_upgrade")
 
-		out := filepath.Join(outputDir, fmt.Sprintf("lightddns-%s-%s-%s.pkg.tar.zst", pkgVersion, archRelease, arch))
+		out := filepath.Join(outputDir,
+			fmt.Sprintf("lightddns-%s-%s-%s.pkg.tar.zst", pkgVersion, archRelease, arch))
 		if err := nfpmbuild.WriteTo(info, "archlinux", out); err != nil {
 			common.Fatalf("package: %s", err)
 		}
