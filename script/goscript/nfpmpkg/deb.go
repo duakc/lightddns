@@ -13,7 +13,7 @@ import (
 	"github.com/goreleaser/nfpm/v2"
 )
 
-func buildDeb(ctx context.Context, targets target.Target, baseContents *FileContents) {
+func buildDeb(ctx context.Context, targets []target.Target, baseContents *FileContents) {
 	outputDir := common.BuildDir("nfpm", "deb")
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		common.Fatalf("%s", err)

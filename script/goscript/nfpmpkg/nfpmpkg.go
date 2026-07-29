@@ -13,6 +13,7 @@ package nfpmpkg
 import (
 	"context"
 	"flag"
+	"runtime"
 	"strings"
 
 	constpkg "github.com/duakc/lightddns/constant"
@@ -29,9 +30,14 @@ import (
 
 func Run(ctx context.Context) {
 	var (
+		goos   string
+		goarch string
+
 		format   string
 		buildAll bool
 	)
+	flag.StringVar(&goos, "goos", runtime.GOOS, "target OS")
+	flag.StringVar(&goarch, "goarch", runtime.GOARCH, "target architecture")
 	flag.StringVar(&format, "format", "all", "package format: deb|rpm|archlinux|openwrt|all")
 	flag.BoolVar(&buildAll, "all", false, "build every shipped arch (default: host arch only)")
 	flag.Parse()

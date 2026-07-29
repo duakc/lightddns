@@ -140,7 +140,7 @@ var all = []Target{
 }
 
 func All() []Target {
-	return append([]Target(nil), all...)
+	return all
 }
 
 // Host returns the baseline target for the current runtime GOOS/GOARCH.
@@ -153,45 +153,48 @@ func Host() (Target, bool) {
 	return Target{}, false
 }
 
-// Filter returns every target matching goos and goarch; an empty string matches
-// any value for that dimension.
-func Filter(goos, goarch string) []Target {
-	var out []Target
-	for _, t := range all {
-		if (goos == "" || t.GOOS == goos) && (goarch == "" || t.GOARCH == goarch) {
-			out = append(out, t)
+func DEBTargets(tgt []Target, goos, goarch string) []Target {
+	var filtered []Target
+	for _, target := range tgt {
+		if target.Deb {
+			filtered = append(filtered, target)
 		}
 	}
-	return out
+	return FilterTargets(filtered, goos, goarch)
 }
 
-// DEBTargets, RPMTargets and ArchLinuxTargets return the targets that ship as
-// the respective package format. When buildAll is false the set is narrowed to
-// the host GOOS/GOARCH (0 or 1 target).
-func DEBTargets(buildAll bool) []Target {
-	return shipping(buildAll, func(t Target) bool { return t.Deb })
-}
-
-func RPMTargets(buildAll bool) []Target {
-	return shipping(buildAll, func(t Target) bool { return t.RPM })
-}
-
-func ArchLinuxTargets(buildAll bool) []Target {
-	return shipping(buildAll, func(t Target) bool { return t.ArchLinux })
-}
-
-func shipping(buildAll bool, ships func(Target) bool) []Target {
-	var out []Target
-	for _, t := range all {
-		if !ships(t) {
-			continue
+func RPMTargets(tgt []Target, goos, goarch string) []Target {
+	var filtered []Target
+	for _, target := range tgt {
+		if target.RPM {
+			filtered = append(filtered, target)
 		}
-		if !buildAll && (t.GOOS != runtime.GOOS || t.GOARCH != runtime.GOARCH) {
-			continue
-		}
-		out = append(out, t)
 	}
-	return out
+	return FilterTargets(filtered, goos, goarch)
+}
+
+func ArchLinuxTargets(tgt []Target, goos, goarch string) []Target {
+	var filtered []Target
+	for _, target := range tgt {
+		if target.ArchLinux {
+			filtered = append(filtered, target)
+		}
+	}
+	return FilterTargets(filtered, goos, goarch)
+}
+
+func FilterTargets(tgt []Target, goos, goarch string) []Target {
+	if goos == "" && goarch == "" {
+		return tgt
+	}
+	var filtered []Target
+	for _, t := range tgt {
+		if matchEmptyGlobal(t.GOOS, goos) &&
+			matchEmptyGlobal(t.GOARCH, goarch) {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
 }
 
 // OpenWrtTarget is one compile variant and the OpenWrt subtarget arch labels
@@ -242,13 +245,14 @@ var openwrtTargets = []OpenWrtTarget{
 // OpenWrtTargets returns the OpenWrt build variants. Since every variant is a
 // linux cross-build, buildAll=false narrows by the host GOARCH only (GOOS is
 // irrelevant), so the command is usable from a non-linux dev host.
-func OpenWrtTargets(buildAll bool) []OpenWrtTarget {
-	if buildAll {
+func OpenWrtTargets(goos, goarch string) []OpenWrtTarget {
+	if goos == "" && goarch == "" {
 		return append([]OpenWrtTarget(nil), openwrtTargets...)
 	}
 	var out []OpenWrtTarget
 	for _, t := range openwrtTargets {
-		if t.GOARCH == runtime.GOARCH {
+		if matchEmptyGlobal(t.GOARCH, goarch) &&
+			matchEmptyGlobal(t.GOOS, goos) {
 			out = append(out, t)
 		}
 	}
@@ -280,9 +284,6 @@ func (t Target) BinaryName(base string) string {
 }
 
 func (t Target) DEBArchName() string {
-	if !t.Deb {
-		return ""
-	}
 	switch t.GOARCH {
 	case "arm":
 		if t.GOARMVersion == 7 {
@@ -321,8 +322,12 @@ func (t Target) RPMArchName() string {
 }
 
 func (t Target) ArchLinuxArchName() string {
-	if !t.ArchLinux || t.GOOS != "linux" || t.GOARCH != "amd64" || t.GOAMD64Version != 0 {
-		return ""
+	if t.GOARCH != "amd64" {
+		return t.GOARCH
 	}
 	return "x86_64"
+}
+
+func matchEmptyGlobal(raw, c string) bool {
+	return raw == c || len(c) == 0 || c == "*"
 }
