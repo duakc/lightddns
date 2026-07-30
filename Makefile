@@ -87,13 +87,17 @@ build-rpm:
 build-nfpm-archlinux:
 	$(GO_SCRIPT) nfpm --format archlinux
 
+.PHONY: build-alpine-apk
+build-alpine-apk:
+	$(GO_SCRIPT) nfpm --format alpine.apk --goarch '*'
+
 .PHONY: build-openwrt
 build-openwrt:
 	$(GO_SCRIPT) nfpm --format openwrt
 
 .PHONY: build-openwrt-all
 build-openwrt-all:
-	$(GO_SCRIPT) nfpm --format openwrt --all
+	$(GO_SCRIPT) nfpm --format openwrt --goarch '*'
 
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
 # the package for the host system. The result lands under build/nix/result.

@@ -44,8 +44,8 @@ func buildDeb(ctx context.Context, targets []target.Target, baseContents *FileCo
 				PostRemove:  common.ReleaseDir("deb", "scripts", "postrm"),
 			},
 			Deb: nfpm.Deb{
-				Arch:        tgt.DEBArchName(),
-				ArchVariant: tgt.DEBArchVariantName(),
+				Arch:        tgt.DEBArch,
+				ArchVariant: tgt.DEBArchVariant,
 			},
 		}
 

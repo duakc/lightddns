@@ -42,22 +42,28 @@ func Run(ctx context.Context) {
 		buildAll bool
 	)
 	flag.StringVar(&goarch, "goarch", runtime.GOARCH, "target architecture")
-	flag.StringVar(&format, "format", "", "package format: deb|rpm|archlinux|openwrt")
-	flag.BoolVar(&buildAll, "all", false, "build every formats")
+	flag.StringVar(&format, "format", "", "package format: deb|rpm|archlinux|ipk|openwrt.apk|alpine.apk|openwrt")
+	flag.BoolVar(&buildAll, "all", false, "build every package format")
 	flag.Parse()
 
-	baseFiles := (&FileContents{}).
-		AddConfig(SchemaURL(gitver.Version(ctx))).
-		AddEnvFile().
-		AddSystemdService().
-		AddMan()
+	schemaURL := SchemaURL(gitver.Version(ctx))
 
 	if packing.PackageDEB.String() == format || buildAll {
+		baseFiles := (&FileContents{}).
+			AddConfig(schemaURL).
+			AddEnvFile().
+			AddSystemdService().
+			AddMan()
 		debTargets := target.DEBTargets(target.All(), nfpmGOOS, goarch)
 		buildDeb(ctx, debTargets, baseFiles)
 	}
 
 	if packing.PackageRPM.String() == format || buildAll {
+		baseFiles := (&FileContents{}).
+			AddConfig(schemaURL).
+			AddEnvFile().
+			AddSystemdService().
+			AddMan()
 		rpmTargets := target.RPMTargets(target.All(), nfpmGOOS, goarch)
 		buildRPM(ctx, rpmTargets, baseFiles)
 	}
@@ -65,9 +71,42 @@ func Run(ctx context.Context) {
 	if packing.PackageArchLinux.String() == format || buildAll {
 	}
 
-	if packing.PackageAPK.String() == format ||
-		packing.PackageIPK.String() == format ||
-		buildAll {
+	if packing.PackageAlpineAPK.String() == format || buildAll {
+		baseFiles := (&FileContents{}).
+			AddConfig(schemaURL).
+			AddEnvFile().
+			AddAlpineOpenRC().
+			AddMan()
+		apkTargets := target.AlpineAPKTargets(target.All(), nfpmGOOS, goarch)
+		buildAlpineAPK(ctx, apkTargets, baseFiles)
+	}
+
+	if format == "openwrt" || buildAll {
+		baseFiles := (&FileContents{}).
+			AddConfig(schemaURL).
+			AddEnvFile().
+			AddOpenWrtInit()
+		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
+		buildOpenWrtIPK(ctx, openWrtTargets, baseFiles)
+		buildOpenWrtAPK(ctx, openWrtTargets, baseFiles)
+	}
+
+	if packing.PackageIPK.String() == format {
+		baseFiles := (&FileContents{}).
+			AddConfig(schemaURL).
+			AddEnvFile().
+			AddOpenWrtInit()
+		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
+		buildOpenWrtIPK(ctx, openWrtTargets, baseFiles)
+	}
+
+	if packing.PackageOpenWrtAPK.String() == format {
+		baseFiles := (&FileContents{}).
+			AddConfig(schemaURL).
+			AddEnvFile().
+			AddOpenWrtInit()
+		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
+		buildOpenWrtAPK(ctx, openWrtTargets, baseFiles)
 	}
 }
 
@@ -92,7 +131,7 @@ func writeToFile(
 	packageType packing.PackageType,
 	info *nfpm.Info,
 ) (*os.File, error) {
-	packager, err := nfpm.Get(packageType.String())
+	packager, err := nfpm.Get(packageType.Nfpm())
 	if err != nil {
 		return nil, err
 	}

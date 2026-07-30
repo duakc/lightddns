@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+if ! getent group lightddns >/dev/null 2>&1; then
+	addgroup -S lightddns
+fi
+
+if ! getent passwd lightddns >/dev/null 2>&1; then
+	adduser -S -D -H -h /var/lib/lightddns -s /sbin/nologin -G lightddns lightddns
+fi
+
+install -d -m 0750 -o lightddns -g lightddns /var/lib/lightddns
+
+if command -v rc-update >/dev/null 2>&1; then
+	rc-update add lightddns default >/dev/null 2>&1 || true
+fi
+
+exit 0

@@ -32,6 +32,14 @@ func (fc *FileContents) AddSystemdService() *FileContents {
 	return fc.append(ContentForSystemdServices())
 }
 
+func (fc *FileContents) AddOpenWrtInit() *FileContents {
+	return fc.append(ContentForOpenWrtInit())
+}
+
+func (fc *FileContents) AddAlpineOpenRC() *FileContents {
+	return fc.append(ContentForAlpineOpenRC())
+}
+
 func (fc *FileContents) AddSystemdTmpFiles() *FileContents {
 	return fc.append(ContentForSystemdTmpFiles())
 }
@@ -60,4 +68,8 @@ func (fc *FileContents) AddBinary(ctx context.Context, tgt target.Target, packag
 		common.Fatalf("%s", err)
 	}
 	return fc.append(cc)
+}
+
+func (fc *FileContents) AddBinaryPath(path string) *FileContents {
+	return fc.append(ContentForBinaryPath(path))
 }

@@ -1,0 +1,27 @@
+#!/sbin/openrc-run
+# OpenRC init script for lightddns on Alpine Linux.
+
+name="lightddns"
+description="lightweight dynamic DNS updater"
+
+command="/usr/bin/lightddns"
+command_args="-D ${lightddns_workdir:-/var/lib/lightddns} run -c ${lightddns_config:-/etc/lightddns.yaml} ${lightddns_args}"
+command_background="yes"
+command_user="${lightddns_user:-lightddns}:${lightddns_group:-lightddns}"
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/lightddns.log"
+error_log="/var/log/lightddns.log"
+
+required_files="${lightddns_config:-/etc/lightddns.yaml}"
+
+start_pre() {
+	checkpath -d -m 0750 -o "${lightddns_user:-lightddns}:${lightddns_group:-lightddns}" "${lightddns_workdir:-/var/lib/lightddns}"
+	checkpath -f -m 0640 -o "${lightddns_user:-lightddns}:${lightddns_group:-lightddns}" /var/log/lightddns.log
+	${command} -D "${lightddns_workdir:-/var/lib/lightddns}" check -c "${lightddns_config:-/etc/lightddns.yaml}"
+}
+
+depend() {
+	need net
+	after firewall
+	use dns logger
+}

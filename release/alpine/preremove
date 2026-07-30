@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+if command -v rc-service >/dev/null 2>&1; then
+	rc-service lightddns stop >/dev/null 2>&1 || true
+fi
+
+if command -v rc-update >/dev/null 2>&1; then
+	rc-update del lightddns default >/dev/null 2>&1 || true
+fi
+
+exit 0

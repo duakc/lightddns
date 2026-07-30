@@ -7,8 +7,9 @@ type PackageType uint8
 const (
 	PackageDEB PackageType = iota
 	PackageRPM
-	PackageAPK
 	PackageIPK
+	PackageOpenWrtAPK
+	PackageAlpineAPK
 	PackageArchLinux
 )
 
@@ -18,14 +19,25 @@ func (p PackageType) String() string {
 		return "deb"
 	case PackageRPM:
 		return "rpm"
-	case PackageAPK:
-		return "apk"
 	case PackageIPK:
 		return "ipk"
+	case PackageOpenWrtAPK:
+		return "openwrt.apk"
+	case PackageAlpineAPK:
+		return "alpine.apk"
 	case PackageArchLinux:
 		return "archlinux"
 	default:
 		return fmt.Sprintf("PackageType(%d)", p)
+	}
+}
+
+func (p PackageType) Nfpm() string {
+	switch p {
+	case PackageOpenWrtAPK, PackageAlpineAPK:
+		return "apk"
+	default:
+		return p.String()
 	}
 }
 

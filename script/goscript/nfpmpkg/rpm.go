@@ -43,7 +43,7 @@ func buildRPM(ctx context.Context, targets []target.Target, baseContents *FileCo
 				PostRemove:  common.ReleaseDir("rpm", "scripts", "postun"),
 			},
 			RPM: nfpm.RPM{
-				Arch: tgt.RPMArchName(),
+				Arch: tgt.RPMArch,
 			},
 		}
 

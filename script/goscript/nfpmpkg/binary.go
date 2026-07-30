@@ -29,10 +29,14 @@ func ContentForBinary(ctx context.Context, tgt target.Target, forPackager packin
 	if err != nil {
 		return nil, err
 	}
+	return ContentForBinaryPath(buildBinary), nil
+}
+
+func ContentForBinaryPath(path string) files.Contents {
 	return files.Contents{
 		{
-			Source: buildBinary, Destination: "/usr/bin/lightddns",
+			Source: path, Destination: "/usr/bin/lightddns",
 			FileInfo: &files.ContentFileInfo{Mode: 0o755, Owner: "root", Group: "root"},
 		},
-	}, nil
+	}
 }

@@ -1,0 +1,13 @@
+# Configuration for /etc/init.d/lightddns
+
+# User/group used to run lightddns.
+lightddns_user="lightddns"
+lightddns_group="lightddns"
+
+# Main config file and working directory.
+lightddns_config="/etc/lightddns.yaml"
+lightddns_workdir="/var/lib/lightddns"
+
+# Extra arguments appended to the "run" command, for example:
+# lightddns_args="--once"
+lightddns_args=""

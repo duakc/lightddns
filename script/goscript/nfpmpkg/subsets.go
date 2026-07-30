@@ -58,6 +58,32 @@ func ContentForSystemdServices() files.Contents {
 	}
 }
 
+func ContentForOpenWrtInit() files.Contents {
+	return files.Contents{
+		{
+			Source:      releaseDirFileHelper.Path("openwrt", "lightddns.init"),
+			Destination: "/etc/init.d/lightddns",
+			FileInfo:    &files.ContentFileInfo{Mode: 0o755},
+		},
+	}
+}
+
+func ContentForAlpineOpenRC() files.Contents {
+	return files.Contents{
+		{
+			Source:      releaseDirFileHelper.Path("alpine", "lightddns.initd"),
+			Destination: "/etc/init.d/lightddns",
+			FileInfo:    &files.ContentFileInfo{Mode: 0o755},
+		},
+		{
+			Source:      releaseDirFileHelper.Path("alpine", "lightddns.confd"),
+			Destination: "/etc/conf.d/lightddns",
+			Type:        files.TypeConfigNoReplace,
+			FileInfo:    &files.ContentFileInfo{Mode: 0o644},
+		},
+	}
+}
+
 func ContentForEnvFile() files.Contents {
 	return files.Contents{
 		{
