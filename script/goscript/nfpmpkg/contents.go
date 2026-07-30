@@ -7,6 +7,7 @@ import (
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
+
 	"github.com/goreleaser/nfpm/v2/files"
 )
 

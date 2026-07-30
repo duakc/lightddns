@@ -5,14 +5,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
+
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/services/filehelper"
+
+	"github.com/Masterminds/semver/v3"
 	"github.com/goreleaser/nfpm/v2"
 )
 
@@ -71,7 +73,7 @@ func debName(info *nfpm.Info, tgt target.Target) string {
 }
 
 func debVersion(info *nfpm.Info, version *semver.Version) {
-	info.Version = fmt.Sprintf("v%d.%d.%d", version.Major(), version.Minor(),
+	info.Version = fmt.Sprintf("%d.%d.%d", version.Major(), version.Minor(),
 		version.Patch())
 	info.Release = debReleaseVersion
 	info.Prerelease = version.Prerelease()

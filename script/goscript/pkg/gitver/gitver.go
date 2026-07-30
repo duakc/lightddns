@@ -5,8 +5,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
+
+	"github.com/Masterminds/semver/v3"
 )
 
 var (

@@ -7,7 +7,6 @@ import (
 )
 
 func TestTargets(t *testing.T) {
-
 	t.Run("no goos,no goarch", func(t *testing.T) {
 		allTargets := []Target{
 			{GOOS: "linux", GOARCH: "amd64"},
@@ -60,6 +59,5 @@ func TestTargets(t *testing.T) {
 			{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 3},
 		}
 		assert.Equal(t, filteredTargets, FilterTargets(allTargets, "linux", "amd64"))
-
 	})
 }

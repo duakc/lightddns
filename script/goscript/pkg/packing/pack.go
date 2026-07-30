@@ -82,8 +82,8 @@ func (file *File) Render(stageFileHelper filehelper.Helper, subSet SubSet) (stri
 	if file.To == "" {
 		file.To = file.From
 	}
-	if file.Mode == 0000 {
-		file.Mode = 0644
+	if file.Mode == 0o000 {
+		file.Mode = 0o644
 	}
 
 	replacedBuffer, err := subSet.RenderContent(file.SubSetVec, slices.Clone(file.read()))

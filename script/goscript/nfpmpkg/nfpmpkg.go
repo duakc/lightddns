@@ -21,9 +21,10 @@ import (
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
-	"github.com/duakc/mt/services/filehelper"
-	"github.com/goreleaser/nfpm/v2"
 
+	"github.com/duakc/mt/services/filehelper"
+
+	"github.com/goreleaser/nfpm/v2"
 	_ "github.com/goreleaser/nfpm/v2/apk"
 	_ "github.com/goreleaser/nfpm/v2/arch"
 	_ "github.com/goreleaser/nfpm/v2/deb"
@@ -62,15 +63,12 @@ func Run(ctx context.Context) {
 	}
 
 	if packing.PackageArchLinux.String() == format || buildAll {
-
 	}
 
 	if packing.PackageAPK.String() == format ||
 		packing.PackageIPK.String() == format ||
 		buildAll {
-
 	}
-
 }
 
 func BaseInfo(goarch string) *nfpm.Info {

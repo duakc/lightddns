@@ -10,9 +10,6 @@ GO_SCRIPT=GOSCRIPT_DRAFT_SUB_DIR="draft" \
 		GOSCRIPT_RELEASE_DIR=$(RELEASE_FILE_DIR) \
 		go run $(SCRIPT_WORKDIR)/run.go
 
-GO_BUILD=$(GO_SCRIPT) build --verbose \
-			--workdir $(MAIN_WORKDIR) --binary $(NAME)
-
 ifeq ($(origin DOCKER_CLI), undefined)
     DOCKER_CLI := $(shell command -v nerdctl || command -v docker)
 endif
@@ -21,7 +18,7 @@ endif
 
 .PHONY: all
 all: toolchain clean generate test \
-	generate-schema build-all
+	generate-schema build-all build-deb build-rpm
 
 .PHONY: test
 test: lint
@@ -60,15 +57,15 @@ clean:
 
 .PHONY: build-all
 build-all: build
-	@$(GO_BUILD) --all
+	@$(GO_SCRIPT) build --all
 
 .PHONY: build-dev
 build-dev: generate
-	@$(GO_BUILD) --tags debug
+	@$(GO_SCRIPT) build --tags debug
 
 .PHONY: build
 build: generate
-	@$(GO_BUILD)
+	@$(GO_SCRIPT) build
 
 .PHONY: build-docs
 build-docs:

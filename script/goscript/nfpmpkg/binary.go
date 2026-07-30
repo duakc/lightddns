@@ -8,6 +8,7 @@ import (
 	"github.com/duakc/lightddns/script/goscript/pkg/gobuild"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
+
 	"github.com/goreleaser/nfpm/v2/files"
 )
 
@@ -29,7 +30,9 @@ func ContentForBinary(ctx context.Context, tgt target.Target, forPackager packin
 		return nil, err
 	}
 	return files.Contents{
-		{Source: buildBinary, Destination: "/usr/bin/lightddns",
-			FileInfo: &files.ContentFileInfo{Mode: 0755, Owner: "root", Group: "root"}},
+		{
+			Source: buildBinary, Destination: "/usr/bin/lightddns",
+			FileInfo: &files.ContentFileInfo{Mode: 0o755, Owner: "root", Group: "root"},
+		},
 	}, nil
 }

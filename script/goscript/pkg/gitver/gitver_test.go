@@ -19,7 +19,8 @@ func TestGitVer(T *testing.T) {
 		strconv.Itoa(int(version.Minor())),
 		strconv.Itoa(int(version.Patch())),
 		version.Prerelease(),
-		version.Metadata()} {
+		version.Metadata(),
+	} {
 		T.Log(vv)
 		T.Log("\n")
 	}

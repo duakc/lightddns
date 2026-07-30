@@ -3,14 +3,16 @@ package nfpmpkg
 import (
 	"context"
 
-	"github.com/Masterminds/semver/v3"
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
+
 	"github.com/duakc/mt"
 	"github.com/duakc/mt/services/filehelper"
+
+	"github.com/Masterminds/semver/v3"
 	"github.com/goreleaser/nfpm/v2"
 )
 
