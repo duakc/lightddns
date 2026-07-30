@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-var Verbose = os.Getenv("GOSCRIPT_VERBOSE") == "1"
-
 type Cmd struct {
 	Name string
 	Args []string
@@ -29,10 +27,8 @@ func CommandCapture(ctx context.Context, c Cmd) (string, error) {
 }
 
 func (c Cmd) prepare(ctx context.Context) *exec.Cmd {
-	if Verbose {
-		// Command echo stays uncoloured - it's a faithful transcript.
-		_, _ = fmt.Fprintf(os.Stderr, "$ %s\n", c)
-	}
+	// Command echo stays uncoloured - it's a faithful transcript.
+	_, _ = fmt.Fprintf(os.Stderr, "$ %s\n", c)
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
 	if c.Dir != "" {
 		cmd.Dir = c.Dir

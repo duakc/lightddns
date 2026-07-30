@@ -45,6 +45,8 @@ github.com/duakc/mt v0.0.0-20260622092557-3273326f7db6 h1:BOZxqMdmCxpFfYeHMevAVy
 github.com/duakc/mt v0.0.0-20260622092557-3273326f7db6/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/duakc/mt v0.0.0-20260729064502-3c565c11c6c6 h1:axY7Naxf3cGZaI1c935Cykk8i8n/9/QSOl0XtmcHf30=
 github.com/duakc/mt v0.0.0-20260729064502-3c565c11c6c6/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260729100808-8140a5a7dff4 h1:TvGGSxyVmFt4IxbaDJlvvMbKIJxjcqrUBKcIBoaUsrE=
+github.com/duakc/mt v0.0.0-20260729100808-8140a5a7dff4/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
 github.com/elastic/go-freelru v0.16.0/go.mod h1:bSdWT4M0lW79K8QbX6XY2heQYSCqD7THoYf82pT/H3I=
 github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=

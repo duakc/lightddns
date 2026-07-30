@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
+	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/gobuild"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
@@ -12,7 +13,14 @@ import (
 
 func BuildBinary(ctx context.Context, tgt target.Target, forPackager packing.PackageType) (string, error) {
 	outputDir := common.BuildDraftDir("nfpm", "binary", forPackager.String())
-	return gobuild.Plain(ctx, tgt, outputDir)
+	common.Infof("start build binary for %s , goos=%s, goarch=%s",
+		forPackager.String(), tgt.GOOS, tgt.GOARCH)
+	p := gobuild.DefaultParams()
+	p.OutputDir = outputDir
+	p.Qualified = true
+	p.Version = gitver.Version(ctx)
+	p.Branch = gitver.Branch(ctx)
+	return gobuild.Binary(ctx, tgt, p)
 }
 
 func ContentForBinary(ctx context.Context, tgt target.Target, forPackager packing.PackageType) (files.Contents, error) {

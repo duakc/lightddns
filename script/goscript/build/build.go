@@ -43,12 +43,10 @@ func Run(ctx context.Context) {
 	// Select targets: --os/--arch (or --all) filters the matrix; with no
 	// selection, default to the host's baseline target only.
 	var targets []target.Target
-	if !all && goos == "" && goarch == "" {
-		if host, ok := target.Host(); ok {
-			targets = append(targets, host)
-		}
+	if all {
+		targets = target.All()
 	} else {
-		targets = target.Filter(goos, goarch)
+		targets = target.FilterTargets(target.All(), goos, goarch)
 	}
 
 	if len(targets) == 0 {

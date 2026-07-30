@@ -28,3 +28,12 @@ func (p PackageType) String() string {
 		return fmt.Sprintf("PackageType(%d)", p)
 	}
 }
+
+func (p PackageType) Ext() string {
+	switch p {
+	case PackageArchLinux:
+		return "pkg.zst"
+	default:
+		return p.String()
+	}
+}

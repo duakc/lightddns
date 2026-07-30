@@ -5,13 +5,10 @@ import (
 	"os"
 
 	"github.com/duakc/lightddns/infra/gos"
-	"github.com/duakc/lightddns/script/goscript/archlinux"
 	"github.com/duakc/lightddns/script/goscript/build"
-	"github.com/duakc/lightddns/script/goscript/deb"
 	"github.com/duakc/lightddns/script/goscript/gendoc"
 	"github.com/duakc/lightddns/script/goscript/genschema"
 	"github.com/duakc/lightddns/script/goscript/nfpmpkg"
-	"github.com/duakc/lightddns/script/goscript/rpm"
 )
 
 // Thin dispatcher:
@@ -36,12 +33,6 @@ func main() {
 		gendoc.Run(ctx)
 	case "genschema":
 		genschema.Run(ctx)
-	case "deb":
-		deb.Run(ctx)
-	case "rpm":
-		rpm.Run(ctx)
-	case "archlinux":
-		archlinux.Run(ctx)
 	case "nfpm":
 		nfpmpkg.Run(ctx)
 	default:

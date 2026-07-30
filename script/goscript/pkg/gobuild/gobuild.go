@@ -71,10 +71,10 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	if tgt.GOAMD64Version != 0 && goarch == "amd64" {
 		env = append(env, fmt.Sprintf("GOAMD64=v%d", tgt.GOAMD64Version))
 	}
-	if tgt.SoftFloat && (goarch == "mips" || goarch == "mipsle") {
+	if tgt.MIPSSoftFloat && (goarch == "mips" || goarch == "mipsle") {
 		env = append(env, "GOMIPS=softfloat")
 	}
-	if tgt.SoftFloat && (goarch == "mips64" || goarch == "mips64le") {
+	if tgt.MIPSSoftFloat && (goarch == "mips64" || goarch == "mips64le") {
 		env = append(env, "GOMIPS64=softfloat")
 	}
 	if tgt.GOARMVersion > 0 && goarch == "arm" {

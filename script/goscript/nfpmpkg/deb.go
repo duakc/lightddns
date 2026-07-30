@@ -1,64 +1,78 @@
 package nfpmpkg
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
+	"github.com/Masterminds/semver/v3"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
-	"github.com/duakc/lightddns/script/goscript/pkg/nfpmbuild"
+	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
+	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
-
+	"github.com/duakc/mt"
+	"github.com/duakc/mt/services/filehelper"
 	"github.com/goreleaser/nfpm/v2"
 )
 
+const (
+	debReleaseVersion = "1"
+)
+
 func buildDeb(ctx context.Context, targets []target.Target, baseContents *FileContents) {
-	outputDir := common.BuildDir("nfpm", "deb")
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		common.Fatalf("%s", err)
-	}
-	targets := target.DEBTargets(p.buildAll)
-	if len(targets) == 0 {
-		common.Fatalf("no deb built for host arch (try --all)")
-	}
-	pkgVersion := sanitizeVersion(p.buildVersion, "")
+	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "deb"))
+	defer outputDir.Close()
 
 	for _, tgt := range targets {
-		binPath, err := p.compileBinary("deb", tgt)
-		if err != nil {
-			common.Fatalf("compile: %s", err)
+		if !tgt.DEB {
+			continue
 		}
-		debArch := tgt.DEBArchName()
+		contents := baseContents.Copy().
+			AddBinary(ctx, tgt, packing.PackageDEB)
 
-		info := &nfpm.Info{
-			Name:          "lightddns",
-			Arch:          tgt.GOARCH,
-			Version:       pkgVersion,
-			VersionSchema: "none",
-			Section:       "net",
-			Priority:      "optional",
-			Maintainer:    "duakc <young@qeee.net>",
-			Description:   "Lightweight dynamic DNS (DDNS) updater",
-			Homepage:      "https://lightddns.duaky.com",
-			License:       "GPL-2.0",
-			Overridables: nfpm.Overridables{
-				Depends:  []string{"adduser"},
-				Contents: append(nfpmbuild.ContentsSystemdService(p.configPath, p.manPath), nfpmbuild.Binary(binPath)),
-				Scripts: nfpm.Scripts{
-					PostInstall: common.ReleaseDir("deb", "pkgroot", "DEBIAN", "postinst"),
-					PreRemove:   common.ReleaseDir("deb", "pkgroot", "DEBIAN", "prerm"),
-					PostRemove:  common.ReleaseDir("deb", "pkgroot", "DEBIAN", "postrm"),
-				},
+		info := BaseInfo(tgt.GOARCH)
+
+		info.Overridables = nfpm.Overridables{
+			Depends:  []string{"adduser"},
+			Contents: contents.Contents,
+			Scripts: nfpm.Scripts{
+				PostInstall: common.ReleaseDir("deb", "scripts", "postinst"),
+				PreRemove:   common.ReleaseDir("deb", "scripts", "prerm"),
+				PostRemove:  common.ReleaseDir("deb", "scripts", "postrm"),
+			},
+			Deb: nfpm.Deb{
+				Arch:        tgt.DEBArchName(),
+				ArchVariant: tgt.DEBArchVariantName(),
 			},
 		}
-		info.Deb.Arch = debArch
 
-		out := filepath.Join(outputDir, fmt.Sprintf("lightddns_%s_%s.deb", pkgVersion, debArch))
-		if err := nfpmbuild.WriteTo(info, "deb", out); err != nil {
-			common.Fatalf("package: %s", err)
+		debVersion(info, gitver.Semver(ctx))
+
+		file, err := writeToFile(outputDir, debName(info, tgt), packing.PackageDEB, info)
+		if err != nil {
+			common.Fatalf("pack deb %s", err)
 		}
-		common.Infof("built %s", out)
+
+		common.Infof("built %s (size %d)", file.Name(), mt.Must(file.Stat()).Size())
+		_ = file.Close()
 	}
 	common.Infof("done, built %d deb(s)", len(targets))
+}
+
+func debName(info *nfpm.Info, tgt target.Target) string {
+	baseNames := []string{
+		constpkg.Project, info.Version, info.Prerelease, info.Release,
+		cmp.Or(info.Deb.ArchVariant, info.Deb.Arch, tgt.GOARCH),
+	}
+
+	return target.QualifyName(baseNames...) +
+		"." + packing.PackageDEB.Ext()
+}
+
+func debVersion(info *nfpm.Info, version *semver.Version) {
+	info.Version = fmt.Sprintf("v%d.%d.%d", version.Major(), version.Minor(),
+		version.Patch())
+	info.Release = debReleaseVersion
+	info.Prerelease = version.Prerelease()
 }

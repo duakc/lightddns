@@ -12,13 +12,16 @@ package nfpmpkg
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"os"
 	"runtime"
-	"strings"
 
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/script/goscript/pkg/common"
+	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
+	"github.com/duakc/lightddns/script/goscript/pkg/target"
+	"github.com/duakc/mt/services/filehelper"
 	"github.com/goreleaser/nfpm/v2"
 
 	_ "github.com/goreleaser/nfpm/v2/apk"
@@ -28,56 +31,49 @@ import (
 	_ "github.com/goreleaser/nfpm/v2/rpm"
 )
 
+const nfpmGOOS = "linux"
+
 func Run(ctx context.Context) {
 	var (
-		goos   string
 		goarch string
 
 		format   string
 		buildAll bool
 	)
-	flag.StringVar(&goos, "goos", runtime.GOOS, "target OS")
 	flag.StringVar(&goarch, "goarch", runtime.GOARCH, "target architecture")
-	flag.StringVar(&format, "format", "all", "package format: deb|rpm|archlinux|openwrt|all")
-	flag.BoolVar(&buildAll, "all", false, "build every shipped arch (default: host arch only)")
+	flag.StringVar(&format, "format", "", "package format: deb|rpm|archlinux|openwrt")
+	flag.BoolVar(&buildAll, "all", false, "build every formats")
 	flag.Parse()
 
-	if format == "all" {
-		buildDeb(p)
-		buildRPM(p)
-		buildArch(p)
-		buildOpenWrt(p)
+	baseFiles := (&FileContents{}).
+		AddConfig(SchemaURL(gitver.Version(ctx))).
+		AddEnvFile().
+		AddSystemdService().
+		AddMan()
+
+	if packing.PackageDEB.String() == format || buildAll {
+		debTargets := target.DEBTargets(target.All(), nfpmGOOS, goarch)
+		buildDeb(ctx, debTargets, baseFiles)
 	}
 
-	switch format {
-	case packing.PackageDEB.String():
-		buildDeb(p)
-	case packing.PackageRPM.String():
-		buildRPM(p)
-	case packing.PackageArchLinux.String():
-		buildArch(p)
-	case packing.PackageAPK.String(), packing.PackageIPK.String():
-		buildOpenWrt(p)
-	default:
-		common.Fatalf("unknown package format: %s", format)
+	if packing.PackageRPM.String() == format || buildAll {
+		rpmTargets := target.RPMTargets(target.All(), nfpmGOOS, goarch)
+		buildRPM(ctx, rpmTargets, baseFiles)
 	}
+
+	if packing.PackageArchLinux.String() == format || buildAll {
+
+	}
+
+	if packing.PackageAPK.String() == format ||
+		packing.PackageIPK.String() == format ||
+		buildAll {
+
+	}
+
 }
 
-func sanitizeVersion(v, sep string) string {
-	v = strings.TrimPrefix(v, "v")
-	if sep != "" {
-		v = strings.ReplaceAll(v, "-", sep)
-	} else {
-		sep = "~"
-	}
-
-	if v == "" || v[0] < '0' || v[0] > '9' {
-		v = "0.0.0" + sep + v
-	}
-	return v
-}
-
-func BaseInfo(goarch, pkgVersion string) *nfpm.Info {
+func BaseInfo(goarch string) *nfpm.Info {
 	return &nfpm.Info{
 		Name:          constpkg.Project,
 		Description:   constpkg.ProjectDescription,
@@ -85,8 +81,35 @@ func BaseInfo(goarch, pkgVersion string) *nfpm.Info {
 		License:       constpkg.LICENSE,
 		VersionSchema: "semver",
 		Maintainer:    "young <young@qeee.net>",
+		Priority:      "optional",
 
 		Arch:    goarch,
-		Version: pkgVersion,
+		Version: gitver.Version(context.Background()),
 	}
+}
+
+func writeToFile(
+	fh filehelper.Helper,
+	packageName string,
+	packageType packing.PackageType,
+	info *nfpm.Info,
+) (*os.File, error) {
+	packager, err := nfpm.Get(packageType.String())
+	if err != nil {
+		return nil, err
+	}
+	info = nfpm.WithDefaults(info)
+	if err := nfpm.Validate(info); err != nil {
+		return nil, err
+	}
+	file, err := fh.Create(packageName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = packager.Package(info, file)
+	if err != nil {
+		return nil, errors.Join(err, file.Close())
+	}
+	return file, nil
 }

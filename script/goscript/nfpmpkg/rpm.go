@@ -1,67 +1,72 @@
 package nfpmpkg
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
+	"context"
 
+	"github.com/Masterminds/semver/v3"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
-	"github.com/duakc/lightddns/script/goscript/pkg/nfpmbuild"
+	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
+	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
-
+	"github.com/duakc/mt"
+	"github.com/duakc/mt/services/filehelper"
 	"github.com/goreleaser/nfpm/v2"
 )
 
-// rpmRelease is the RPM Release field; pinned so the filename is deterministic.
-const rpmRelease = "1"
+const (
+	rpmReleaseVersion = "1"
+)
 
-func buildRPM(p params) {
-	outputDir := common.BuildDir("nfpm", "rpm")
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		common.Fatalf("%s", err)
-	}
-	targets := target.RPMTargets(p.buildAll)
-	if len(targets) == 0 {
-		common.Fatalf("no rpm built for host arch (try --all)")
-	}
-	// rpm forbids "-" in Version; "~" orders as a pre-release.
-	pkgVersion := sanitizeVersion(p.buildVersion, "~")
+func buildRPM(ctx context.Context, targets []target.Target, baseContents *FileContents) {
+	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "rpm"))
+	defer outputDir.Close()
 
 	for _, tgt := range targets {
-		binPath, err := p.compileBinary("rpm", tgt)
-		if err != nil {
-			common.Fatalf("compile: %s", err)
+		if !tgt.RPM {
+			continue
 		}
-		rpmArch := tgt.RPMArchName()
+		contents := baseContents.Copy().
+			AddBinary(ctx, tgt, packing.PackageRPM)
 
-		info := &nfpm.Info{
-			Name:          "lightddns",
-			Arch:          tgt.GOARCH,
-			Version:       pkgVersion,
-			VersionSchema: "none",
-			Release:       rpmRelease,
-			Maintainer:    "duakc <young@qeee.net>",
-			Description:   "Lightweight dynamic DNS (DDNS) updater",
-			Homepage:      "https://lightddns.duaky.com",
-			License:       "GPL-2.0-only",
-			Overridables: nfpm.Overridables{
-				Depends:  []string{"shadow-utils"},
-				Contents: append(nfpmbuild.ContentsSystemdService(p.configPath, p.manPath), nfpmbuild.Binary(binPath)),
-				Scripts: nfpm.Scripts{
-					PreInstall:  common.ReleaseDir("rpm", "scripts", "pre"),
-					PostInstall: common.ReleaseDir("rpm", "scripts", "post"),
-					PreRemove:   common.ReleaseDir("rpm", "scripts", "preun"),
-					PostRemove:  common.ReleaseDir("rpm", "scripts", "postun"),
-				},
+		info := BaseInfo(tgt.GOARCH)
+
+		info.Overridables = nfpm.Overridables{
+			Depends:  []string{"shadow-utils"},
+			Contents: contents.Contents,
+			Scripts: nfpm.Scripts{
+				PreInstall:  common.ReleaseDir("rpm", "scripts", "pre"),
+				PostInstall: common.ReleaseDir("rpm", "scripts", "post"),
+				PreRemove:   common.ReleaseDir("rpm", "scripts", "preun"),
+				PostRemove:  common.ReleaseDir("rpm", "scripts", "postun"),
+			},
+			RPM: nfpm.RPM{
+				Arch: tgt.RPMArchName(),
 			},
 		}
-		info.RPM.Arch = rpmArch
 
-		out := filepath.Join(outputDir, fmt.Sprintf("lightddns-%s-%s.%s.rpm", pkgVersion, rpmRelease, rpmArch))
-		if err := nfpmbuild.WriteTo(info, "rpm", out); err != nil {
-			common.Fatalf("package: %s", err)
+		rpmVersion(info, gitver.Semver(ctx))
+
+		file, err := writeToFile(outputDir, rpmName(info, tgt), packing.PackageRPM, info)
+		if err != nil {
+			common.Fatalf("pack rpm %s", err)
 		}
-		common.Infof("built %s", out)
+
+		common.Infof("built %s (size %d)", file.Name(), mt.Must(file.Stat()).Size())
+		_ = file.Close()
 	}
 	common.Infof("done, built %d rpm(s)", len(targets))
+}
+
+func rpmName(info *nfpm.Info, tgt target.Target) string {
+	return target.QualifyName(
+		constpkg.Project, info.Version, info.Release, info.RPM.Arch) +
+		"." + packing.PackageRPM.Ext()
+}
+
+func rpmVersion(info *nfpm.Info, version *semver.Version) {
+	info.Version = version.String()
+	info.Release = rpmReleaseVersion
+	// RPM doesn't accept Prerelease .
+	// info.Prerelease = version.Prerelease()
 }

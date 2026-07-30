@@ -39,13 +39,13 @@ type Target struct {
 	GO386 string
 
 	// mips
-	SoftFloat bool
+	MIPSSoftFloat bool
 
 	// Whether this row ships as a .deb / .rpm / Arch Linux package. Only ONE
 	// variant per arch is marked (e.g. baseline amd64, hardfloat mips);
 	// microarch/softfloat duplicates stay false. The arch NAME is derived by the
 	// package-specific mapping method, not repeated per row.
-	Deb       bool
+	DEB       bool
 	RPM       bool
 	ArchLinux bool
 }
@@ -80,31 +80,31 @@ var all = []Target{
 	//{GOOS: "freebsd", GOARCH: "mipsle", SoftFloat: false},
 
 	// linux-amd64 (only the baseline ships; microarch levels are extra builds)
-	{GOOS: "linux", GOARCH: "amd64", Deb: true, RPM: true, ArchLinux: true},
-	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 1},
-	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 2},
-	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 3},
+	{GOOS: "linux", GOARCH: "amd64", DEB: true, RPM: true, ArchLinux: true},
+	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 1, DEB: true, RPM: true},
+	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 2, DEB: true, RPM: true},
+	{GOOS: "linux", GOARCH: "amd64", GOAMD64Version: 3, DEB: true, RPM: true},
 
 	// linux-arm (rpm only packages the v7/hardfloat profile)
-	{GOOS: "linux", GOARCH: "arm", GOARMVersion: 5, Deb: true},
-	{GOOS: "linux", GOARCH: "arm", GOARMVersion: 6, Deb: true},
-	{GOOS: "linux", GOARCH: "arm", GOARMVersion: 7, Deb: true, RPM: true},
-	{GOOS: "linux", GOARCH: "arm64", Deb: true, RPM: true},
+	{GOOS: "linux", GOARCH: "arm", GOARMVersion: 5, DEB: true, RPM: true},
+	{GOOS: "linux", GOARCH: "arm", GOARMVersion: 6, DEB: true, RPM: true},
+	{GOOS: "linux", GOARCH: "arm", GOARMVersion: 7, DEB: true, RPM: true},
+	{GOOS: "linux", GOARCH: "arm64", DEB: true, RPM: true},
 
 	// linux-mips (only hardfloat ships; rpm has no mips)
 	// mips && mipsle
-	{GOOS: "linux", GOARCH: "mips", SoftFloat: true},
-	{GOOS: "linux", GOARCH: "mipsle", SoftFloat: true},
+	{GOOS: "linux", GOARCH: "mips", MIPSSoftFloat: true},
+	{GOOS: "linux", GOARCH: "mipsle", MIPSSoftFloat: true},
 	// mipshf && mipslehf
-	{GOOS: "linux", GOARCH: "mips", SoftFloat: false, Deb: true},
-	{GOOS: "linux", GOARCH: "mipsle", SoftFloat: false, Deb: true},
+	{GOOS: "linux", GOARCH: "mips", MIPSSoftFloat: false, DEB: true},
+	{GOOS: "linux", GOARCH: "mipsle", MIPSSoftFloat: false, DEB: true},
 
 	// linux-others
-	{GOOS: "linux", GOARCH: "386", Deb: true, RPM: true},
-	{GOOS: "linux", GOARCH: "loong64", Deb: true, RPM: true},
+	{GOOS: "linux", GOARCH: "386", DEB: true, RPM: true},
+	{GOOS: "linux", GOARCH: "loong64", DEB: true, RPM: true},
 	//{GOOS: "linux", GOARCH: "ppc64", Deb: true, RPM: true},
 	//{GOOS: "linux", GOARCH: "ppc64le", Deb: true, RPM: true},
-	{GOOS: "linux", GOARCH: "riscv64", Deb: true, RPM: true},
+	{GOOS: "linux", GOARCH: "riscv64", DEB: true, RPM: true},
 	//{GOOS: "linux", GOARCH: "s390x", Deb: true, RPM: true},
 	//{GOOS: "linux", GOARCH: "sparc64", Deb: true},
 
@@ -156,7 +156,7 @@ func Host() (Target, bool) {
 func DEBTargets(tgt []Target, goos, goarch string) []Target {
 	var filtered []Target
 	for _, target := range tgt {
-		if target.Deb {
+		if target.DEB {
 			filtered = append(filtered, target)
 		}
 	}
@@ -227,17 +227,17 @@ var openwrtTargets = []OpenWrtTarget{
 	{Target{GOOS: "linux", GOARCH: "arm", GOARMVersion: 5}, []string{
 		"arm_arm926ej-s", "arm_cortex-a7", "arm_cortex-a9", "arm_fa526", "arm_xscale",
 	}},
-	{Target{GOOS: "linux", GOARCH: "mipsle", SoftFloat: true}, []string{
+	{Target{GOOS: "linux", GOARCH: "mipsle", MIPSSoftFloat: true}, []string{
 		"mipsel_24kc", "mipsel_74kc", "mipsel_mips32",
 	}},
 	{Target{GOOS: "linux", GOARCH: "mipsle"}, []string{"mipsel_24kc_24kf"}}, // hardfloat
-	{Target{GOOS: "linux", GOARCH: "mips", SoftFloat: true}, []string{
+	{Target{GOOS: "linux", GOARCH: "mips", MIPSSoftFloat: true}, []string{
 		"mips_24kc", "mips_4kec", "mips_mips32",
 	}},
-	{Target{GOOS: "linux", GOARCH: "mips64", SoftFloat: true}, []string{
+	{Target{GOOS: "linux", GOARCH: "mips64", MIPSSoftFloat: true}, []string{
 		"mips64_mips64r2", "mips64_octeonplus",
 	}},
-	{Target{GOOS: "linux", GOARCH: "mips64le", SoftFloat: true}, []string{"mips64el_mips64r2"}},
+	{Target{GOOS: "linux", GOARCH: "mips64le", MIPSSoftFloat: true}, []string{"mips64el_mips64r2"}},
 	{Target{GOOS: "linux", GOARCH: "riscv64"}, []string{"riscv64_generic"}},
 	{Target{GOOS: "linux", GOARCH: "loong64"}, []string{"loongarch64_generic"}},
 }
@@ -266,7 +266,7 @@ func (t Target) variantParts() []string {
 		parts = append(parts, fmt.Sprintf("v%d", t.GOAMD64Version))
 	}
 
-	if t.SoftFloat && t.GOARCH == "mips" {
+	if t.MIPSSoftFloat && t.GOARCH == "mips" {
 		parts = append(parts, "softfloat")
 	} else if t.GOARCH == "mips" || t.GOARCH == "mipsle" {
 		parts = append(parts, "hardfloat")
@@ -280,7 +280,7 @@ func (t Target) variantParts() []string {
 }
 
 func (t Target) BinaryName(base string) string {
-	return strings.Join(append([]string{base}, t.variantParts()...), "-")
+	return QualifyName(append([]string{base}, t.variantParts()...)...)
 }
 
 func (t Target) DEBArchName() string {
@@ -303,14 +303,40 @@ func (t Target) DEBArchName() string {
 	}
 }
 
+func (t Target) DEBArchVariantName() string {
+	switch {
+	case t.GOARCH == "amd64" && t.GOAMD64Version == 1:
+		return "amd64v1"
+	case t.GOARCH == "amd64" && t.GOAMD64Version == 2:
+		return "amd64v2"
+	case t.GOARCH == "amd64" && t.GOAMD64Version == 3:
+		return "amd64v3"
+	}
+	return t.DEBArchName()
+}
+
 func (t Target) RPMArchName() string {
 	switch t.GOARCH {
 	case "amd64":
+		switch t.GOAMD64Version {
+		case 1:
+			return "x86-64-v1"
+		case 2:
+			return "x86-64-v2"
+		case 3:
+			return "x86-64-v3"
+		}
 		return "x86_64"
 	case "arm64":
 		return "aarch64"
 	case "arm":
-		return "armv7hl"
+		switch t.GOARMVersion {
+		case 5:
+			return "armv5tel"
+		case 6:
+			return "armv6hl" // or armv6l
+		}
+		return "armv7hl" // or armv7hnl
 	case "386":
 		return "i686"
 	case "loong64":
@@ -330,4 +356,8 @@ func (t Target) ArchLinuxArchName() string {
 
 func matchEmptyGlobal(raw, c string) bool {
 	return raw == c || len(c) == 0 || c == "*"
+}
+
+func QualifyName(name ...string) string {
+	return strings.Join(name, "-")
 }
