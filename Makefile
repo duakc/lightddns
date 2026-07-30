@@ -19,7 +19,7 @@ endif
 .PHONY: all
 all: toolchain clean generate test \
 	generate-schema build-all \
-	build-deb build-rpm build-alpine-apk build-openwrt
+	build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
 
 .PHONY: test
 test: lint

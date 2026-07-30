@@ -46,67 +46,40 @@ func Run(ctx context.Context) {
 	flag.BoolVar(&buildAll, "all", false, "build every package format")
 	flag.Parse()
 
-	schemaURL := SchemaURL(gitver.Version(ctx))
-
 	if packing.PackageDEB.String() == format || buildAll {
-		baseFiles := (&FileContents{}).
-			AddConfig(schemaURL).
-			AddEnvFile().
-			AddSystemdService().
-			AddMan()
 		debTargets := target.DEBTargets(target.All(), nfpmGOOS, goarch)
-		buildDeb(ctx, debTargets, baseFiles)
+		buildDeb(ctx, debTargets)
 	}
 
 	if packing.PackageRPM.String() == format || buildAll {
-		baseFiles := (&FileContents{}).
-			AddConfig(schemaURL).
-			AddEnvFile().
-			AddSystemdService().
-			AddMan()
 		rpmTargets := target.RPMTargets(target.All(), nfpmGOOS, goarch)
-		buildRPM(ctx, rpmTargets, baseFiles)
+		buildRPM(ctx, rpmTargets)
 	}
 
 	if packing.PackageArchLinux.String() == format || buildAll {
+		archLinuxTargets := target.ArchLinuxTargets(target.All(), nfpmGOOS, goarch)
+		buildArchLinux(ctx, archLinuxTargets)
 	}
 
 	if packing.PackageAlpineAPK.String() == format || buildAll {
-		baseFiles := (&FileContents{}).
-			AddConfig(schemaURL).
-			AddEnvFile().
-			AddAlpineOpenRC().
-			AddMan()
 		apkTargets := target.AlpineAPKTargets(target.All(), nfpmGOOS, goarch)
-		buildAlpineAPK(ctx, apkTargets, baseFiles)
+		buildAlpineAPK(ctx, apkTargets)
 	}
 
 	if format == "openwrt" || buildAll {
-		baseFiles := (&FileContents{}).
-			AddConfig(schemaURL).
-			AddEnvFile().
-			AddOpenWrtInit()
 		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
-		buildOpenWrtIPK(ctx, openWrtTargets, baseFiles)
-		buildOpenWrtAPK(ctx, openWrtTargets, baseFiles)
+		buildOpenWrtIPK(ctx, openWrtTargets)
+		buildOpenWrtAPK(ctx, openWrtTargets)
 	}
 
 	if packing.PackageIPK.String() == format {
-		baseFiles := (&FileContents{}).
-			AddConfig(schemaURL).
-			AddEnvFile().
-			AddOpenWrtInit()
 		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
-		buildOpenWrtIPK(ctx, openWrtTargets, baseFiles)
+		buildOpenWrtIPK(ctx, openWrtTargets)
 	}
 
 	if packing.PackageOpenWrtAPK.String() == format {
-		baseFiles := (&FileContents{}).
-			AddConfig(schemaURL).
-			AddEnvFile().
-			AddOpenWrtInit()
 		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
-		buildOpenWrtAPK(ctx, openWrtTargets, baseFiles)
+		buildOpenWrtAPK(ctx, openWrtTargets)
 	}
 }
 

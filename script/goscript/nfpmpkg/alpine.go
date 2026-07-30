@@ -18,9 +18,15 @@ import (
 
 const alpineReleaseVersion = "1"
 
-func buildAlpineAPK(ctx context.Context, targets []target.Target, baseContents *FileContents) {
+func buildAlpineAPK(ctx context.Context, targets []target.Target) {
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "alpine", "apk"))
 	defer outputDir.Close()
+
+	baseContents := (&FileContents{}).
+		AddConfig(SchemaURL(gitver.LocatableVersion(ctx))).
+		AddEnvFile().
+		AddAlpineOpenRC().
+		AddMan()
 
 	built := 0
 	for _, tgt := range targets {

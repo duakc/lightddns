@@ -18,9 +18,14 @@ import (
 
 const openWrtReleaseVersion = "1"
 
-func buildOpenWrtIPK(ctx context.Context, targets []target.Target, baseContents *FileContents) {
+func buildOpenWrtIPK(ctx context.Context, targets []target.Target) {
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "openwrt", "ipk"))
 	defer outputDir.Close()
+
+	baseContents := (&FileContents{}).
+		AddConfig(SchemaURL(gitver.LocatableVersion(ctx))).
+		AddEnvFile().
+		AddOpenWrtInit()
 
 	built := 0
 	for _, tgt := range targets {
@@ -65,9 +70,14 @@ func buildOpenWrtIPK(ctx context.Context, targets []target.Target, baseContents 
 	common.Infof("done, built %d openwrt ipk(s)", built)
 }
 
-func buildOpenWrtAPK(ctx context.Context, targets []target.Target, baseContents *FileContents) {
+func buildOpenWrtAPK(ctx context.Context, targets []target.Target) {
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "openwrt", "apk"))
 	defer outputDir.Close()
+
+	baseContents := (&FileContents{}).
+		AddConfig(SchemaURL(gitver.LocatableVersion(ctx))).
+		AddEnvFile().
+		AddOpenWrtInit()
 
 	built := 0
 	for _, tgt := range targets {

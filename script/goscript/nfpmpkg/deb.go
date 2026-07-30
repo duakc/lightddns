@@ -22,9 +22,15 @@ const (
 	debReleaseVersion = "1"
 )
 
-func buildDeb(ctx context.Context, targets []target.Target, baseContents *FileContents) {
+func buildDeb(ctx context.Context, targets []target.Target) {
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "deb"))
 	defer outputDir.Close()
+
+	baseContents := (&FileContents{}).
+		AddConfig(SchemaURL(gitver.LocatableVersion(ctx))).
+		AddEnvFile().
+		AddSystemdService().
+		AddMan()
 
 	for _, tgt := range targets {
 		if !tgt.DEB {

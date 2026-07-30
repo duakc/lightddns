@@ -11,12 +11,13 @@ import (
 )
 
 var (
-	gitVersionOnce, gitBranchOnce sync.Once
+	gitVersionOnce, gitBranchOnce, gitLocatableVersionOnce sync.Once
 
 	gitVersion       *semver.Version
 	gitVersionString string
 
-	gitBranch string
+	gitBranch           string
+	gitLocatableVersion string
 )
 
 func Semver(ctx context.Context) *semver.Version {
@@ -54,6 +55,18 @@ func Branch(ctx context.Context) string {
 		}
 	})
 	return gitBranch
+}
+
+func LocatableVersion(ctx context.Context) string {
+	gitLocatableVersionOnce.Do(func() {
+		gitLocatableVersion = unknown
+		if tags := git(ctx, "tag", "--points-at", "HEAD"); tags != "" {
+			gitLocatableVersion = strings.SplitN(tags, "\n", 2)[0]
+		} else if hash := git(ctx, "rev-parse", "HEAD"); hash != "" {
+			gitLocatableVersion = hash
+		}
+	})
+	return gitLocatableVersion
 }
 
 const unknown = "(unknown)"
