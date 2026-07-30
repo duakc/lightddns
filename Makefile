@@ -18,7 +18,8 @@ endif
 
 .PHONY: all
 all: toolchain clean generate test \
-	generate-schema build-all build-deb build-rpm
+	generate-schema build-all \
+	build-deb build-rpm build-alpine-apk build-openwrt
 
 .PHONY: test
 test: lint
@@ -84,8 +85,8 @@ build-rpm:
 	$(GO_SCRIPT) nfpm --format rpm --goarch '*'
 
 .PHONY: build-archlinux
-build-nfpm-archlinux:
-	$(GO_SCRIPT) nfpm --format archlinux
+build-archlinux:
+	$(GO_SCRIPT) nfpm --format archlinux --goarch '*'
 
 .PHONY: build-alpine-apk
 build-alpine-apk:
@@ -93,10 +94,6 @@ build-alpine-apk:
 
 .PHONY: build-openwrt
 build-openwrt:
-	$(GO_SCRIPT) nfpm --format openwrt
-
-.PHONY: build-openwrt-all
-build-openwrt-all:
 	$(GO_SCRIPT) nfpm --format openwrt --goarch '*'
 
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
