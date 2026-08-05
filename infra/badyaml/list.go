@@ -15,7 +15,8 @@ func (L *Listable[T]) UnmarshalYAML(bs []byte) error {
 	var v T
 	commonErr := Unmarshal(bs, &v)
 	if commonErr == nil {
-		L.Value = append(L.Value, v)
+		L.Value = append([]T{}, v)
+		return nil
 	}
 	return errors.Join(commonErr, err)
 }
