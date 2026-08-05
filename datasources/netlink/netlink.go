@@ -33,7 +33,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.NetlinkDatasour
 		interfaceFinder:     control.NewDefaultInterfaceFinder(),
 		interfaceName:       option.IfName,
 		interfaceIndex:      option.IfIndex,
-		allowBogon:          option.AllowBogon,
+		includeBogon:        option.IncludeBogon,
 		logger:              logger,
 	}
 	return n, nil
@@ -47,7 +47,7 @@ type Netlink struct {
 	interfaceFinder control.InterfaceFinder
 	interfaceName   string
 	interfaceIndex  int
-	allowBogon      bool
+	includeBogon    bool
 
 	finderAccess sync.Mutex
 }
@@ -58,7 +58,7 @@ func (n *Netlink) IP(ctx context.Context) ([]netip.Addr, error) {
 		return nil, err
 	}
 	return mt.Filter(ip, func(addr netip.Addr) bool {
-		return n.allowBogon || !netx.IsBogon(addr)
+		return n.includeBogon || !netx.IsBogon(addr)
 	}), nil
 }
 

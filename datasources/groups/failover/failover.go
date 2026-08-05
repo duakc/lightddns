@@ -10,7 +10,6 @@ import (
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netx"
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt"
@@ -110,19 +109,23 @@ func (f *FailOver) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, e
 			f.lastSuccess = 0
 		}
 		succeedDatasource := f.datasources[f.lastSuccess]
-		if ipv6 && ipv4 {
-			ips, err = succeedDatasource.IP(ctx)
-		} else if dualStack, isDualStack := succeedDatasource.(adapter.DatasourceDualStack); isDualStack {
-			switch {
-			case ipv4:
-				ips, err = dualStack.IPv4(ctx)
-			case ipv6:
-				ips, err = dualStack.IPv6(ctx)
-			}
-		} else {
-			ips, err = succeedDatasource.IP(ctx)
-			ips = netx.FilterAddress(ips, ipv4, ipv6)
-		}
+
+		//if ipv6 && ipv4 {
+		//	ips, err = succeedDatasource.IP(ctx)
+		//} else if dualStack, isDualStack := succeedDatasource.(adapter.DatasourceDualStack); isDualStack {
+		//	switch {
+		//	case ipv4:
+		//		ips, err = dualStack.IPv4(ctx)
+		//	case ipv6:
+		//		ips, err = dualStack.IPv6(ctx)
+		//	}
+		//} else {
+		//	ips, err = succeedDatasource.IP(ctx)
+		//	ips = netx.FilterAddress(ips, ipv4, ipv6)
+		//}
+
+		limitedDatasource := datasourcex.NewLimited(succeedDatasource, ipv4, ipv6, true)
+		ips, err = limitedDatasource.IP(ctx)
 		if err == nil {
 			f.lastSuccess = (f.lastSuccess + walked) % len(f.datasources)
 			return ips, nil

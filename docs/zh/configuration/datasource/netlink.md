@@ -36,7 +36,7 @@ ifName: eth0
 ifIndex: 2
 ```
 
-## `allowBogon`
+## `includeBogon`
 
 是否允许返回 bogon 地址 — 包括私有（RFC 1918）、链路本地、回环以及其他保留范围。设为 `false`（默认）时，仅返回全球单播地址。
 

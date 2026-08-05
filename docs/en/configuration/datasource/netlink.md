@@ -36,7 +36,7 @@ Filter by network interface index. When both `ifName` and `ifIndex` are set, `if
 ifIndex: 2
 ```
 
-## `allowBogon`
+## `includeBogon`
 
 Whether to include bogon IP addresses — private (RFC 1918), link-local, loopback, and other reserved ranges. When `false` (default), only global unicast addresses are returned.
 

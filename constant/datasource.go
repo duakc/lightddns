@@ -11,4 +11,5 @@ const (
 
 	DatasourceGroupTypeSum      = "sum"
 	DatasourceGroupTypeFailover = "failover"
+	DatasourceGroupFilter       = "filter"
 )

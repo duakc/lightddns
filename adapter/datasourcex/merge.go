@@ -3,23 +3,13 @@ package datasourcex
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter"
 )
 
 func MergeDualStackDatasourceIP(ctx context.Context, s adapter.DatasourceDualStack) ([]netip.Addr, error) {
-	ipv4, err := s.IPv4(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("ipv4: %w", err)
-	}
-
-	ipv6, err := s.IPv6(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("ipv6: %w", err)
-	}
-	return append(ipv4, ipv6...), nil
+	return NewLimited(s, true, true, true).IP(ctx)
 }
 
 func MergeDatasources(ctx context.Context, datasources []adapter.Datasource, ipv4, ipv6, fastfail bool) ([]netip.Addr, error) {

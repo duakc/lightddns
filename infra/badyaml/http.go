@@ -3,10 +3,7 @@ package badyaml
 import (
 	"fmt"
 	"net/http"
-	urlpkg "net/url"
 	"strings"
-
-	"github.com/duakc/lightddns/infra/netx/domains"
 )
 
 type HTTPMethod string
@@ -53,38 +50,5 @@ func (h *HTTPHeader) UnmarshalYAML(data []byte) error {
 			}
 		}
 	}
-	return nil
-}
-
-type URL struct {
-	URL *urlpkg.URL
-	Raw string
-}
-
-func (m *URL) UnmarshalYAML(data []byte) error {
-	s, err := UnmarshalType[string](data)
-	if err != nil {
-		return err
-	}
-	parse, err := urlpkg.Parse(s)
-	if err != nil {
-		return err
-	}
-	m.URL = parse
-	m.Raw = s
-	return nil
-}
-
-type DomainName string
-
-func (d *DomainName) UnmarshalYAML(data []byte) error {
-	s, err := UnmarshalType[string](data)
-	if err != nil {
-		return err
-	}
-	if !domains.IsDomainName(s) {
-		return fmt.Errorf("invalid domain name: %s", s)
-	}
-	*d = DomainName(s)
 	return nil
 }

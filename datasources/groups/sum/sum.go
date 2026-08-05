@@ -42,8 +42,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 		datasources:         datasources,
 
-		fastFail: option.FastFail,
-		logger:   logger,
+		logger: logger,
 	}
 
 	return sum, nil
@@ -53,7 +52,6 @@ type Sum struct {
 	adapter.AbstractManagedType
 
 	logger      *zap.Logger
-	fastFail    bool
 	datasources []adapter.Datasource
 }
 
@@ -88,5 +86,5 @@ func (s *Sum) IPv6(ctx context.Context) ([]netip.Addr, error) {
 }
 
 func (s *Sum) handle(ctx context.Context, ipv4, ipv6 bool) ([]netip.Addr, error) {
-	return datasourcex.MergeDatasources(ctx, s.datasources, ipv4, ipv6, s.fastFail)
+	return datasourcex.MergeDatasources(ctx, s.datasources, ipv4, ipv6, true)
 }

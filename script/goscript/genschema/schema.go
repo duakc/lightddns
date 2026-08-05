@@ -35,6 +35,7 @@ var (
 func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 	optionsTypeMappingTableOnce.Do(func() {
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.Listable[string]]()] = listAble(JSONTypeString)
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.Listable[badyaml.Prefix]]()] = listAble(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.EnvironmentVariable]()] = listAble(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.HTTPHeader]()] = listAble(JSONTypeString)
 
