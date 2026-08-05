@@ -1,5 +1,7 @@
 package badyaml
 
+import "errors"
+
 type Listable[T any] struct {
 	Value []T `yaml:"-"`
 }
@@ -9,10 +11,11 @@ func (L *Listable[T]) UnmarshalYAML(bs []byte) error {
 	if err == nil {
 		return nil
 	}
+
 	var v T
-	err = Unmarshal(bs, &v)
-	if err == nil {
+	commonErr := Unmarshal(bs, &v)
+	if commonErr == nil {
 		L.Value = append(L.Value, v)
 	}
-	return nil
+	return errors.Join(commonErr, err)
 }

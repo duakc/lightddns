@@ -1,3 +1,5 @@
+#!/bin/sh
+
 if command -v systemctl >/dev/null 2>&1; then
 	systemctl disable --now lightddns.service >/dev/null 2>&1 || true
 fi
