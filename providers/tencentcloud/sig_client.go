@@ -57,7 +57,7 @@ func (tc *TencentSignHTTPRequester) Do(r *http.Request) (resp *http.Response, er
 	if err != nil {
 		return nil, fmt.Errorf("tencentcloud sign: authorization: %w", err)
 	}
-	r.Header.Set("Authorization", auth)
+	r.Header.Set(httpx.HeaderAuthorization, auth)
 
 	return tc.HTTPRequester.Do(r)
 }

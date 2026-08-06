@@ -42,9 +42,15 @@ const (
 	HeaderRegion    = "X-TC-Region"
 )
 
-const ContentTypeJSON = "application/json; charset=utf-8"
+const (
+	ContentTypeJSON = "application/json; charset=utf-8"
+)
 
-var TencentCloudEndpoint = mt.Must(urlpkg.Parse("https://dnspod.tencentcloudapi.com"))
+const (
+	DNSPodEndpoint = "https://dnspod.tencentcloudapi.com"
+)
+
+var dnsPodEndpointUrl = mt.Must(urlpkg.Parse(DNSPodEndpoint))
 
 type APIClient interface {
 	DescribeDomainFilterList(context.Context, DescribeDomainFilterListRequest) (DescribeDomainFilterListResponse, error)
@@ -56,16 +62,16 @@ type APIClient interface {
 
 // defaultAPIClient implements the DNSPod RPC API over HTTP with TC3 signing.
 type defaultAPIClient struct {
-	logger *zap.Logger
-	do     httpx.HTTPRequester
+	logger    *zap.Logger
+	requester httpx.HTTPRequester
 }
 
-func NewAPIClient(logger *zap.Logger, do httpx.HTTPRequester, secretId, secretKey string) APIClient {
+func NewAPIClient(logger *zap.Logger, requester httpx.HTTPRequester, secretId, secretKey string) APIClient {
 	logger = zaplog.DoNotPanic(logger).Named("api")
 	return &defaultAPIClient{
 		logger: logger,
-		do: &TencentSignHTTPRequester{
-			HTTPRequester: do,
+		requester: &TencentSignHTTPRequester{
+			HTTPRequester: requester,
 			Logger:        logger,
 			SecretId:      secretId,
 			SecretKey:     secretKey,
@@ -109,18 +115,15 @@ func (c *defaultAPIClient) DeleteRecord(ctx context.Context,
 	return doAction[DeleteRecordResponse](ctx, c, DNSPodActionDeleteRecord, req)
 }
 
-func (c *defaultAPIClient) actionLogger(action string) *zap.Logger {
-	return c.logger.With(zap.String("action", action))
-}
-
 func doAction[Resp any](ctx context.Context, c *defaultAPIClient, action string, body any) (Resp, error) {
 	var zero Resp
 
-	logger := c.actionLogger(action)
+	logger := c.logger.With(zap.String("action", action))
 
 	req := newRequest(http.MethodPost, action)
-	req.ExtendHeader.Set("Host", TencentCloudEndpoint.Host)
-	req.ExtendHeader.Set("Content-Type", ContentTypeJSON)
+	req.ExtendHeader.Set(httpx.HeaderHost, dnsPodEndpointUrl.Host)
+	req.ExtendHeader.Set(httpx.HeaderContentType, ContentTypeJSON)
+
 	req.Body = body
 
 	httpReq, err := req.ToRequestContext(ctx)
@@ -128,7 +131,7 @@ func doAction[Resp any](ctx context.Context, c *defaultAPIClient, action string,
 		return zero, fmt.Errorf("build request %s: %w", action, err)
 	}
 
-	resp, err := c.do.Do(httpReq)
+	resp, err := c.requester.Do(httpReq)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
@@ -159,7 +162,7 @@ func doAction[Resp any](ctx context.Context, c *defaultAPIClient, action string,
 }
 
 func newRequest(method, action string) httpx.ReqConfig {
-	req := httpx.NewReqConfig(method, TencentCloudEndpoint)
+	req := httpx.NewReqConfig(method, dnsPodEndpointUrl)
 	req.ExtendHeader.Set(HeaderAction, action)
 	req.ExtendHeader.Set(HeaderVersion, DNSPodDefaultVersion)
 	return req

@@ -6,8 +6,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const HeaderAuthorization = "Authorization"
-
 type HTTPRequester interface {
 	// Do send an HTTP request defined in the r
 	// Response can not be nil if err is nil

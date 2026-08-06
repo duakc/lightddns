@@ -49,7 +49,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 	var zones []ddnsx.Zone
 	for pageNumber := 1; ; pageNumber++ {
 		page, err := c.api.DescribeDomains(ctx, DescribeDomainsRequest{
-			KeyWord:    domains.NormalizeFQDN(keyword),
+			KeyWord:    domains.FqdnToDomain(keyword),
 			PageNumber: pageNumber,
 			PageSize:   pageSize,
 		})
@@ -83,7 +83,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 	var records []ddnsx.Existing[Record]
 	for pageNumber := 1; ; pageNumber++ {
 		page, err := c.api.DescribeDomainRecords(ctx, DescribeDomainRecordsRequest{
-			DomainName:  domains.NormalizeFQDN(key.Zone.Fqdn),
+			DomainName:  domains.FqdnToDomain(key.Zone.Fqdn),
 			RRKeyWord:   rr,
 			TypeKeyWord: key.Type.String(),
 			PageNumber:  pageNumber,
@@ -98,7 +98,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 			}
 			address, err := netip.ParseAddr(record.Value)
 			if err != nil {
-				return nil, fmt.Errorf("record %s: not an address: %s: %w", record.RecordId, record.Value, err)
+				return nil, fmt.Errorf("DescribeDomainRecords: record %s: not an address: %s: %w", record.RecordId, record.Value, err)
 			}
 			records = append(records, ddnsx.Existing[Record]{
 				Addr:   address.Unmap(),
@@ -118,7 +118,7 @@ func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
 		return err
 	}
 	_, err = c.api.AddDomainRecord(ctx, AddDomainRecordRequest{
-		DomainName: domains.NormalizeFQDN(target.Zone.Fqdn),
+		DomainName: domains.FqdnToDomain(target.Zone.Fqdn),
 		RR:         rr,
 		Type:       target.Type.String(),
 		Value:      target.Address.String(),

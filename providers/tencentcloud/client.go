@@ -1,14 +1,15 @@
 package tencentcloud
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net/netip"
 	"strconv"
-	"strings"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
+	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/zaplog"
 
@@ -75,7 +76,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Existing[Record], error) {
 	const pageSize = 100
 
-	domain := domains.NormalizeFQDN(key.Zone.Fqdn)
+	domain := domains.FqdnToDomain(key.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(key.FQDN, key.Zone.Fqdn)
 	if err != nil {
 		return nil, err
@@ -117,11 +118,12 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 }
 
 func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
-	domain := domains.NormalizeFQDN(target.Zone.Fqdn)
+	domain := domains.FqdnToDomain(target.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
 		return err
 	}
+
 	_, err = c.api.CreateRecord(ctx, CreateRecordRequest{
 		Domain:     domain,
 		SubDomain:  subdomain,
@@ -129,30 +131,33 @@ func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
 		RecordLine: DefaultRecordLine,
 		Value:      target.Address.Unmap().String(),
 		TTL:        target.TTL,
+		Remark:     providerx.UpdateMessage(""),
 	})
 	return err
 }
 
 func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, record Record) error {
-	domain := domains.NormalizeFQDN(target.Zone.Fqdn)
+	domain := domains.FqdnToDomain(target.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
 		return err
 	}
+
 	_, err = c.api.ModifyRecord(ctx, ModifyRecordRequest{
 		Domain:     domain,
 		RecordId:   record.RecordId,
 		SubDomain:  subdomain,
 		RecordType: target.Type.String(),
-		RecordLine: lineOrDefault(record.Line),
+		RecordLine: cmp.Or(record.Line, DefaultRecordLine),
 		Value:      target.Address.Unmap().String(),
 		TTL:        target.TTL,
+		Remark:     providerx.UpdateMessage(""),
 	})
 	return err
 }
 
 func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record Record) error {
-	domain := domains.NormalizeFQDN(key.Zone.Fqdn)
+	domain := domains.FqdnToDomain(key.Zone.Fqdn)
 	_, err := c.api.DeleteRecord(ctx, DeleteRecordRequest{
 		Domain:   domain,
 		RecordId: record.RecordId,
@@ -160,25 +165,10 @@ func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record Record)
 	return err
 }
 
-func lineOrDefault(line string) string {
-	if line == "" {
-		return DefaultRecordLine
-	}
-	return line
-}
-
 func relativeSubDomain(fqdn, zone string) (string, error) {
-	fqdn = mDns.Fqdn(fqdn)
-	zone = mDns.Fqdn(zone)
-	if fqdn == zone {
-		return "@", nil
+	relative, err := domains.CutDomainSuffix(fqdn, zone)
+	if err != nil {
+		return "", err
 	}
-	if subdomain, found := strings.CutSuffix(fqdn, "."+zone); found {
-		return subdomain, nil
-	}
-	return "", fmt.Errorf("fqdn %q is not within zone %q", fqdn, zone)
-}
-
-func (c *Client) actionLogger(action string) *zap.Logger {
-	return c.logger.With(zap.String("action", action))
+	return cmp.Or(relative, "@"), nil
 }

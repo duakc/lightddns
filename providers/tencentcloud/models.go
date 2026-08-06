@@ -169,6 +169,7 @@ type CreateRecordRequest struct {
 	RecordLine string `json:"RecordLine"`
 	Value      string `json:"Value"`
 	TTL        uint32 `json:"TTL,omitempty"`
+	Remark     string `json:"Remark,omitempty"`
 }
 
 type CreateRecordResponse struct {
@@ -184,6 +185,7 @@ type ModifyRecordRequest struct {
 	RecordLine string `json:"RecordLine"`
 	Value      string `json:"Value"`
 	TTL        uint32 `json:"TTL,omitempty"`
+	Remark     string `json:"Remark,omitempty"`
 }
 
 type ModifyRecordResponse struct {

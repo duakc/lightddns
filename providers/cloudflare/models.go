@@ -69,8 +69,14 @@ type DNSRecordRequest struct {
 	Proxied        bool   `json:"proxied"`
 }
 
+type ZoneStatus string
+
+const (
+	ZoneStatusActive ZoneStatus = "active"
+)
+
 type ListZonesRequest struct {
-	Status  string
+	Status  ZoneStatus
 	Name    string
 	Page    int
 	PerPage int

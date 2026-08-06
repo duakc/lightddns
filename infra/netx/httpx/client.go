@@ -95,16 +95,6 @@ func ClientOptionEnableProxy() HTTPClientOption {
 	})
 }
 
-// ClientOptionWithDialer sets a custom dialer on the underlying *http.Transport.
-// It is a no-op if a custom RoundTripper has replaced the default transport
-// (see ClientOptionWithRoundTripper).
-func ClientOptionWithDialer(d dialerx.Dialer) HTTPClientOption {
-	return FuncHTTPClientOption(func(c *Client) {
-		t := getClientTransport(c)
-		t.DialContext = d.DialContext
-	})
-}
-
 func ClientOptionWithHeader(key, value string) HTTPClientOption {
 	return FuncHTTPClientOption(func(c *Client) {
 		if len(key) == 0 { // empty value is allowed.

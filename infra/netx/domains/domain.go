@@ -1,6 +1,7 @@
 package domains
 
 import (
+	"fmt"
 	"strings"
 
 	mDns "github.com/miekg/dns"
@@ -102,9 +103,24 @@ func IsDomainName(s string) bool {
 	return nonNumeric
 }
 
-func NormalizeFQDN(name string) string {
+func FqdnToDomain(name string) string {
 	if mDns.IsFqdn(name) {
 		return strings.TrimSuffix(name, ".")
 	}
 	return name
+}
+
+func CutDomainSuffix(fqdn, zone string) (string, error) {
+	zoneFqdn := mDns.Fqdn(zone)
+	fqdn = mDns.Fqdn(fqdn)
+
+	if fqdn == zoneFqdn {
+		return "", nil
+	}
+
+	cut, found := strings.CutSuffix(fqdn, "."+zoneFqdn)
+	if !found {
+		return "", fmt.Errorf("fqdn %q is not within zone %q", fqdn, zone)
+	}
+	return cut, nil
 }

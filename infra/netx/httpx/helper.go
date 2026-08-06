@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 )
 
@@ -67,4 +69,42 @@ func ReadAndReplayBody(request *http.Request) ([]byte, error) {
 		return io.NopCloser(bytes.NewReader(body)), nil
 	}
 	return body, nil
+}
+
+func ExtractIPFromRequest(req *http.Request) ([]netip.Addr, error) {
+	for _, header := range []string{
+		HeaderCfConnectingIP,
+		HeaderTrueClientIP,
+		HeaderXRealIP,
+		HeaderXForwardedFor,
+	} {
+		currentHeader := req.Header.Get(header)
+		if len(currentHeader) == 0 {
+			continue
+		}
+		var ips []netip.Addr
+		for _, part := range strings.Split(currentHeader, ",") {
+			ipStr := strings.TrimSpace(part)
+			if ipStr == "" {
+				continue
+			}
+			if addr, err := netip.ParseAddr(ipStr); err == nil {
+				ips = append(ips, addr)
+			}
+		}
+		if len(ips) != 0 {
+			return ips, nil
+		}
+	}
+
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("split address: %s: %w", req.RemoteAddr, err)
+	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote address: %s: %w", req.RemoteAddr, err)
+	}
+
+	return []netip.Addr{addr}, nil
 }

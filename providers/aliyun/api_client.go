@@ -32,7 +32,11 @@ const (
 	AlidnsActionDeleteDomainRecord    = "DeleteDomainRecord"
 )
 
-var aliyunDNSEndpoint = mt.Must(urlpkg.Parse("https://alidns.aliyuncs.com"))
+const (
+	DNSAPIEndpoint = "https://alidns.aliyuncs.com"
+)
+
+var aliyunDNSEndpoint = mt.Must(urlpkg.Parse(DNSAPIEndpoint))
 
 type APIClient interface {
 	DescribeDomains(context.Context, DescribeDomainsRequest) (DescribeDomainsResponse, error)
@@ -44,18 +48,18 @@ type APIClient interface {
 
 // defaultAPIClient performs one signed Aliyun RPC request per method call.
 type defaultAPIClient struct {
-	logger *zap.Logger
-	do     httpx.HTTPRequester
+	logger    *zap.Logger
+	requester httpx.HTTPRequester
 }
 
-func NewAPIClient(logger *zap.Logger, do httpx.HTTPRequester,
+func NewAPIClient(logger *zap.Logger, requester httpx.HTTPRequester,
 	secretAccessKeyId, secretAccessKeySecret, secretSecurityToken string,
 ) APIClient {
 	logger = zaplog.DoNotPanic(logger).Named("api")
 	return &defaultAPIClient{
 		logger: logger,
-		do: &RpcSignRequester{
-			HTTPRequester:         do,
+		requester: &RpcSignRequester{
+			HTTPRequester:         requester,
 			Logger:                logger,
 			SecretSecurityToken:   secretSecurityToken,
 			SecretAccessKeyId:     secretAccessKeyId,
@@ -114,7 +118,7 @@ func doAction[Resp any](ctx context.Context, c *defaultAPIClient, action string,
 		return zero, fmt.Errorf("build request %s: %w", action, err)
 	}
 
-	resp, err := c.do.Do(httpReq)
+	resp, err := c.requester.Do(httpReq)
 	if resp != nil {
 		defer resp.Body.Close()
 	}

@@ -6,7 +6,7 @@ import (
 	"net/netip"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
-	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/zaplog"
 
@@ -54,7 +54,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 		// Cloudflare's name filter won't work for zone discovery, so deliberately
 		// ignore keyword and paginate the complete active-zone list.
 		page, err := c.api.ListZones(ctx, ListZonesRequest{
-			Status:  "active",
+			Status:  ZoneStatusActive,
 			Page:    pageNumber,
 			PerPage: pageSize,
 		})
@@ -75,7 +75,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 }
 
 func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Existing[Record], error) {
-	name := domains.NormalizeFQDN(key.FQDN)
+	name := domains.FqdnToDomain(key.FQDN)
 
 	var existing []ddnsx.Existing[Record]
 	for pageNumber := 1; ; pageNumber++ {
@@ -139,10 +139,10 @@ func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record Record)
 }
 
 func (c *Client) recordRequest(target ddnsx.RecordSpec) (DNSRecordRequest, error) {
-	name := domains.NormalizeFQDN(target.FQDN)
+	name := domains.FqdnToDomain(target.FQDN)
 
 	return DNSRecordRequest{
-		Comment: constpkg.ThisRecordIsManagedByLightddns,
+		Comment: providerx.UpdateMessage(""),
 
 		Name: name,
 

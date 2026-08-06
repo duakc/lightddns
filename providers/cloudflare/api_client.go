@@ -17,7 +17,11 @@ import (
 	"go.uber.org/zap"
 )
 
-var cloudflareAPIEndpoint = mt.Must(urlpkg.Parse("https://api.cloudflare.com/client/v4/zones"))
+const (
+	APIEndpoint = "https://api.cloudflare.com/client/v4/zones"
+)
+
+var cloudflareAPIEndpoint = mt.Must(urlpkg.Parse(APIEndpoint))
 
 type APIClient interface {
 	ListZones(context.Context, ListZonesRequest) (ListZonesResponse, error)
@@ -28,22 +32,25 @@ type APIClient interface {
 }
 
 type defaultAPIClient struct {
-	do httpx.HTTPRequester
+	requester httpx.HTTPRequester
 }
 
-func NewAPIClient(logger *zap.Logger, do httpx.HTTPRequester, token string) APIClient {
+func NewAPIClient(logger *zap.Logger, requester httpx.HTTPRequester, token string) APIClient {
 	logger = zaplog.DoNotPanic(logger).Named("api")
-	return &defaultAPIClient{do: &apiRequester{
-		HTTPRequester: do,
-		Logger:        logger,
-		Token:         token,
-	}}
+	return &defaultAPIClient{
+		requester: &apiRequester{
+			HTTPRequester: requester,
+			Logger:        logger,
+			Token:         token,
+		},
+	}
 }
 
 func (c *defaultAPIClient) ListZones(ctx context.Context, request ListZonesRequest) (ListZonesResponse, error) {
 	req := c.newRequest(http.MethodGet)
-	setQuery(req.Query, "status", request.Status)
-	if len(request.Name) > 0 && strings.TrimSuffix(request.Name, ".") != "" {
+	setQuery(req.Query, "status", string(request.Status))
+
+	if len(request.Name) > 0 && len(strings.TrimSuffix(request.Name, ".")) > 0 {
 		name := dns.Fqdn(request.Name)
 		setQuery(req.Query, "name", "contains:"+name)
 	}
@@ -55,6 +62,10 @@ func (c *defaultAPIClient) ListZones(ctx context.Context, request ListZonesReque
 func (c *defaultAPIClient) ListDNSRecords(
 	ctx context.Context, request ListDNSRecordsRequest,
 ) (ListDNSRecordsResponse, error) {
+	if request.ZoneID == "" {
+		return mt.Zero[ListDNSRecordsResponse](), fmt.Errorf("ListDNSRecords: empty zone id")
+	}
+
 	req := c.newRequest(http.MethodGet)
 	req.ExtendPath = append(req.ExtendPath, request.ZoneID, "dns_records")
 	setQuery(req.Query, "name", request.Name)
@@ -66,6 +77,10 @@ func (c *defaultAPIClient) ListDNSRecords(
 func (c *defaultAPIClient) CreateDNSRecord(
 	ctx context.Context, request CreateDNSRecordRequest,
 ) (CreateDNSRecordResponse, error) {
+	if request.ZoneID == "" {
+		return mt.Zero[CreateDNSRecordResponse](), fmt.Errorf("CreateDNSRecord: empty zone id")
+	}
+
 	req := c.newRequest(http.MethodPost)
 	req.ExtendPath = append(req.ExtendPath, request.ZoneID, "dns_records")
 	req.Body = request.Body
@@ -75,6 +90,14 @@ func (c *defaultAPIClient) CreateDNSRecord(
 func (c *defaultAPIClient) UpdateDNSRecord(
 	ctx context.Context, request UpdateDNSRecordRequest,
 ) (UpdateDNSRecordResponse, error) {
+	if request.ZoneID == "" {
+		return mt.Zero[UpdateDNSRecordResponse](), fmt.Errorf("UpdateDNSRecord: empty zone id")
+	}
+
+	if request.RecordID == "" {
+		return mt.Zero[UpdateDNSRecordResponse](), fmt.Errorf("UpdateDNSRecord: empty record id")
+	}
+
 	req := c.newRequest(http.MethodPatch)
 	req.ExtendPath = append(req.ExtendPath, request.ZoneID, "dns_records", request.RecordID)
 	req.Body = request.Body
@@ -84,6 +107,14 @@ func (c *defaultAPIClient) UpdateDNSRecord(
 func (c *defaultAPIClient) DeleteDNSRecord(
 	ctx context.Context, request DeleteDNSRecordRequest,
 ) (DeleteDNSRecordResponse, error) {
+	if request.ZoneID == "" {
+		return mt.Zero[DeleteDNSRecordResponse](), fmt.Errorf("DeleteDNSRecord: empty zone id")
+	}
+
+	if request.RecordID == "" {
+		return mt.Zero[DeleteDNSRecordResponse](), fmt.Errorf("DeleteDNSRecord: empty record id")
+	}
+
 	req := c.newRequest(http.MethodDelete)
 	req.ExtendPath = append(req.ExtendPath, request.ZoneID, "dns_records", request.RecordID)
 	return doAPIRequest[DeleteDNSRecordResponse](ctx, c, req)
@@ -94,7 +125,7 @@ func (c *defaultAPIClient) newRequest(method string) httpx.ReqConfig {
 }
 
 func (c *defaultAPIClient) Do(request *http.Request) (*http.Response, error) {
-	return c.do.Do(request)
+	return c.requester.Do(request)
 }
 
 func doAPIRequest[Resp interface{ JoinError(error) error }](
@@ -103,12 +134,15 @@ func doAPIRequest[Resp interface{ JoinError(error) error }](
 	result, response, requestErr := httpx.JSONRequest[Resp](
 		ctx, client, request, httpx.RespPolicy{},
 	)
+
 	if response != nil {
 		defer response.Body.Close()
 	}
+
 	if err := result.JoinError(requestErr); err != nil {
 		return result, fmt.Errorf("cloudflare API: %w", err)
 	}
+
 	return result, nil
 }
 
