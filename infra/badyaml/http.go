@@ -38,8 +38,6 @@ func (h *HTTPHeader) UnmarshalYAML(data []byte) error {
 	h.Header = make(http.Header)
 	for k, v := range m {
 		switch val := v.(type) {
-		case string:
-			h.Header.Add(k, val)
 		case []any:
 			for _, item := range val {
 				if s, ok := item.(string); ok {
@@ -48,6 +46,8 @@ func (h *HTTPHeader) UnmarshalYAML(data []byte) error {
 					h.Header.Add(k, fmt.Sprint(item))
 				}
 			}
+		default:
+			h.Header.Add(k, fmt.Sprint(v))
 		}
 	}
 	return nil

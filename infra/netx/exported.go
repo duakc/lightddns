@@ -4,6 +4,8 @@ import (
 	"net/netip"
 
 	"github.com/duakc/lightddns/infra/netx/internal"
+
+	"go4.org/netipx"
 )
 
 func IsIPv4(ip netip.Addr) bool {
@@ -24,6 +26,10 @@ func SplitIPv4AndIPv6(ips []netip.Addr) (ipv4, ipv6 []netip.Addr) {
 
 func IsBogon(ip netip.Addr) bool {
 	return internal.IsBogon(ip)
+}
+
+func BuildIPSetFromPrefixes(prefixes []netip.Prefix) (*netipx.IPSet, error) {
+	return internal.BuildIPSetFromPrefixes(prefixes)
 }
 
 const (

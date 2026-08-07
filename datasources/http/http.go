@@ -102,7 +102,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 			httpOptions...)
 		ipv4RequestContext, err = newRequestContext(string(option.Method), v4URL.Raw,
 			option.Headers.Header, httpClient,
-			option.JSON.IPv4, option.Regex.IPv4)
+			option.JQ.IPv4, option.Regex.IPv4)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 			httpOptions...)
 		ipv6RequestContent, err = newRequestContext(string(option.Method), v6URL.Raw,
 			option.Headers.Header, httpClient,
-			option.JSON.IPv6, option.Regex.IPv6)
+			option.JQ.IPv6, option.Regex.IPv6)
 		if err != nil {
 			return nil, err
 		}

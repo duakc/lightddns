@@ -4,6 +4,8 @@ import (
 	"net/netip"
 
 	"github.com/duakc/mt"
+
+	"go4.org/netipx"
 )
 
 func IsIPv4(ip netip.Addr) bool {
@@ -47,4 +49,12 @@ func IsBogon(ip netip.Addr) bool {
 		ip.IsLinkLocalMulticast() ||
 		ip.IsLinkLocalUnicast() ||
 		ip.IsInterfaceLocalMulticast()
+}
+
+func BuildIPSetFromPrefixes(prefixes []netip.Prefix) (*netipx.IPSet, error) {
+	var builder netipx.IPSetBuilder
+	for _, prefix := range prefixes {
+		builder.AddPrefix(prefix)
+	}
+	return builder.IPSet()
 }

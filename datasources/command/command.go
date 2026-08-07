@@ -38,8 +38,8 @@ func init() {
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasourceOption) (adapter.Datasource, error) {
-	command := sh.New()
-	command.Envs(option.Env.Values)
+	commandShell := sh.New()
+	commandShell.Envs(option.Env)
 
 	cc := &Command{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
@@ -61,10 +61,10 @@ func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasour
 		if !isShell {
 			return nil, fmt.Errorf("unknown shell: %s", option.Shell)
 		}
-		command.Shell = shell
+		commandShell.Shell = shell
 	}
 
-	cc.cmd = command
+	cc.cmd = commandShell
 	return cc, nil
 }
 

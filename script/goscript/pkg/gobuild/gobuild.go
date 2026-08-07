@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
@@ -149,7 +149,7 @@ func Plain(ctx context.Context, tgt target.Target, outputDir string) (string, er
 // fall back to the environment.
 func buildVarExpander(p Params, tgt target.Target, tags string) func(string) string {
 	vars := map[string]string{
-		"REPO_NAME":        constant.Repo,
+		"REPO_NAME":        constpkg.Repo,
 		"PARAM_BUILD_TAGS": tags,
 	}
 	for _, src := range []struct {

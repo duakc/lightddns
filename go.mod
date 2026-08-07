@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/duakc/mt v0.0.0-20260729100808-8140a5a7dff4
+	github.com/duakc/mt v0.0.0-20260807044541-747b15722101
 	github.com/elastic/go-freelru v0.16.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/uuid v1.6.0

@@ -44,13 +44,11 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.Duration]()] = singleType(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.URL]()] = singleType(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.DomainName]()] = singleType(JSONTypeString)
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.Regex]()] = singleType(JSONTypeString)
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.JQ]()] = singleType(JSONTypeString)
 
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.StringOrNumber]()] = stringOr(singleType(JSONTypeNumber))
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[string]]()] = dualStack(singleType(JSONTypeString))
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[badyaml.URL]]()] = dualStack(singleType(JSONTypeString))
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.DualStack[badyaml.Listable[string]]]()] = dualStack(listAble(JSONTypeString))
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()] = enumSchema(JSONTypeString, "debug", "info", "warn", "error", "panic", "fatal")
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.NotEmpty[string]]()] = singleType(JSONTypeString)
 
 		optionsTypeMappingTable[reflect.TypeFor[dialerx.DialStrategy]()] = enumSchema(JSONTypeString, mt.Map(
 			[]dialerx.DialStrategy{dialerx.DialOnlyIPv4, dialerx.DialOnlyIPv6, dialerx.DialPreferIPv4, dialerx.DialPreferIPv6},
@@ -58,7 +56,15 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 				return s.String()
 			})...)
 
-		optionsTypeMappingTable[reflect.TypeFor[options.DNSOption]()] = mt.Must(jsonschema.For[options.DNSOption](nil))
+		optionsTypeMappingTable[reflect.TypeFor[options.DNSOption]()] = stringOr(
+			mt.Must(jsonschema.For[options.DNSOption](&jsonschema.ForOptions{
+				TypeSchemas: optionsTypeMappingTable,
+			})))
+		optionsTypeMappingTable[reflect.TypeFor[options.CommandOutput]()] = enumSchema(JSONTypeString, mt.Map(
+			[]options.CommandOutput{options.CommandOutputStdout, options.CommandOutputStderr, options.CommandOutputAll},
+			func(s options.CommandOutput) string {
+				return string(s)
+			}))
 	})
 	return optionsTypeMappingTable
 }

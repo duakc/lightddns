@@ -5,19 +5,30 @@ import (
 	"github.com/duakc/lightddns/infra/badyaml"
 )
 
+type CommandOutput string
+
+const (
+	CommandOutputStdout CommandOutput = "stdout"
+	CommandOutputStderr CommandOutput = "stderr"
+	CommandOutputAll    CommandOutput = "all"
+)
+
 type CommandDatasourceOption struct {
 	AbstractDatasourceOption `yaml:",inline"`
 
-	Cmd badyaml.DualStack[badyaml.Listable[string]] `json:"cmd" yaml:"cmd"`
+	Cmd badyaml.Listable[string] `json:"cmd" yaml:"cmd"`
 
-	Shell    string `json:"shell,omitempty"    yaml:"shell,omitempty"`
-	ExitCode int    `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
+	ExitCode int `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
 
-	Env badyaml.EnvironmentVariable `json:"env,omitempty" yaml:"env,omitempty"`
+	Env    []string        `json:"env,omitempty" yaml:"env,omitempty"`
+	Output []CommandOutput `json:"output,omitempty" yaml:"output,omitempty"`
 
-	Stdin  string `json:"stdin,omitempty"  yaml:"stdin,omitempty"`
-	Stdout string `json:"stdout,omitempty" yaml:"stdout,omitempty"`
-	Stderr string `json:"stderr,omitempty" yaml:"stderr,omitempty"`
+	Stdin string `json:"stdin,omitempty"  yaml:"stdin,omitempty"`
+	// Stdout string `json:"stdout,omitempty" yaml:"stdout,omitempty"`
+	// Stderr string `json:"stderr,omitempty" yaml:"stderr,omitempty"`
+
+	JQ    *badyaml.JQ    `json:"jq,omitempty" yaml:"jq,omitempty"`
+	Regex *badyaml.Regex `json:"regex,omitempty" yaml:"regex,omitempty"`
 }
 
 func (CommandDatasourceOption) UsedType() string {

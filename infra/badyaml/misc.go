@@ -1,13 +1,13 @@
 package badyaml
 
 import (
-	"errors"
 	"fmt"
-	"reflect"
+	"regexp"
 	"time"
 
 	"github.com/duakc/mt"
 
+	"github.com/itchyny/gojq"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -77,45 +77,81 @@ func (L *LogLevel) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-type NotEmpty[T any] struct {
-	Value T
+//type NotEmpty[T any] struct {
+//	Value T
+//}
+//
+//var ErrValuesIsEmpty = errors.New("values is empty")
+//
+//func (E *NotEmpty[T]) UnmarshalYAML(data []byte) error {
+//	ret, err := UnmarshalType[T](data)
+//	if err != nil {
+//		return err
+//	}
+//
+//	type ZeroChecker interface {
+//		IsZero() bool
+//	}
+//
+//	if checker, ok := any(ret).(ZeroChecker); ok && checker.IsZero() {
+//		return ErrValuesIsEmpty
+//	}
+//
+//	val := reflect.ValueOf(ret)
+//
+//	if !val.IsValid() {
+//		return fmt.Errorf("value is invalid")
+//	}
+//
+//	kind := val.Kind()
+//
+//	switch {
+//	case (kind == reflect.Slice || kind == reflect.Map) && val.Len() == 0:
+//		return ErrValuesIsEmpty
+//	case (kind == reflect.Ptr || kind == reflect.Interface || kind == reflect.Chan ||
+//		kind == reflect.Func) && val.IsNil():
+//		return ErrValuesIsEmpty
+//	case val.IsZero():
+//		return ErrValuesIsEmpty
+//	}
+//
+//	E.Value = ret
+//
+//	return nil
+//}
+
+type JQ struct {
+	*gojq.Query
 }
 
-var ErrValuesIsEmpty = errors.New("values is empty")
-
-func (E *NotEmpty[T]) UnmarshalYAML(data []byte) error {
-	ret, err := UnmarshalType[T](data)
+func (jq *JQ) UnmarshalYAML(data []byte) error {
+	jqString, err := UnmarshalType[string](data)
 	if err != nil {
 		return err
 	}
-
-	type ZeroChecker interface {
-		IsZero() bool
+	jqQuery, jqParseErr := gojq.Parse(jqString)
+	if jqParseErr != nil {
+		return jqParseErr
 	}
 
-	if checker, ok := any(ret).(ZeroChecker); ok && checker.IsZero() {
-		return ErrValuesIsEmpty
+	jq.Query = jqQuery
+	return nil
+}
+
+type Regex struct {
+	*regexp.Regexp
+}
+
+func (re *Regex) UnmarshalYAML(data []byte) error {
+	reString, err := UnmarshalType[string](data)
+	if err != nil {
+		return err
+	}
+	compile, compileErr := regexp.Compile(reString)
+	if compileErr != nil {
+		return compileErr
 	}
 
-	val := reflect.ValueOf(ret)
-
-	if !val.IsValid() {
-		return fmt.Errorf("value is invalid")
-	}
-
-	kind := val.Kind()
-
-	switch {
-	case (kind == reflect.Slice || kind == reflect.Map) && val.Len() == 0:
-		return ErrValuesIsEmpty
-	case (kind == reflect.Ptr || kind == reflect.Interface || kind == reflect.Chan ||
-		kind == reflect.Func) && val.IsNil():
-		return ErrValuesIsEmpty
-	case val.IsZero():
-		return ErrValuesIsEmpty
-	}
-
-	E.Value = ret
-
+	re.Regexp = compile
 	return nil
 }

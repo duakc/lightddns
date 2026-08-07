@@ -12,13 +12,12 @@ type HTTPDatasourceOption struct {
 	HTTP    HTTPOption    `json:"http,omitempty"    yaml:"http,omitempty"`
 	DNS     DNSOption     `json:"dns,omitempty"     yaml:"dns,omitempty"`
 
-	URL badyaml.DualStack[badyaml.URL] `json:"url" yaml:"url"`
-
-	JSON  badyaml.DualStack[string] `json:"json,omitempty"  yaml:"json,omitempty"`
-	Regex badyaml.DualStack[string] `json:"regex,omitempty" yaml:"regex,omitempty"`
-
+	URL     badyaml.URL        `json:"url" yaml:"url"`
 	Method  badyaml.HTTPMethod `json:"method,omitempty"  yaml:"method,omitempty"`
 	Headers badyaml.HTTPHeader `json:"headers,omitempty" yaml:"headers,omitempty"`
+
+	JQ    badyaml.JQ    `json:"jq,omitempty" yaml:"jq,omitempty"`
+	Regex badyaml.Regex `json:"regex,omitempty" yaml:"regex,omitempty"`
 }
 
 func (HTTPDatasourceOption) UsedType() string {

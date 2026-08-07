@@ -9,7 +9,7 @@ import (
 	"github.com/duakc/lightddns/cmd/lightddns/internal/common"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
-	"github.com/duakc/lightddns/constant"
+	constpkg "github.com/duakc/lightddns/constant"
 	// registry
 	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
@@ -28,8 +28,8 @@ import (
 var closeManager closeme.Manager
 
 var rootCommand = &cobra.Command{
-	Use:              constant.Project,
-	Short:            constant.Project + " is a lightweight dynamic DNS updater",
+	Use:              constpkg.Project,
+	Short:            constpkg.ProjectDescription,
 	PersistentPreRun: preRun,
 }
 
