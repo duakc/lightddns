@@ -1,28 +1,24 @@
 package command
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/netip"
-	"strings"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync"
 
 	"github.com/duakc/lightddns/adapter"
-	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/netx"
+	"github.com/duakc/lightddns/datasources/internal"
 	"github.com/duakc/lightddns/options"
 
-	"github.com/duakc/mt"
 	"github.com/duakc/mt/freebuf"
 	"github.com/duakc/mt/services"
-	"github.com/duakc/mt/services/closeme"
 	"github.com/duakc/mt/services/filehelper"
-	"github.com/duakc/mt/sh"
-	"github.com/duakc/mt/xtypes"
 
 	"go.uber.org/zap"
 )
@@ -38,34 +34,71 @@ func init() {
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasourceOption) (adapter.Datasource, error) {
-	commandShell := sh.New()
-	commandShell.Envs(option.Env)
+	if len(option.Cmd.Value) == 0 {
+		return nil, fmt.Errorf("empty command")
+	}
+	if option.Capture == options.CommandOutputNone {
+		return nil, fmt.Errorf("set `capture` to `%s` is not allowed", options.CommandOutputNone)
+	}
 
-	cc := &Command{
-		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
+	stdout, stderr := io.Discard, io.Discard
+	switch option.Output {
+	case options.CommandOutputAll:
+		stdout, stderr = os.Stdout, os.Stderr
+	case options.CommandOutputStdout:
+		stdout = os.Stdout
+	case options.CommandOutputStderr:
+		stderr = os.Stderr
+	}
 
-		cmdIPv4:  xtypes.NewJoinedString(option.Cmd.IPv4.Value, " "),
-		cmdIPv6:  xtypes.NewJoinedString(option.Cmd.IPv6.Value, " "),
+	rc := &runCommandContext{
+		logger:   logger,
+		commands: option.Cmd.Value,
 		exitCode: option.ExitCode,
 
-		stdin:  option.Stdin,
-		stdout: option.Stdout,
-		stderr: option.Stderr,
-		logger: logger,
+		stdout: stdout,
+		stderr: stderr,
+		env:    append(os.Environ(), option.Env...),
+		matcher: internal.NewDefaultIPMatcher(
+			option.Match.JQ.Cast(),
+			option.Match.Regexp.Cast(),
+		),
+
+		captureStderr: stderr == os.Stderr,
+		captureStdout: stdout == os.Stdout,
 	}
 
-	if option.Shell == "none" {
-		cc.noShell = true
-	} else if option.Shell != "" {
-		shell, isShell := sh.ShellFromString(option.Shell)
-		if !isShell {
-			return nil, fmt.Errorf("unknown shell: %s", option.Shell)
+	lightddnsFileHelper := services.Lookup[filehelper.Helper](ctx)
+
+	workDir := option.WorkDir
+	if workDir == "" {
+		workDir = lightddnsFileHelper.Path(".")
+		rc.workDir = workDir
+	}
+
+	if option.Stdin != "" {
+		stdinBuffer, err := os.ReadFile(filepath.Join(workDir, option.Stdin))
+		if err != nil {
+			return nil, fmt.Errorf("read stdin file: %s: %w", option.Stdin, err)
 		}
-		commandShell.Shell = shell
+		rc.stdinBuffer = stdinBuffer
 	}
 
-	cc.cmd = commandShell
-	return cc, nil
+	if rc.stdinBuffer == nil && option.StdinContent != "" {
+		rc.stdinBuffer = []byte(option.StdinContent)
+	}
+
+	var syncMutex *sync.Mutex
+	if option.Sync {
+		syncMutex = &sync.Mutex{}
+	}
+
+	return &Command{
+		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
+		logger:              logger,
+		runCommandContext:   rc,
+		syncMutex:           syncMutex,
+	}, nil
 }
 
 type Command struct {
@@ -73,144 +106,143 @@ type Command struct {
 
 	logger *zap.Logger
 
-	cmd     *sh.Cmd
-	cmdIPv4 xtypes.Joined[string]
-	cmdIPv6 xtypes.Joined[string]
+	syncMutex *sync.Mutex
 
-	exitCode int
-
-	closers closeme.Manager
-	noShell bool
-
-	stdinData []byte
-
-	stdin, stdout, stderr string
+	runCommandContext *runCommandContext
 }
 
 func (c *Command) IP(ctx context.Context) ([]netip.Addr, error) {
-	return datasourcex.MergeDualStackDatasourceIP(ctx, c)
+	if c.syncMutex != nil {
+		c.syncMutex.Lock()
+		defer c.syncMutex.Unlock()
+	}
+	return c.runCommandContext.Handle(ctx)
 }
 
-func (c *Command) IPv4(ctx context.Context) ([]netip.Addr, error) {
-	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv4,
-		c.exitCode, c.noShell, c.stdinData)
-	if err != nil {
-		return nil, err
-	}
-	return netx.FilterAddress(ip, true, false), nil
+type runCommandContext struct {
+	logger *zap.Logger
+
+	commands []string
+
+	stdout, stderr io.Writer
+	stdinBuffer    []byte
+
+	matcher *internal.IPMatcher
+
+	workDir string
+	env     []string
+
+	exitCode int
+
+	captureStdout bool
+	captureStderr bool
 }
 
-func (c *Command) IPv6(ctx context.Context) ([]netip.Addr, error) {
-	ip, err := runCommand(ctx, c.logger, c.cmd, c.cmdIPv6,
-		c.exitCode, c.noShell, c.stdinData)
-	if err != nil {
-		return nil, err
-	}
-	return netx.FilterAddress(ip, false, true), nil
-}
+func (rc *runCommandContext) Handle(ctx context.Context) ([]netip.Addr, error) {
+	const maxCommandOutputBufferSize = 1<<16 - 1
 
-func (c *Command) Close() error {
-	return c.closers.Close()
-}
-
-func (c *Command) Start(ctx context.Context, stage services.Stage) error {
-	switch stage {
-	case services.StagePreStart:
-		fileHelper := services.Lookup[filehelper.Helper](ctx)
-		if c.stdin != "" {
-			stdin, err := fileHelper.Root().ReadFile(c.stdin)
-			if err != nil {
-				return fmt.Errorf("open stdin: %w", err)
-			}
-
-			c.stdinData = stdin
-		}
-		if c.stdout != "" {
-			stdout, err := fileHelper.Create(c.stdout)
-			if err != nil {
-				return fmt.Errorf("open stdout: %w", err)
-			}
-			closeme.AddClose(c.closers, stdout)
-			c.cmd.Stdout = stdout
-			if c.stderr == "" {
-				// redirect stderr to the same stdout
-				c.cmd.Stderr = stdout
-			}
-		}
-
-		if c.stderr != "" {
-			stderr, err := fileHelper.Create(c.stderr)
-			if err != nil {
-				return fmt.Errorf("open stderr: %w", err)
-			}
-			closeme.AddClose(c.closers, stderr)
-			c.cmd.Stderr = stderr
-		}
-	case services.StagePostStart, services.StageStart:
-		return nil
-	default:
-		panic("unknown stage: " + stage.String())
-	}
-	return nil
-}
-
-func runCommand(ctx context.Context, logger *zap.Logger,
-	cmd *sh.Cmd, command xtypes.Joined[string], exitCode int, noShell bool,
-	stdinData []byte,
-) ([]netip.Addr, error) {
-	const maxOutputBufferSize = 1<<16 - 1
-
-	if command.Join == "" {
-		return []netip.Addr{}, nil
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	logger = logger.WithLazy(zap.String("command", command.Join))
-	buf := freebuf.NewSerialLimited(maxOutputBufferSize)
+	buf := freebuf.NewSerialLimited(maxCommandOutputBufferSize)
 	defer buf.FreeMe()
 
-	runCmd := *cmd
-	runCmd.Stdout = io.MultiWriter(buf, runCmd.Stdout)
-	runCmd.Stderr = io.MultiWriter(buf, runCmd.Stderr)
-	if len(stdinData) > 0 {
-		runCmd.Stdin = bytes.NewReader(stdinData)
+	logger := rc.logger.WithLazy(zap.Strings("commands", rc.commands))
+
+	var (
+		stdout = rc.stdout
+		stderr = rc.stderr
+	)
+
+	if rc.captureStdout {
+		logger.Debug("command stdout will be captured")
+		stdout = io.MultiWriter(rc.stdout, buf)
+	}
+	if rc.captureStderr {
+		logger.Debug("command stderr will be captured")
+		stderr = io.MultiWriter(rc.stderr, buf)
 	}
 
-	logger.Debug("run", zap.String("shell", cmd.Shell.String()))
-	var err error
-	if noShell {
-		err = runCmd.ExecCommand(ctx, command.Array[0], command.Array[1:]...).Run()
-	} else {
-		err = runCmd.RunContext(ctx, command.Join)
-	}
-	if err != nil {
-		shellErr, ok := errors.AsType[*sh.ShellError](err)
-		if !ok {
-			return nil, err
-		}
-		if code := sh.ExitCode(shellErr); code != exitCode {
-			return nil, shellErr.Unwrap()
-		}
-	}
-	logger.Debug("exit succeed", zap.Int("exit_code", exitCode))
-	if ce := logger.Check(zap.DebugLevel, "command output"); ce != nil {
-		ce.Write(zap.Int("len", buf.Len()), zap.String("output", string(buf.Bytes())))
+	cmd := exec.CommandContext(ctx, rc.commands[0], rc.commands[1:]...)
+	cmd.Env = rc.env
+	cmd.Dir = rc.workDir
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	if len(rc.stdinBuffer) > 0 {
+		cmd.Stdin = bytes.NewReader(rc.stdinBuffer)
 	}
 
-	var ans []netip.Addr
-	bufScan := bufio.NewScanner(buf)
-	for bufScan.Scan() {
-		line := bufScan.Text()
-		ipSplit := strings.Fields(line)
-		for i := 0; i < len(ipSplit); i++ {
-			ip := mt.UnquoteString(ipSplit[i])
-			addr, err := netip.ParseAddr(ip)
-			if err != nil {
-				return nil, err
-			}
-			ans = append(ans, addr)
-		}
+	startErr := cmd.Start()
+	if startErr != nil {
+		return nil, startErr
 	}
-	return ans, nil
+
+	logger.Debug("start and wait until process quit",
+		zap.Int("pid", cmd.ProcessState.Pid()))
+
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		return nil, waitErr
+	}
+
+	logger.Info("quited",
+		zap.String("state", cmd.ProcessState.String()))
+
+	if cmd.ProcessState.ExitCode() != rc.exitCode {
+		return nil, fmt.Errorf("unexcepted exit code: %d", cmd.ProcessState.ExitCode())
+	}
+
+	return rc.matcher.Try(ctx, buf.Bytes())
 }
+
+//func runCommand(ctx context.Context, logger *zap.Logger,
+//	cmd *sh.Cmd, command xtypes.Joined[string], exitCode int, noShell bool,
+//	stdinData []byte,
+//) ([]netip.Addr, error) {
+//	const maxOutputBufferSize = 1<<16 - 1
+//	logger = logger.WithLazy(zap.String("command", command.Join))
+//	buf := freebuf.NewSerialLimited(maxOutputBufferSize)
+//	defer buf.FreeMe()
+//
+//	runCmd := *cmd
+//	runCmd.Stdout = io.MultiWriter(buf, runCmd.Stdout)
+//	runCmd.Stderr = io.MultiWriter(buf, runCmd.Stderr)
+//	if len(stdinData) > 0 {
+//		runCmd.Stdin = bytes.NewReader(stdinData)
+//	}
+//
+//	logger.Debug("run", zap.String("shell", cmd.Shell.String()))
+//	var err error
+//	if noShell {
+//		err = runCmd.ExecCommand(ctx, command.Array[0], command.Array[1:]...).Run()
+//	} else {
+//		err = runCmd.RunContext(ctx, command.Join)
+//	}
+//	if err != nil {
+//		shellErr, ok := errors.AsType[*sh.ShellError](err)
+//		if !ok {
+//			return nil, err
+//		}
+//		if code := sh.ExitCode(shellErr); code != exitCode {
+//			return nil, shellErr.Unwrap()
+//		}
+//	}
+//	logger.Debug("exit succeed", zap.Int("exit_code", exitCode))
+//	if ce := logger.Check(zap.DebugLevel, "command output"); ce != nil {
+//		ce.Write(zap.Int("len", buf.Len()), zap.String("output", string(buf.Bytes())))
+//	}
+//
+//	var ans []netip.Addr
+//	bufScan := bufio.NewScanner(buf)
+//	for bufScan.Scan() {
+//		line := bufScan.Text()
+//		ipSplit := strings.Fields(line)
+//		for i := 0; i < len(ipSplit); i++ {
+//			ip := mt.UnquoteString(ipSplit[i])
+//			addr, err := netip.ParseAddr(ip)
+//			if err != nil {
+//				return nil, err
+//			}
+//			ans = append(ans, addr)
+//		}
+//	}
+//	return ans, nil
+//}

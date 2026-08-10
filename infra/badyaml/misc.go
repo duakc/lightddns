@@ -120,9 +120,7 @@ func (L *LogLevel) UnmarshalYAML(data []byte) error {
 //	return nil
 //}
 
-type JQ struct {
-	*gojq.Query
-}
+type JQ gojq.Query
 
 func (jq *JQ) UnmarshalYAML(data []byte) error {
 	jqString, err := UnmarshalType[string](data)
@@ -134,13 +132,18 @@ func (jq *JQ) UnmarshalYAML(data []byte) error {
 		return jqParseErr
 	}
 
-	jq.Query = jqQuery
+	*jq = JQ(*jqQuery)
 	return nil
 }
 
-type Regex struct {
-	*regexp.Regexp
+func (jq *JQ) Cast() *gojq.Query {
+	if jq == nil {
+		return nil
+	}
+	return (*gojq.Query)(jq)
 }
+
+type Regex regexp.Regexp
 
 func (re *Regex) UnmarshalYAML(data []byte) error {
 	reString, err := UnmarshalType[string](data)
@@ -152,6 +155,13 @@ func (re *Regex) UnmarshalYAML(data []byte) error {
 		return compileErr
 	}
 
-	re.Regexp = compile
+	*re = Regex(*compile)
 	return nil
+}
+
+func (re *Regex) Cast() *regexp.Regexp {
+	if re == nil {
+		return nil
+	}
+	return (*regexp.Regexp)(re)
 }

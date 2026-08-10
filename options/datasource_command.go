@@ -8,6 +8,7 @@ import (
 type CommandOutput string
 
 const (
+	CommandOutputNone   CommandOutput = "none"
 	CommandOutputStdout CommandOutput = "stdout"
 	CommandOutputStderr CommandOutput = "stderr"
 	CommandOutputAll    CommandOutput = "all"
@@ -20,15 +21,19 @@ type CommandDatasourceOption struct {
 
 	ExitCode int `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
 
-	Env    []string        `json:"env,omitempty" yaml:"env,omitempty"`
-	Output []CommandOutput `json:"output,omitempty" yaml:"output,omitempty"`
+	Env     []string      `json:"env,omitempty"     yaml:"env,omitempty"`
+	Output  CommandOutput `json:"output,omitempty"  yaml:"output,omitempty"`
+	Capture CommandOutput `json:"capture,omitempty" yaml:"capture,omitempty"`
 
-	Stdin string `json:"stdin,omitempty"  yaml:"stdin,omitempty"`
-	// Stdout string `json:"stdout,omitempty" yaml:"stdout,omitempty"`
-	// Stderr string `json:"stderr,omitempty" yaml:"stderr,omitempty"`
+	// Stdin's priority is higher than StdinContent.
+	Stdin        string `json:"stdin,omitempty"        yaml:"stdin,omitempty"`
+	StdinContent string `json:"stdinContent,omitempty" yaml:"stdinContent"`
 
-	JQ    *badyaml.JQ    `json:"jq,omitempty" yaml:"jq,omitempty"`
-	Regex *badyaml.Regex `json:"regex,omitempty" yaml:"regex,omitempty"`
+	Sync bool `json:"sync,omitempty" yaml:"sync,omitempty"`
+
+	WorkDir string `json:"workDir,omitempty" yaml:"workDir,omitempty"`
+
+	Match MatchOption `json:"match,omitempty" yaml:"match,omitempty"`
 }
 
 func (CommandDatasourceOption) UsedType() string {

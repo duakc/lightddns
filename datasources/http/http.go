@@ -1,9 +1,7 @@
 package http
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,20 +9,19 @@ import (
 	"net/http"
 	"net/netip"
 	urlpkg "net/url"
-	"regexp"
 
 	"github.com/duakc/lightddns/adapter"
 	"github.com/duakc/lightddns/adapter/datasourcex"
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/infra/badyaml"
-	"github.com/duakc/lightddns/infra/netx"
+	"github.com/duakc/lightddns/datasources/internal"
 	"github.com/duakc/lightddns/infra/netx/dialerx"
 	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/options/castoption"
 
-	"github.com/itchyny/gojq"
+	"github.com/duakc/mt/freebuf"
+
 	"go.uber.org/zap"
 )
 
@@ -43,29 +40,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 		option.Method = http.MethodGet
 	}
 
-	v4URL, v6URL := option.URL.IPv4, option.URL.IPv6
-	if v4URL.Raw == "" && v6URL.Raw == "" {
-		return nil, fmt.Errorf("url: at least one of ipv4 or ipv6 must be specified")
-	}
-
-	// If a URL host is a literal IP, force its stack and disable the other.
-	for stack, url := range map[string]*badyaml.URL{"ipv4": &v4URL, "ipv6": &v6URL} {
-		if url.Raw == "" || domains.IsDomainName(url.URL.Host) {
-			continue
-		}
-		addr, err := netip.ParseAddr(url.URL.Host)
-		if err != nil {
-			return nil, fmt.Errorf("url.%s: unknown address: %w: %w", stack, err, dialerx.ErrNoAddressToDialer)
-		}
-		if (stack == "ipv4") != netx.IsIPv4(addr) {
-			return nil, fmt.Errorf("url.%s: address family mismatch: %s", stack, addr)
-		}
-	}
-
-	needDNS := (v4URL.Raw != "" && domains.IsDomainName(v4URL.URL.Host)) ||
-		(v6URL.Raw != "" && domains.IsDomainName(v6URL.URL.Host))
-
-	var ipv4RequestContext, ipv6RequestContent *requestContext
+	needDNS := option.URL.Raw != "" && domains.IsDomainName(option.URL.URL.Host)
 
 	connectDialer, err := castoption.BuildDialer(option.Connect)
 	if err != nil {
@@ -84,6 +59,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	if err != nil {
 		return nil, fmt.Errorf("building http options: %w", err)
 	}
+
 	customHeaders := maps.Clone(option.Headers.Header)
 
 	if len(customHeaders) == 0 {
@@ -97,34 +73,34 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 	// the custom header must have on element (User-Agent)
 	httpOptions = append(httpOptions, httpx.ClientOptionWithHeaders(customHeaders))
 
-	if v4URL.Raw != "" && option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
-		httpClient := httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer},
-			httpOptions...)
-		ipv4RequestContext, err = newRequestContext(string(option.Method), v4URL.Raw,
-			option.Headers.Header, httpClient,
-			option.JQ.IPv4, option.Regex.IPv4)
-		if err != nil {
-			return nil, err
-		}
+	requests := &requestContext{
+		method:  string(option.Method),
+		url:     option.URL.URL,
+		headers: customHeaders,
+		matcher: internal.NewDefaultIPMatcher(
+			option.Match.JQ.Cast(),
+			option.Match.Regexp.Cast(),
+		),
 	}
 
-	if v6URL.Raw != "" && option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
-		httpClient := httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer},
+	var v4Request, v6Request requestContext
+	if option.Connect.DialStrategy != dialerx.DialOnlyIPv4 {
+		v6Request = *requests
+		v6Request.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer},
 			httpOptions...)
-		ipv6RequestContent, err = newRequestContext(string(option.Method), v6URL.Raw,
-			option.Headers.Header, httpClient,
-			option.JQ.IPv6, option.Regex.IPv6)
-		if err != nil {
-			return nil, err
-		}
+	}
+	if option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
+		v4Request = *requests
+		v4Request.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer},
+			httpOptions...)
 	}
 
 	httpds := &Httpds{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 
 		logger: logger,
-		v4:     ipv4RequestContext,
-		v6:     ipv6RequestContent,
+		v4:     &v4Request,
+		v6:     &v6Request,
 	}
 	return httpds, nil
 }
@@ -162,35 +138,7 @@ type requestContext struct {
 
 	requester httpx.HTTPRequester
 
-	jsonMatch  *gojq.Query
-	regexMatch *regexp.Regexp
-}
-
-func newRequestContext(method string, url string, headers http.Header,
-	requester httpx.HTTPRequester, jq string, re string,
-) (*requestContext, error) {
-	R := new(requestContext)
-	var err error
-	if jq != "" {
-		if R.jsonMatch, err = gojq.Parse(jq); err != nil {
-			return nil, fmt.Errorf("MatchJson: %w", err)
-		}
-	}
-	if re != "" {
-		if R.regexMatch, err = regexp.Compile(re); err != nil {
-			return nil, fmt.Errorf("MatchRegex: %w", err)
-		}
-	}
-	parsedURL, err := urlpkg.Parse(url)
-	if err != nil {
-		return nil, fmt.Errorf("parse url: %w", err)
-	}
-	R.method = method
-	R.url = parsedURL
-	R.headers = headers
-	R.requester = requester
-
-	return R, nil
+	matcher *internal.IPMatcher
 }
 
 func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, err error) {
@@ -210,53 +158,32 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 		return nil, &httpx.BadStatusCodeError{Got: response.StatusCode}
 	}
 
-	limitedReader := io.LimitReader(response.Body, constpkg.HTTPMaxBodySize)
+	buffer := freebuf.NewSerialLimited(constpkg.HTTPMaxBodySize)
+	defer buffer.FreeMe()
 
-	if httpx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.jsonMatch != nil {
-		var jsonObject any
-		if err := json.NewDecoder(limitedReader).Decode(&jsonObject); err != nil {
-			return nil, fmt.Errorf("decode JSON: %w", err)
-		}
-		iter := rc.jsonMatch.RunWithContext(ctx, jsonObject)
-		for val, ok := iter.Next(); ok; val, ok = iter.Next() {
-			switch x := val.(type) {
-			case error:
-				if haltErr, ok := errors.AsType[*gojq.HaltError](x); ok && haltErr.Value() == nil {
-					break
-				}
-				return nil, fmt.Errorf("jq execution error: %w", x)
-			case string:
-				addr, err := netip.ParseAddr(x)
-				if err != nil {
-					return nil, err
-				}
-				addresses = append(addresses, addr)
-			}
-		}
-	} else {
-		buffer, err := io.ReadAll(limitedReader)
+	if _, readErr := buffer.ReadFrom(response.Body); readErr != nil && !errors.Is(readErr, io.ErrShortBuffer) {
+		return nil, readErr
+	}
+
+	// this differs from `IPMatcher.Try`.
+	// HTTP can carry information to determine whether the content is JSON or plain text.
+	//
+	// therefore, we first check if the returned value is JSON.
+	// if it is JSON and jQuery failed, we simply return an error;
+	// proceeding with the subsequent logic is pointless.
+	if httpx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.matcher.JQ != nil {
+		addresses, err = rc.matcher.JSON(ctx, buffer.Bytes())
 		if err != nil {
-			return nil, fmt.Errorf("read response.Body: %w", err)
-		}
-
-		if rc.regexMatch != nil {
-			for _, x := range rc.regexMatch.FindAllSubmatch(buffer, -1) {
-				if len(x) > 1 {
-					xx := x[1]
-					addr, err := netip.ParseAddr(string(xx))
-					if err != nil {
-						return nil, err
-					}
-					addresses = append(addresses, addr)
-				}
-			}
-		} else {
-			addr, err := netip.ParseAddr(string(bytes.TrimSpace(buffer)))
-			if err != nil {
-				return nil, err
-			}
-			addresses = append(addresses, addr)
+			return nil, err
 		}
 	}
-	return addresses, nil
+
+	if rc.matcher.Regexp != nil {
+		addresses, err = rc.matcher.Re(buffer.Bytes())
+		if err == nil && len(addresses) > 0 {
+			return addresses, nil
+		}
+	}
+
+	return rc.matcher.Plain(buffer.Bytes())
 }

@@ -61,7 +61,10 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 				TypeSchemas: optionsTypeMappingTable,
 			})))
 		optionsTypeMappingTable[reflect.TypeFor[options.CommandOutput]()] = enumSchema(JSONTypeString, mt.Map(
-			[]options.CommandOutput{options.CommandOutputStdout, options.CommandOutputStderr, options.CommandOutputAll},
+			[]options.CommandOutput{
+				options.CommandOutputNone, options.CommandOutputStdout,
+				options.CommandOutputStderr, options.CommandOutputAll,
+			},
 			func(s options.CommandOutput) string {
 				return string(s)
 			}))

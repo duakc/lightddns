@@ -20,7 +20,7 @@ type DatasourceGroupFilterRuleOption struct {
 type DatasourceGroupFilterOption struct {
 	AbstractDatasourceGroupOption `yaml:",inline"`
 
-	Rules []DatasourceGroupFilterRuleOption `yaml:"rules" json:"rules"`
+	Rules []DatasourceGroupFilterRuleOption `json:"rules" yaml:"rules"`
 }
 
 func (DatasourceGroupFilterOption) UsedType() string {
