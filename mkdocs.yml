@@ -28,6 +28,7 @@ nav:
           - Command: configuration/datasource/command.md
           - Sum: configuration/datasource/sum.md
           - Failover: configuration/datasource/failover.md
+          - Filter: configuration/datasource/filter.md
       - Providers:
           - Cloudflare: configuration/provider/cloudflare.md
           - Aliyun: configuration/provider/aliyun.md
@@ -39,6 +40,7 @@ nav:
           - ConnectOption: configuration/shared/connect.md
           - HTTPOption: configuration/shared/http.md
           - DNSOption: configuration/shared/dns.md
+          - MatchOption: configuration/shared/match.md
 theme:
   name: material
   features:
@@ -110,6 +112,7 @@ plugins:
             Command: Command
             Sum: Sum
             Failover: Failover
+            Filter: Filter
             Providers: 服务提供方
             Services: 服务
             Prometheus: Prometheus
@@ -118,6 +121,7 @@ plugins:
             ConnectOption: ConnectOption
             HTTPOption: HTTPOption
             DNSOption: DNSOption
+            MatchOption: MatchOption
 extra_css:
   - stylesheets/extra.css
 markdown_extensions:

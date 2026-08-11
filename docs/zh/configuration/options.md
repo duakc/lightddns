@@ -27,6 +27,25 @@ services:
     # ... Prometheus 导出器配置
 ```
 
+## 工作目录
+
+CLI 全局参数 `-D` / `--workdir` 用于设置 Lightddns 的工作目录，默认值是 `.`。
+
+这个值会影响：
+
+- 相对 `run -c/--config` 路径：`-c config.yaml` 会从工作目录读取。
+- 相对 `--env-file` 路径：`--env-file secrets.env` 会从工作目录读取。
+- 相对 `log.output` 路径：日志文件会创建在工作目录下。
+- `command` 数据源：`workDir` 留空时，命令在工作目录中执行；相对 `command.workDir` 会基于工作目录解析；相对 `command.stdin` 会基于命令的有效工作目录解析。
+
+绝对路径会按原样使用。
+
+```bash
+lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
+```
+
+在这个例子中，`lightddns.yaml`、`secrets.env` 以及相对日志/命令路径都基于 `/etc/lightddns`。
+
 ## `log`
 
 全局日志配置。参见 [日志](log.md)。
@@ -42,6 +61,7 @@ services:
 | [`command`](datasource/command.md) | 通过执行 Shell 命令获取 IP 地址。 |
 | [`sum`](datasource/sum.md) | 合并多个子数据源的 IP 地址。 |
 | [`failover`](datasource/failover.md) | 按优先级顺序查询子数据源，失败时自动切换。 |
+| [`filter`](datasource/filter.md) | 使用 CIDR 前缀规则过滤子数据源返回的 IP 地址。 |
 
 ## `providers`
 

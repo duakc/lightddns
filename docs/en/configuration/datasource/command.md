@@ -1,97 +1,61 @@
 # Command
 
-Runs shell commands to discover IP addresses. Each command's stdout is parsed line-by-line for valid IP addresses.
+Runs an external command and extracts IP addresses from its output.
 
 ```yaml
 # required
 type: command
 name: data-cmd
-
-cmd:
-  ipv4: "curl -s https://api.ipify.org"
-  ipv6: "curl -s https://api6.ipify.org"
+cmd: ["curl", "-s", "https://api.ipify.org"]
 
 # optional
-shell: ""
 exitCode: 0
 env:
-  PATH: "/usr/bin:/bin:/usr/sbin:/sbin"
+  - PATH=/usr/bin:/bin:/usr/sbin:/sbin
+output: none
+capture: stdout
 stdin: ""
-stdout: ""
-stderr: ""
+stdinContent: ""
+sync: false
+workDir: ""
+match:
+  regex: ""
 ```
 
 ??? note "Behavior"
-    IPv4 and IPv6 commands run independently. When a command is empty, that IP version is skipped. Command output is read line-by-line; each whitespace-separated token on a line is parsed as an IP address. Only addresses matching the requested version are returned.
+    The command is executed directly with the configured argument list. Lightddns does not add an implicit shell. Use array form for commands with arguments. If you need shell features such as pipes, redirects, environment expansion, or `&&`, call the shell explicitly.
+
+    `capture` decides which stream is parsed for IP addresses. `output` only decides which stream is also forwarded to the Lightddns process stdout/stderr.
 
 ---
 
 ## `cmd`
 
-The commands to run for IPv4 and IPv6. When a command is empty, that IP version is skipped.
+The command to execute.
 
-**Short form** (`string`) — same command for both IPv4 and IPv6:
+**String form** is accepted for single executable names:
 
 ```yaml
-cmd: "curl -s https://api.ipify.org"
+cmd: my-ip-helper
 ```
 
-**Object form** — separate commands for IPv4 and IPv6:
+**Array form** is the recommended form for commands with arguments:
 
 ```yaml
-cmd:
-  ipv4: "curl -s https://api.ipify.org"
-  ipv6: "curl -s https://api6.ipify.org"
+cmd: ["curl", "-s", "https://api.ipify.org"]
 ```
 
-**Array form** — pass the program and arguments as a list. Required when using `shell: "none"`:
+To use shell syntax, call a shell explicitly:
 
 ```yaml
-cmd:
-  ipv4: ["curl", "-s", "https://api.ipify.org"]
-  ipv6: ["curl", "-s", "https://api6.ipify.org"]
-```
-
----
-
-## `shell`
-
-The shell interpreter used to run the commands. When empty, a default is selected automatically.
-
-Set to `"none"` to run the command directly without any shell. This avoids [shell injection](https://en.wikipedia.org/wiki/Code_injection#Shell_injection) and word-splitting issues, but **requires the array form of `cmd`** — otherwise the command string is treated as the executable name, which will fail.
-
-!!! warning "`shell: none`"
-    When `shell` is set to `none`, you must use the **array form** of `cmd`. A plain string like `"curl -s https://api.ipify.org"` will be treated as a single executable name, not a command with arguments.
-
-```yaml
-# Without a shell — array form is required
-shell: none
-cmd:
-  ipv4: ["curl", "-s", "https://api.ipify.org"]
-```
-
-??? note "Supported shells by platform"
-    Windows:
-    - powershell, cmd
-
-    Linux:
-    - bash, zsh, fish, dash, sh, ash, mksh, csh, tcsh, rksh, ksh
-
-    macOS:
-    - zsh, bash, sh, ksh, csh, tcsh, fish, dash, ash, mksh
-
-    FreeBSD / OpenBSD / NetBSD / Dragonfly:
-    - sh, csh, tcsh, bash, zsh, fish, mksh, dash, ash, rksh, ksh
-
-```yaml
-shell: bash
+cmd: ["sh", "-c", "curl -s https://api.ipify.org | tr -d '\\n'"]
 ```
 
 ---
 
 ## `exitCode`
 
-The expected exit code for a successful run. All other exit codes are treated as errors.
+The expected exit code for a successful run. Any other exit code is treated as an error.
 
 ```yaml
 exitCode: 0
@@ -101,40 +65,110 @@ exitCode: 0
 
 ## `env`
 
-Environment variables for the command execution.
+Additional environment variables for the command. They are appended to the inherited process environment and use `KEY=VALUE` entries.
 
 ```yaml
 env:
-  PATH: "/usr/bin:/bin:/usr/sbin:/sbin"
+  - PATH=/usr/bin:/bin:/usr/sbin:/sbin
+  - TOKEN={{ .Env.MY_TOKEN }}
+```
+
+---
+
+## `output`
+
+Controls which streams are forwarded to Lightddns stdout/stderr for visibility. It does not decide which stream is parsed.
+
+| Value | Behavior |
+|---|---|
+| `none` or empty | Do not forward command output. |
+| `stdout` | Forward stdout. |
+| `stderr` | Forward stderr. |
+| `all` | Forward both stdout and stderr. |
+
+```yaml
+output: stderr
+```
+
+---
+
+## `capture`
+
+Controls which streams are captured and parsed for IP addresses.
+
+| Value | Behavior |
+|---|---|
+| empty | Same as `stdout`. |
+| `stdout` | Parse stdout. |
+| `stderr` | Parse stderr. |
+| `all` | Parse both stdout and stderr. |
+| `none` | Invalid for this datasource. |
+
+```yaml
+capture: stdout
 ```
 
 ---
 
 ## `stdin`
 
-Path to a file whose contents are piped to the command's stdin. If the command needs continuous input, use a streaming file such as a domain socket.
+Path to a file whose contents are piped to the command's stdin.
 
-!!! warning Stdin  
-    The functionality of this configuration option currently needs improvement, 
-    and the exact wording may change in the future. For cases requiring password input, 
-    such as `sudo`, I highly recommend using files like `/etc/sudoers` to configure it.
+Relative paths are resolved against this datasource's effective working directory:
+
+1. `workDir`, when set.
+2. Otherwise the global working directory from `lightddns -D/--workdir`.
+3. Otherwise the process working directory, because `-D` defaults to `.`.
+
+Absolute paths are read as-is. When both `stdin` and `stdinContent` are set, `stdin` takes priority.
 
 ```yaml
-stdin: /path/to/input.txt
+stdin: input.txt
 ```
 
-## `stdout`
+---
 
-Path to a file where the command's stdout is written. IP addresses are still parsed from stdout as normal. If `stderr` is not set, stderr is redirected to the same file.
+## `stdinContent`
+
+Inline content to pipe to the command's stdin. Ignored when `stdin` is set.
 
 ```yaml
-stdout: /var/log/ddns-ip.log
+stdinContent: |
+  query payload
 ```
 
-## `stderr`
+---
 
-Path to a file where the command's stderr is written.
+## `sync`
+
+When `true`, concurrent IP lookups for this datasource are serialized. Use this when the command reads or writes shared local state.
 
 ```yaml
-stderr: /var/log/ddns-ip-error.log
+sync: true
+```
+
+---
+
+## `workDir`
+
+Working directory for the command process and the base directory for relative `stdin` paths.
+
+When empty, this uses the global working directory configured with `lightddns -D/--workdir`. When set to a relative path, it is resolved under that global working directory. Absolute paths are used as-is.
+
+```yaml
+workDir: scripts
+```
+
+With `lightddns -D /etc/lightddns run -c config.yaml`, the example above runs the command in `/etc/lightddns/scripts`.
+
+---
+
+## `match`
+
+Optional extraction rules. See [MatchOption](../shared/match.md).
+
+```yaml
+match:
+  jq: ".ip"
+  regex: "IP:\\s+(\\S+)"
 ```

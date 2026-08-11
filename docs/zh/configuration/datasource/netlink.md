@@ -10,7 +10,7 @@ name: data-netlink
 # optional
 ifName: eth0
 ifIndex: 0
-allowBogon: false
+includeBogon: false
 ```
 
 ??? note "行为说明"
@@ -41,5 +41,5 @@ ifIndex: 2
 是否允许返回 bogon 地址 — 包括私有（RFC 1918）、链路本地、回环以及其他保留范围。设为 `false`（默认）时，仅返回全球单播地址。
 
 ```yaml
-allowBogon: false
+includeBogon: false
 ```

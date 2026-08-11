@@ -27,6 +27,25 @@ services:
     # ... Prometheus exporter config
 ```
 
+## Working Directory
+
+The CLI global flag `-D` / `--workdir` sets Lightddns' working directory. It defaults to `.`.
+
+This value affects:
+
+- Relative `run -c/--config` paths: `-c config.yaml` is read from the working directory.
+- Relative `--env-file` paths: `--env-file secrets.env` is read from the working directory.
+- Relative `log.output` paths: they are created under the working directory.
+- `command` datasources: when `workDir` is empty, commands run in the working directory; relative `command.workDir` values are resolved under it; relative `command.stdin` paths are resolved under the command's effective working directory.
+
+Absolute paths are used as-is.
+
+```bash
+lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
+```
+
+In this example, `lightddns.yaml`, `secrets.env`, and relative log/command paths are based on `/etc/lightddns`.
+
 ## `log`
 
 Global logging configuration. See [Log](log.md).
@@ -42,6 +61,7 @@ A list of datasources. Each datasource discovers the current public IP address o
 | [`command`](datasource/command.md) | Run shell commands to discover IP addresses. |
 | [`sum`](datasource/sum.md) | Merge IPs from multiple child datasources. |
 | [`failover`](datasource/failover.md) | Query child datasources in priority order, failing over on error. |
+| [`filter`](datasource/filter.md) | Filter IPs from child datasources with CIDR prefix rules. |
 
 ## `providers`
 

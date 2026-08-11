@@ -9,10 +9,10 @@ name: data-sum
 datasources:
   - data-http
   - data-netlink
-
-# optional
-fastFail: false
 ```
+
+??? note "行为说明"
+    子数据源会按顺序查询，并把得到的 IP 地址拼接成一个结果。当前实现使用快速失败行为：任意子数据源返回错误时，sum 数据源会立即返回该错误。
 
 ## `datasources`
 
@@ -22,14 +22,4 @@ fastFail: false
 datasources:
   - data-http
   - data-cmd
-```
-
----
-
-## `fastFail`
-
-设为 `true` 时，任意子数据源返回错误，整个组立即失败。设为 `false`（默认）时，收集各数据源的错误；仅当**所有**数据源均失败或返回空结果时才报错。
-
-```yaml
-fastFail: true
 ```

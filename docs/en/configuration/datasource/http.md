@@ -1,23 +1,20 @@
 # HTTP
 
-Retrieves the public IP address via HTTP. Supports JSON (jq) extraction, regex extraction, and dual-stack networking (IPv4/IPv6).
+Retrieves public IP addresses through an HTTP request. It supports plain-text responses, JSON extraction through `match.jq`, regex extraction through `match.regex`, and IPv4/IPv6 connection selection.
 
 ```yaml
 # required
 type: http
 name: data-http
-url: https://api64.ipify.org?format=json
+url: https://api.ip.sb/ip
 
 # optional
-json:
-  ipv4: ".ip"
-  ipv6: ".ip"
-regex:
-  ipv4: ""
-  ipv6: ""
 method: GET
 headers:
   User-Agent: Lightddns/stable
+match:
+  jq: ""
+  regex: ""
 
 dns: system
 connect:
@@ -27,101 +24,101 @@ http:
 ```
 
 ??? note "Behavior"
-    The HTTP datasource creates independent IPv4 and IPv6 request contexts, each pinned to its own `tcp4`/`tcp6` dialer:
+    The HTTP datasource creates request contexts according to `connect.dialStrategy`:
 
-    - An IPv4 context is created when `url.ipv4` is set and `dialStrategy` is not `ipv6_only`
-    - An IPv6 context is created when `url.ipv6` is set and `dialStrategy` is not `ipv4_only`
+    - `prefer_ipv6` / `prefer_ipv4`: create both IPv4 and IPv6 request contexts, then merge results.
+    - `ipv4_only`: create only the IPv4 request context.
+    - `ipv6_only`: create only the IPv6 request context.
 
-    Each context uses its own URL plus the corresponding `json`/`regex` expression. The final result merges IPv4 and IPv6.
+    Each request context uses the same `url`, `method`, `headers`, and `match` settings, but its network dialer is pinned to `tcp4` or `tcp6`.
 
 ---
 
-[JQ and Regex Examples](../example/http.md)
+## Common Services
+
+These examples show the expected config shape for common public IP endpoints. Provider availability, rate limits, and returned address family are controlled by those external services.
+
+### Plain Text
+
+Use no `match` block when the response body is only an IP address.
+
+```yaml
+- type: http
+  name: ip-sb
+  url: https://api.ip.sb/ip
+```
+
+```yaml
+- type: http
+  name: ipify-v4
+  url: https://api.ipify.org
+  connect:
+    dialStrategy: ipv4_only
+```
+
+```yaml
+- type: http
+  name: ipify-v6
+  url: https://api6.ipify.org
+  connect:
+    dialStrategy: ipv6_only
+```
+
+### JSON
+
+Use `match.jq` for JSON endpoints.
+
+```yaml
+- type: http
+  name: ipinfo
+  url: https://ipinfo.io
+  match:
+    jq: ".ip"
+```
+
+```yaml
+- type: http
+  name: ipify-json
+  url: https://api64.ipify.org?format=json
+  match:
+    jq: ".ip"
+```
+
+### Text With Labels
+
+Use `match.regex` when the page includes text around the address.
+
+```yaml
+- type: http
+  name: ipip
+  url: https://myip.ipip.net
+  match:
+    regex: "当前 IP：\\s*(.+?)\\s*来自于："
+```
+
+---
 
 ## `url`
 
-The request URL for retrieving the IP address. **Must include the `http://` or `https://` scheme**.
-
-**Short form** (`string`) — same URL used for both IPv4 and IPv6 requests:
+The request URL for retrieving the IP address. It must include the `http://` or `https://` scheme.
 
 ```yaml
-# Returns plain-text IP
 url: https://api.ip.sb/ip
-
-# Returns JSON
-url: https://api64.ipify.org?format=json
 ```
-
-**Object form** — separate endpoints for each stack. Useful when IPv4 and IPv6 lookups live on different hosts. Either stack may be omitted to disable that family entirely.
-
-```yaml
-url:
-  ipv4: https://api.ipify.org
-  ipv6: https://api6.ipify.org
-```
-
-If a URL host is a literal IP address rather than a domain name, the address family must match the stack it is assigned to (an IPv4 literal under `ipv4`, an IPv6 literal under `ipv6`).
-
----
-
-## `json`
-
-Extracts IP addresses from JSON responses using [jq](https://github.com/itchyny/gojq) syntax.
-
-**Short form** (`string`) — same jq expression for both IPv4 and IPv6:
-
-```yaml
-json: ".ip"
-```
-
-**Object form** — separate jq expressions for IPv4 and IPv6:
-
-```yaml
-json:
-  ipv4: ".ipv4"
-  ipv6: ".ipv6"
-```
-
-When the response `Content-Type` is `application/json` and `json` is configured, JSON path extraction takes priority. Each jq result value is parsed as an IP address; ensure the returned value is a valid IPv4 or IPv6 string.
-
----
-
-## `regex`
-
-Extracts IP addresses from non-JSON responses using a regular expression. At least one of `json` or `regex` must be configured.
-
-**Short form** (`string`) — same regex for both IPv4 and IPv6:
-
-```yaml
-regex: "IP:\\s*(.+?)\\n"
-```
-
-**Object form** — separate regex for IPv4 and IPv6:
-
-```yaml
-regex:
-  ipv4: "IPv4:\\s*(.+?)\\n"
-  ipv6: "IPv6:\\s*(.+?)\\n"
-```
-
-Takes the **first match** as the IP address.
-
-!!! note "Extraction priority"
-    1. If `Content-Type` is `application/json` and `json` is set — JSON (jq) extraction
-    2. If `regex` is set — regex extraction
-    3. Otherwise — treat response body as plain-text IP
 
 ---
 
 ## `method`
 
-HTTP request method. Supports `GET`, `POST`, `PUT`, `HEAD`, `DELETE`, `PATCH`, `CONNECT`, `OPTIONS`, `TRACE`, plus `BREW`, `PROPFIND`, `WHEN`.
+HTTP request method. Empty defaults to `GET`.
+
+Supported values: `GET`, `POST`, `PUT`, `HEAD`, `DELETE`, `PATCH`, `CONNECT`, `OPTIONS`, `TRACE`, plus `BREW`, `PROPFIND`, `WHEN`.
 
 ---
 
 ## `headers`
 
-Custom HTTP request headers. Values can be a single string or an array.
+Custom HTTP request headers. Values can be a single string or an array. If `User-Agent` is omitted, Lightddns adds its default User-Agent.
 
 ```yaml
 headers:
@@ -131,6 +128,14 @@ headers:
     - value1
     - value2
 ```
+
+---
+
+## `match`
+
+Optional extraction rules. See [MatchOption](../shared/match.md).
+
+For HTTP specifically, JSON `Content-Type` plus `match.jq` disables fallback to regex/plain text. This prevents a broken JSON endpoint from being accidentally accepted through unrelated response text.
 
 ---
 

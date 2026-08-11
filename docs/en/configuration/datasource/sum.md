@@ -9,10 +9,10 @@ name: data-sum
 datasources:
   - data-http
   - data-netlink
-
-# optional
-fastFail: false
 ```
+
+??? note "Behavior"
+    Child datasources are queried in order and their IP addresses are concatenated. The current implementation uses fast-fail behavior: if any child datasource returns an error, the sum datasource returns that error immediately.
 
 ## `datasources`
 
@@ -22,14 +22,4 @@ A list of datasource names to merge. Each name must reference a datasource defin
 datasources:
   - data-http
   - data-cmd
-```
-
----
-
-## `fastFail`
-
-When `true`, the group fails immediately if any child datasource returns an error. When `false` (default), errors from individual datasources are collected; the group only fails if **all** datasources fail or return empty results.
-
-```yaml
-fastFail: true
 ```

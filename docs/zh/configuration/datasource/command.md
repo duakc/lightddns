@@ -1,97 +1,61 @@
 # Command
 
-通过执行 Shell 命令获取 IP 地址。命令的标准输出将逐行解析，提取合法的 IP 地址。
+通过执行外部命令获取 IP 地址，并从命令输出中提取地址。
 
 ```yaml
 # required
 type: command
 name: data-cmd
-
-cmd:
-  ipv4: "curl -s https://api.ipify.org"
-  ipv6: "curl -s https://api6.ipify.org"
+cmd: ["curl", "-s", "https://api.ipify.org"]
 
 # optional
-shell: ""
 exitCode: 0
 env:
-  PATH: "/usr/bin:/bin:/usr/sbin:/sbin"
+  - PATH=/usr/bin:/bin:/usr/sbin:/sbin
+output: none
+capture: stdout
 stdin: ""
-stdout: ""
-stderr: ""
+stdinContent: ""
+sync: false
+workDir: ""
+match:
+  regex: ""
 ```
 
 ??? note "行为说明"
-    IPv4 和 IPv6 命令独立执行。命令为空时跳过对应的 IP 版本。命令输出逐行读取，每行中的空白分隔标记均被解析为 IP 地址。仅返回与请求版本匹配的地址。
+    命令会按配置的参数列表直接执行，Lightddns 不会额外包一层隐式 shell。带参数的命令建议使用数组形式。若需要管道、重定向、环境变量展开、`&&` 等 shell 语法，请显式调用 shell。
+
+    `capture` 决定解析哪个输出流里的 IP 地址。`output` 只决定哪些输出流会同时转发到 Lightddns 进程自己的 stdout/stderr。
 
 ---
 
 ## `cmd`
 
-分别为 IPv4 和 IPv6 指定执行命令。命令为空时，跳过对应的 IP 版本。
+要执行的命令。
 
-**简写形式**（`string`）— IPv4 和 IPv6 共用同一个命令：
+**字符串形式**适合只有可执行文件名、没有参数的命令：
 
 ```yaml
-cmd: "curl -s https://api.ipify.org"
+cmd: my-ip-helper
 ```
 
-**对象形式** — 单独为 IPv4 和 IPv6 指定命令：
+**数组形式**适合带参数的命令，也是推荐形式：
 
 ```yaml
-cmd:
-  ipv4: "curl -s https://api.ipify.org"
-  ipv6: "curl -s https://api6.ipify.org"
+cmd: ["curl", "-s", "https://api.ipify.org"]
 ```
 
-**数组形式** — 将程序和参数分开传入，使用 `shell: "none"` 时必须用此形式：
+如果需要使用 shell 语法，请显式调用 shell：
 
 ```yaml
-cmd:
-  ipv4: ["curl", "-s", "https://api.ipify.org"]
-  ipv6: ["curl", "-s", "https://api6.ipify.org"]
-```
-
----
-
-## `shell`
-
-用于执行命令的 shell 解释器。为空时会自动选择。
-
-设为 `"none"` 时直接执行命令，不经过任何 shell。这可以避免[命令注入](https://en.wikipedia.org/wiki/Code_injection#Shell_injection)和字符串拆分的隐患，但**必须搭配数组形式**的 `cmd` 使用——否则整个命令字符串会被当作可执行文件名，导致运行失败。
-
-!!! warning "`shell: none`"
-    使用 `shell: none` 时，`cmd` **必须**使用数组形式。`"curl -s https://api.ipify.org"` 这样的字符串会被视为一个整体文件名，而非"命令 + 参数"。
-
-```yaml
-# 不使用 shell — 必须用数组形式
-shell: none
-cmd:
-  ipv4: ["curl", "-s", "https://api.ipify.org"]
-```
-
-??? note "各平台支持的 Shell"
-    Windows:
-    - powershell, cmd
-
-    Linux:
-    - bash, zsh, fish, dash, sh, ash, mksh, csh, tcsh, rksh, ksh
-
-    macOS:
-    - zsh, bash, sh, ksh, csh, tcsh, fish, dash, ash, mksh
-
-    FreeBSD / OpenBSD / NetBSD / Dragonfly:
-    - sh, csh, tcsh, bash, zsh, fish, mksh, dash, ash, rksh, ksh
-
-```yaml
-shell: bash
+cmd: ["sh", "-c", "curl -s https://api.ipify.org | tr -d '\\n'"]
 ```
 
 ---
 
 ## `exitCode`
 
-期望的命令退出码。其他退出码将被视为执行失败。
+期望的命令退出码。其它退出码都会被视为错误。
 
 ```yaml
 exitCode: 0
@@ -101,39 +65,110 @@ exitCode: 0
 
 ## `env`
 
-命令执行环境的变量。
+追加到命令执行环境中的环境变量。会保留继承自 Lightddns 进程的环境变量，并追加这里配置的 `KEY=VALUE` 项。
 
 ```yaml
 env:
-  PATH: "/usr/bin:/bin:/usr/sbin:/sbin"
+  - PATH=/usr/bin:/bin:/usr/sbin:/sbin
+  - TOKEN={{ .Env.MY_TOKEN }}
+```
+
+---
+
+## `output`
+
+控制哪些输出流转发到 Lightddns 自身的 stdout/stderr，便于观察命令执行情况。它不决定解析哪个输出流。
+
+| 值 | 行为 |
+|---|---|
+| `none` 或留空 | 不转发命令输出。 |
+| `stdout` | 转发 stdout。 |
+| `stderr` | 转发 stderr。 |
+| `all` | 同时转发 stdout 和 stderr。 |
+
+```yaml
+output: stderr
+```
+
+---
+
+## `capture`
+
+控制捕获并解析哪些输出流。
+
+| 值 | 行为 |
+|---|---|
+| 留空 | 等同于 `stdout`。 |
+| `stdout` | 解析 stdout。 |
+| `stderr` | 解析 stderr。 |
+| `all` | 同时解析 stdout 和 stderr。 |
+| `none` | 对此数据源无效。 |
+
+```yaml
+capture: stdout
 ```
 
 ---
 
 ## `stdin`
 
-将指定文件的内容作为命令的标准输入。若命令需要持续输入，可使用流式传输文件，如 domain socket。
+把指定文件内容作为命令的标准输入。
 
-!!! warning Stdin
-    这个配置项现在功能是需要改进的，具体行文也许会在未来变化。
-    如果为了 `sudo` 这类的需要输入密码的，我更推荐使用 `/etc/sudoers` 这类文件去配置。
+相对路径会基于该数据源的有效工作目录解析：
+
+1. 若配置了 `workDir`，使用 `workDir`。
+2. 否则使用 `lightddns -D/--workdir` 设置的全局工作目录。
+3. 若未显式传 `-D`，其默认值是 `.`，即进程当前工作目录。
+
+绝对路径会按原样读取。若同时设置 `stdin` 和 `stdinContent`，优先使用 `stdin`。
 
 ```yaml
-stdin: /path/to/input.txt
+stdin: input.txt
 ```
 
-## `stdout`
+---
 
-将命令的标准输出写入指定文件。IP 地址仍然会从标准输出中正常解析。若未设置 `stderr`，标准错误也会重定向到同一文件。
+## `stdinContent`
+
+内联标准输入内容。设置了 `stdin` 时此项会被忽略。
 
 ```yaml
-stdout: /var/log/ddns-ip.log
+stdinContent: |
+  query payload
 ```
 
-## `stderr`
+---
 
-将命令的标准错误写入指定文件。
+## `sync`
+
+设为 `true` 时，同一个数据源的并发 IP 查询会串行执行。命令会读写共享本地状态时可以开启。
 
 ```yaml
-stderr: /var/log/ddns-ip-error.log
+sync: true
+```
+
+---
+
+## `workDir`
+
+命令进程的工作目录，同时也是相对 `stdin` 路径的基准目录。
+
+留空时使用 `lightddns -D/--workdir` 设置的全局工作目录。若配置为相对路径，会基于全局工作目录解析。绝对路径会按原样使用。
+
+```yaml
+workDir: scripts
+```
+
+例如执行 `lightddns -D /etc/lightddns run -c config.yaml` 时，上面的配置会让命令在 `/etc/lightddns/scripts` 下运行。
+
+---
+
+## `match`
+
+可选的 IP 提取规则。参见 [MatchOption](../shared/match.md)。
+
+```yaml
+match:
+  jq: ".ip"
+  regex: "IP:\\s+(\\S+)"
 ```

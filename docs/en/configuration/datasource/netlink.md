@@ -10,7 +10,7 @@ name: data-netlink
 # optional
 ifName: eth0
 ifIndex: 0
-allowBogon: false
+includeBogon: false
 ```
 
 ??? note "Behavior"
@@ -41,5 +41,5 @@ ifIndex: 2
 Whether to include bogon IP addresses — private (RFC 1918), link-local, loopback, and other reserved ranges. When `false` (default), only global unicast addresses are returned.
 
 ```yaml
-allowBogon: false
+includeBogon: false
 ```

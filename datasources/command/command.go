@@ -37,6 +37,9 @@ func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasour
 	if len(option.Cmd.Value) == 0 {
 		return nil, fmt.Errorf("empty command")
 	}
+	if option.Capture == "" {
+		option.Capture = options.CommandOutputStdout
+	}
 	if option.Capture == options.CommandOutputNone {
 		return nil, fmt.Errorf("set `capture` to `%s` is not allowed", options.CommandOutputNone)
 	}
@@ -63,9 +66,15 @@ func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasour
 			option.Match.JQ.Cast(),
 			option.Match.Regexp.Cast(),
 		),
+	}
 
-		captureStderr: stderr == os.Stderr,
-		captureStdout: stdout == os.Stdout,
+	switch option.Capture {
+	case options.CommandOutputAll:
+		rc.captureStdout, rc.captureStderr = true, true
+	case options.CommandOutputStdout:
+		rc.captureStdout = true
+	case options.CommandOutputStderr:
+		rc.captureStderr = true
 	}
 
 	lightddnsFileHelper := services.Lookup[filehelper.Helper](ctx)
@@ -73,11 +82,17 @@ func New(ctx context.Context, logger *zap.Logger, option options.CommandDatasour
 	workDir := option.WorkDir
 	if workDir == "" {
 		workDir = lightddnsFileHelper.Path(".")
-		rc.workDir = workDir
+	} else if !filepath.IsAbs(workDir) && lightddnsFileHelper != nil {
+		workDir = lightddnsFileHelper.Path(workDir)
 	}
+	rc.workDir = workDir
 
 	if option.Stdin != "" {
-		stdinBuffer, err := os.ReadFile(filepath.Join(workDir, option.Stdin))
+		stdinPath := option.Stdin
+		if !filepath.IsAbs(stdinPath) {
+			stdinPath = filepath.Join(workDir, stdinPath)
+		}
+		stdinBuffer, err := os.ReadFile(stdinPath)
 		if err != nil {
 			return nil, fmt.Errorf("read stdin file: %s: %w", option.Stdin, err)
 		}
@@ -176,10 +191,10 @@ func (rc *runCommandContext) Handle(ctx context.Context) ([]netip.Addr, error) {
 	}
 
 	logger.Debug("start and wait until process quit",
-		zap.Int("pid", cmd.ProcessState.Pid()))
+		zap.Int("pid", cmd.Process.Pid))
 
 	waitErr := cmd.Wait()
-	if waitErr != nil {
+	if waitErr != nil && (cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != rc.exitCode) {
 		return nil, waitErr
 	}
 
@@ -187,7 +202,7 @@ func (rc *runCommandContext) Handle(ctx context.Context) ([]netip.Addr, error) {
 		zap.String("state", cmd.ProcessState.String()))
 
 	if cmd.ProcessState.ExitCode() != rc.exitCode {
-		return nil, fmt.Errorf("unexcepted exit code: %d", cmd.ProcessState.ExitCode())
+		return nil, fmt.Errorf("unexpected exit code: %d", cmd.ProcessState.ExitCode())
 	}
 
 	return rc.matcher.Try(ctx, buf.Bytes())

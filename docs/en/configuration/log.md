@@ -22,7 +22,7 @@ Disables all logging output when set to `true`.
 
 ## `output`
 
-Log output file path. When empty, logs are written to stdout.
+Log output file path. When empty, logs are written to stdout. Relative paths are created under the global working directory from `lightddns -D/--workdir`.
 
 ```yaml
 output: "/var/log/lightddns.log"

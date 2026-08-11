@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/netip"
-	"slices"
 
 	"github.com/duakc/lightddns/adapter"
 )
@@ -39,7 +38,7 @@ func (l *LimitedDatasource) IP(ctx context.Context) ([]netip.Addr, error) {
 
 	dualStackDatasource, isDualStack := l.Datasource.(adapter.DatasourceDualStack)
 
-	if l.IPv4 && l.IPv6 || !isDualStack {
+	if !isDualStack {
 		list, err := l.Datasource.IP(ctx)
 		if err != nil {
 			err = newDatasourceError(err, "4/6", l.Datasource)
@@ -55,16 +54,18 @@ func (l *LimitedDatasource) IP(ctx context.Context) ([]netip.Addr, error) {
 		ipv4List, err = dualStackDatasource.IPv4(ctx)
 		if err != nil {
 			err = newDatasourceError(err, "4", dualStackDatasource)
+			if l.FastFail {
+				return nil, err
+			}
 		}
 	}
-	if l.IPv6 && err == nil || (err != nil && !l.FastFail) {
+	if l.IPv6 {
 		var ipv6Err error
 		ipv6List, ipv6Err = dualStackDatasource.IPv6(ctx)
 		if ipv6Err != nil {
-			err = newDatasourceError(ipv6Err, "6", dualStackDatasource)
+			err = errors.Join(err, newDatasourceError(ipv6Err, "6", dualStackDatasource))
 		}
-		err = errors.Join(err, ipv6Err)
 	}
 
-	return slices.Concat(ipv4List, ipv6List), err
+	return append(ipv4List, ipv6List...), err
 }

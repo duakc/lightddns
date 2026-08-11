@@ -72,6 +72,9 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 
 	// the custom header must have on element (User-Agent)
 	httpOptions = append(httpOptions, httpx.ClientOptionWithHeaders(customHeaders))
+	if option.HTTP.HTTPDebug && logger != nil && logger.Level().Enabled(zap.DebugLevel) {
+		httpOptions = append(httpOptions, httpx.ClientOptionWithDebugLogger(logger))
+	}
 
 	requests := &requestContext{
 		method:  string(option.Method),
@@ -83,24 +86,26 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 		),
 	}
 
-	var v4Request, v6Request requestContext
+	var v4Request, v6Request *requestContext
 	if option.Connect.DialStrategy != dialerx.DialOnlyIPv4 {
-		v6Request = *requests
-		v6Request.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer},
+		rc := *requests
+		rc.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp6", Dialer: connectDialer},
 			httpOptions...)
+		v6Request = &rc
 	}
 	if option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
-		v4Request = *requests
-		v4Request.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer},
+		rc := *requests
+		rc.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer},
 			httpOptions...)
+		v4Request = &rc
 	}
 
 	httpds := &Httpds{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 
 		logger: logger,
-		v4:     &v4Request,
-		v6:     &v6Request,
+		v4:     v4Request,
+		v6:     v6Request,
 	}
 	return httpds, nil
 }
@@ -152,6 +157,9 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 	if err != nil {
 		return nil, httpx.NewBaseResponseError(err, R.Method, "get ip from remote")
 	}
+	if response == nil {
+		return nil, fmt.Errorf("nil http response")
+	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
@@ -169,13 +177,10 @@ func (rc *requestContext) Handle(ctx context.Context) (addresses []netip.Addr, e
 	// HTTP can carry information to determine whether the content is JSON or plain text.
 	//
 	// therefore, we first check if the returned value is JSON.
-	// if it is JSON and jQuery failed, we simply return an error;
+	// if it is JSON and jq failed, we simply return an error;
 	// proceeding with the subsequent logic is pointless.
 	if httpx.IsJsonContentType(response.Header.Get("Content-Type")) && rc.matcher.JQ != nil {
-		addresses, err = rc.matcher.JSON(ctx, buffer.Bytes())
-		if err != nil {
-			return nil, err
-		}
+		return rc.matcher.JSON(ctx, buffer.Bytes())
 	}
 
 	if rc.matcher.Regexp != nil {

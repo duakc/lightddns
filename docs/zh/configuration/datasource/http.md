@@ -1,23 +1,20 @@
 # HTTP
 
-通过 HTTP 请求获取本机公网 IP 地址。支持 JSON（jq）解析、正则提取，以及双栈网络（IPv4/IPv6）。
+通过 HTTP 请求获取公网 IP 地址。支持纯文本响应、通过 `match.jq` 提取 JSON、通过 `match.regex` 提取文本，以及 IPv4/IPv6 连接选择。
 
 ```yaml
 # required
 type: http
 name: data-http
-url: https://api64.ipify.org?format=json
+url: https://api.ip.sb/ip
 
 # optional
-json:
-  ipv4: ".ip"
-  ipv6: ".ip"
-regex:
-  ipv4: ""
-  ipv6: ""
 method: GET
 headers:
   User-Agent: Lightddns/stable
+match:
+  jq: ""
+  regex: ""
 
 dns: system
 connect:
@@ -27,101 +24,101 @@ http:
 ```
 
 ??? note "行为说明"
-    HTTP 数据源会分别创建 IPv4 和 IPv6 的独立请求上下文，各自固定使用 `tcp4`/`tcp6` 拨号器：
+    HTTP 数据源会按 `connect.dialStrategy` 创建请求上下文：
 
-    - 当 `url.ipv4` 已配置且 `dialStrategy` 不为 `ipv6_only` 时创建 IPv4 上下文
-    - 当 `url.ipv6` 已配置且 `dialStrategy` 不为 `ipv4_only` 时创建 IPv6 上下文
+    - `prefer_ipv6` / `prefer_ipv4`：同时创建 IPv4 和 IPv6 请求上下文，并合并结果。
+    - `ipv4_only`：只创建 IPv4 请求上下文。
+    - `ipv6_only`：只创建 IPv6 请求上下文。
 
-    每个上下文使用自己的 URL 以及对应的 `json`/`regex` 表达式，最终合并 IPv4 和 IPv6 结果返回。
+    每个请求上下文使用相同的 `url`、`method`、`headers` 和 `match` 设置，但网络拨号器会固定为 `tcp4` 或 `tcp6`。
 
 ---
 
-[JQ表达式和Regex部分示例](../example/http.md)
+## 常见服务
+
+下面是几个常见公网 IP 服务的配置写法。服务可用性、频率限制、实际返回的地址族由这些外部服务自身决定。
+
+### 纯文本
+
+响应体只有 IP 地址时，可以不写 `match`。
+
+```yaml
+- type: http
+  name: ip-sb
+  url: https://api.ip.sb/ip
+```
+
+```yaml
+- type: http
+  name: ipify-v4
+  url: https://api.ipify.org
+  connect:
+    dialStrategy: ipv4_only
+```
+
+```yaml
+- type: http
+  name: ipify-v6
+  url: https://api6.ipify.org
+  connect:
+    dialStrategy: ipv6_only
+```
+
+### JSON
+
+JSON 端点使用 `match.jq`。
+
+```yaml
+- type: http
+  name: ipinfo
+  url: https://ipinfo.io
+  match:
+    jq: ".ip"
+```
+
+```yaml
+- type: http
+  name: ipify-json
+  url: https://api64.ipify.org?format=json
+  match:
+    jq: ".ip"
+```
+
+### 带说明文字的文本
+
+页面里除了 IP 还有其它说明文字时，使用 `match.regex`。
+
+```yaml
+- type: http
+  name: ipip
+  url: https://myip.ipip.net
+  match:
+    regex: "当前 IP：\\s*(.+?)\\s*来自于："
+```
+
+---
 
 ## `url`
 
-获取 IP 地址的请求 URL。**必须携带 `http://` 或 `https://` 协议头**。
-
-**简写形式**（`string`）— IPv4 和 IPv6 共用同一个 URL：
+获取 IP 地址的请求 URL。必须包含 `http://` 或 `https://` 协议头。
 
 ```yaml
-# 返回纯文本 IP
 url: https://api.ip.sb/ip
-
-# 返回 JSON
-url: https://api64.ipify.org?format=json
 ```
-
-**对象形式** — 单独为 IPv4 和 IPv6 指定不同的端点。适合两栈服务部署在不同主机的情况。省略某一栈即可禁用该协议族：
-
-```yaml
-url:
-  ipv4: https://api.ipify.org
-  ipv6: https://api6.ipify.org
-```
-
-若 URL 主机部分是 IP 字面量而非域名，其地址族必须与所在栈一致（IPv4 字面量放在 `ipv4` 下，IPv6 字面量放在 `ipv6` 下）。
-
----
-
-## `json`
-
-使用 [jq](https://github.com/itchyny/gojq) 语法从 JSON 响应中提取 IP 地址。
-
-**简写形式**（`string`）— IPv4 和 IPv6 共用同一个 jq 表达式：
-
-```yaml
-json: ".ip"
-```
-
-**对象形式** — 单独为 IPv4 和 IPv6 指定不同的 jq 表达式：
-
-```yaml
-json:
-  ipv4: ".ipv4"
-  ipv6: ".ipv6"
-```
-
-当响应 `Content-Type` 为 `application/json` 且配置了 `json` 字段时，优先使用 JSON 路径提取。jq 查询结果会被解析为 IP 地址，请确保返回值是合法的 IPv4 或 IPv6 字符串。
-
----
-
-## `regex`
-
-使用正则表达式从非 JSON 响应中提取 IP 地址。与 `json` 至少配置一个。
-
-**简写形式**（`string`）— IPv4 和 IPv6 共用同一个正则：
-
-```yaml
-regex: "IP:\\s*(.+?)\\n"
-```
-
-**对象形式** — 单独为 IPv4 和 IPv6 指定不同的正则：
-
-```yaml
-regex:
-  ipv4: "IPv4:\\s*(.+?)\\n"
-  ipv6: "IPv6:\\s*(.+?)\\n"
-```
-
-取**匹配到的第一个**作为 IP 地址。
-
-!!! note "提取优先级"
-    1. 若响应 `Content-Type` 为 `application/json` 且配置了 `json` → JSON（jq）提取
-    2. 若配置了 `regex` → 正则提取
-    3. 否则 → 将响应体整体作为纯文本 IP 解析
 
 ---
 
 ## `method`
 
-HTTP 请求方法。支持 `GET`、`POST`、`PUT`、`HEAD`、`DELETE`、`PATCH`、`CONNECT`、`OPTIONS`、`TRACE`，以及 `BREW`、`PROPFIND`、`WHEN`。
+HTTP 请求方法。留空时默认使用 `GET`。
+
+支持 `GET`、`POST`、`PUT`、`HEAD`、`DELETE`、`PATCH`、`CONNECT`、`OPTIONS`、`TRACE`，以及 `BREW`、`PROPFIND`、`WHEN`。
 
 ---
 
 ## `headers`
 
-自定义 HTTP 请求头。值可以是单个字符串或数组。
+自定义 HTTP 请求头。值可以是单个字符串或数组。如果没有配置 `User-Agent`，Lightddns 会添加默认 User-Agent。
 
 ```yaml
 headers:
@@ -131,6 +128,14 @@ headers:
     - value1
     - value2
 ```
+
+---
+
+## `match`
+
+可选的 IP 提取规则。参见 [MatchOption](../shared/match.md)。
+
+HTTP 数据源有一个特殊规则：当响应 `Content-Type` 是 JSON 且配置了 `match.jq` 时，不会再回退到正则或纯文本。这样可以避免 JSON 端点损坏后，被无关的响应文本误判为有效结果。
 
 ---
 

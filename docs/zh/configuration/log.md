@@ -22,7 +22,7 @@ output: ""
 
 ## `output`
 
-日志输出文件路径。为空时输出到标准输出（stdout）。
+日志输出文件路径。为空时输出到标准输出（stdout）。相对路径会创建在 `lightddns -D/--workdir` 指定的全局工作目录下。
 
 ```yaml
 output: "/var/log/lightddns.log"

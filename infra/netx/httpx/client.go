@@ -204,7 +204,8 @@ func (dc *DebugClient) Do(r *http.Request) (*http.Response, error) {
 	var err error
 
 	if dc.Logger != nil && dc.Logger.Level().Enabled(zap.DebugLevel) {
-		defer NewHTTPRequestRecorder(dc.Logger, r, &resp, &err)
+		defer NewHTTPRequestRecorder(dc.Logger, r, &resp, &err).Record()
 	}
+	resp, err = dc.HTTPRequester.Do(r)
 	return resp, err
 }
