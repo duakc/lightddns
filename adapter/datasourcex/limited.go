@@ -59,6 +59,7 @@ func (l *LimitedDatasource) IP(ctx context.Context) ([]netip.Addr, error) {
 			}
 		}
 	}
+
 	if l.IPv6 {
 		var ipv6Err error
 		ipv6List, ipv6Err = dualStackDatasource.IPv6(ctx)

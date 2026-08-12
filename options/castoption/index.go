@@ -21,12 +21,19 @@ func BuildHTTPClientFromScratch(
 		err = fmt.Errorf("building raw dialer: %w", err)
 		return
 	}
-	resolveDialer, err = BuildResolveDialer(dnsOption, rawDialer, logger)
-	if err != nil {
-		err = fmt.Errorf("building resolve dialer: %w", err)
-		return
+
+	httpDialer := rawDialer
+	if dnsOption.Enabled {
+		resolveDialer, err = BuildResolveDialer(dnsOption, rawDialer, logger)
+		if err != nil {
+			err = fmt.Errorf("building resolve dialer: %w", err)
+			return
+		}
+		httpDialer = resolveDialer
+	} else {
+		resolveDialer = rawDialer
 	}
-	httpClient, err = BuildHTTPClient(httpOption, resolveDialer, logger)
+	httpClient, err = BuildHTTPClient(httpOption, httpDialer, logger)
 	if err != nil {
 		err = fmt.Errorf("building http client: %w", err)
 		return

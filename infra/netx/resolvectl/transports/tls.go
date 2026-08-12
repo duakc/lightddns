@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/internal"
 
 	"github.com/duakc/mt/common/generic"
 
@@ -48,7 +49,14 @@ func NewTLS(logger *zap.Logger, dialer dialerx.Dialer, server string, serverPort
 	}
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{}
+	} else {
+		tlsConfig = tlsConfig.Clone()
 	}
+
+	if tlsConfig.ServerName == "" {
+		tlsConfig.ServerName = server
+	}
+
 	return &TLSTransport{
 		logger:      createLogger(logger, TransportTypeTLS),
 		dialer:      dialer,
@@ -59,42 +67,89 @@ func NewTLS(logger *zap.Logger, dialer dialerx.Dialer, server string, serverPort
 }
 
 func (t *TLSTransport) Exchange(ctx context.Context, message *mDns.Msg) (*mDns.Msg, error) {
-	if t.closed.Load() {
-		return nil, os.ErrClosed
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	t.access.Lock()
-	tlsSession, ok := t.tlsSessions.PopFront()
-	if !ok {
-		var err error
-		tlsSession, err = t.createSession(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("tls: create tls session: %w", err)
+
+	messageID := message.Id
+	tlsSession, reused, err := t.takeSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	exchangedMessage, err := t.exchangeWithSession(ctx, tlsSession, message)
+	if err != nil {
+		_ = tlsSession.conn.Close()
+		if reused && internal.IsClosedError(err) {
+			return nil, Retryable(err)
 		}
+		return nil, err
 	}
+
+	exchangedMessage.Id = messageID
+	t.putSession(tlsSession)
+	return exchangedMessage, nil
+}
+
+func (t *TLSTransport) takeSession(ctx context.Context) (*tlsTransportConn, bool, error) {
+	t.access.Lock()
+	if t.closed.Load() {
+		t.access.Unlock()
+		return nil, false, os.ErrClosed
+	}
+	tlsSession, ok := t.tlsSessions.PopFront()
 	t.access.Unlock()
+	if ok {
+		if t.closed.Load() {
+			_ = tlsSession.conn.Close()
+			return nil, false, os.ErrClosed
+		}
+		return tlsSession, true, nil
+	}
+	if t.closed.Load() {
+		return nil, false, os.ErrClosed
+	}
+	tlsSession, err := t.createSession(ctx)
+	if err != nil {
+		return nil, false, fmt.Errorf("tls: create tls session: %w", err)
+	}
+	if t.closed.Load() {
+		_ = tlsSession.conn.Close()
+		return nil, false, os.ErrClosed
+	}
+	return tlsSession, false, nil
+}
+
+func (t *TLSTransport) putSession(tlsSession *tlsTransportConn) {
+	_ = tlsSession.conn.SetDeadline(time.Time{})
+	t.access.Lock()
+	if t.closed.Load() {
+		t.access.Unlock()
+		_ = tlsSession.conn.Close()
+		return
+	}
+	t.tlsSessions.PushBack(tlsSession)
+	t.access.Unlock()
+}
+
+func (t *TLSTransport) exchangeWithSession(ctx context.Context,
+	tlsSession *tlsTransportConn,
+	message *mDns.Msg,
+) (*mDns.Msg, error) {
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = tlsSession.conn.SetDeadline(deadline)
 	}
 
-	messageID := message.Id
 	tlsSession.queryID++
 	if err := WriteMessage(tlsSession.conn, tlsSession.queryID, message); err != nil {
-		_ = tlsSession.conn.Close()
 		return nil, fmt.Errorf("tls: write: %w", err)
 	}
 	exchangedMessage, err := ReadMessage(tlsSession.conn)
 	if err != nil {
-		_ = tlsSession.conn.Close()
 		return nil, fmt.Errorf("tls: read: %w", err)
 	}
-	exchangedMessage.Id = messageID
-	_ = tlsSession.conn.SetDeadline(time.Time{})
-	if !t.closed.Load() {
-		t.access.Lock()
-		t.tlsSessions.PushBack(tlsSession)
-		t.access.Unlock()
-	} else {
-		_ = tlsSession.conn.Close()
+	if exchangedMessage.Id != tlsSession.queryID {
+		return nil, mDns.ErrId
 	}
 	return exchangedMessage, nil
 }
@@ -107,6 +162,7 @@ func (t *TLSTransport) createSession(ctx context.Context) (*tlsTransportConn, er
 	tlsConn := tls.Client(conn, t.tlsConfig)
 	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
+		_ = conn.Close()
 		return nil, fmt.Errorf("tls handshake: %w", err)
 	}
 	return &tlsTransportConn{tlsConn, 0}, nil

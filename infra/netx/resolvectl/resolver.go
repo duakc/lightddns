@@ -178,7 +178,7 @@ func exchangeOnce(ctx context.Context,
 		ctx = context.Background()
 	}
 	responseMessage, err = cacheFrom.LoadUpstream(ctx, transports.FuncTransport(func(exchangeCtx context.Context, exchangeMessage *mDns.Msg) (*mDns.Msg, error) {
-		exchangedMessage, exchangeErr := dnsTransport.Exchange(exchangeCtx, exchangeMessage)
+		exchangedMessage, exchangeErr := exchangeUpstream(exchangeCtx, dnsTransport, exchangeMessage)
 		if exchangeErr != nil {
 			return nil, exchangeErr
 		}
@@ -207,4 +207,32 @@ func exchangeOnce(ctx context.Context,
 	copiedMessage := responseMessage.Copy()
 	copiedMessage.Id = message.Id
 	return transports.EdnsBackwards(message, copiedMessage), nil
+}
+
+func exchangeUpstream(ctx context.Context,
+	dnsTransport transports.Transport,
+	message *mDns.Msg,
+) (*mDns.Msg, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	var lastRetryableErr error
+	for {
+		if err := ctx.Err(); err != nil {
+			if lastRetryableErr != nil {
+				return nil, fmt.Errorf("%w: last exchange error: %w", err, lastRetryableErr)
+			}
+			return nil, err
+		}
+
+		exchangedMessage, err := dnsTransport.Exchange(ctx, message)
+		if err == nil {
+			return exchangedMessage, nil
+		}
+		if !transports.IsRetryable(err) {
+			return nil, err
+		}
+		lastRetryableErr = err
+	}
 }

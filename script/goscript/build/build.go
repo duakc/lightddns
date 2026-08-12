@@ -17,16 +17,14 @@ func Run(ctx context.Context) {
 	var (
 		tags    string
 		ldFlags string
-		all     bool
 		goos    string
 		goarch  string
 	)
 
 	flag.StringVar(&tags, "tags", "", "extra build tags (comma separated)")
 	flag.StringVar(&ldFlags, "ldflags", "", "extra build flags (comma separated)")
-	flag.StringVar(&goos, "os", "", "GOOS to build (e.g. linux); empty matches every OS")
-	flag.StringVar(&goarch, "arch", "", "GOARCH to build (e.g. amd64); empty matches every arch")
-	flag.BoolVar(&all, "all", false, "build every target (all OS/arch)")
+	flag.StringVar(&goos, "goos", "", "GOOS to build (e.g. linux); empty matches every OS")
+	flag.StringVar(&goarch, "goarch", "", "GOARCH to build (e.g. amd64); empty matches every arch")
 	flag.Parse()
 
 	params.Version = gitver.Version(ctx)
@@ -40,14 +38,7 @@ func Run(ctx context.Context) {
 		params.LDFlags = append(params.LDFlags, strings.Split(ldFlags, ",")...)
 	}
 
-	// Select targets: --os/--arch (or --all) filters the matrix; with no
-	// selection, default to the host's baseline target only.
-	var targets []target.Target
-	if all {
-		targets = target.All()
-	} else {
-		targets = target.FilterTargets(target.All(), goos, goarch)
-	}
+	targets := target.FilterTargets(target.All(), goos, goarch)
 
 	if len(targets) == 0 {
 		common.Warnf("no target matches --os %q --arch %q (host GOOS=%s GOARCH=%s)",

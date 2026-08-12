@@ -28,7 +28,7 @@ func BuildHTTPClient(
 	httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithHeader(
 		httpx.HeaderUserAgent, constpkg.HTTPUserAgent))
 
-	if rawOption.HTTPDebug && logger.Level().Enabled(zap.DebugLevel) {
+	if rawOption.HTTPDebug && logger != nil && logger.Level().Enabled(zap.DebugLevel) {
 		httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithDebugLogger(logger))
 	}
 
@@ -45,11 +45,12 @@ func HTTPOptionToHTTPXOptions(rawOption options.HTTPOption) ([]httpx.HTTPClientO
 		if rawOption.HTTPSProxy == "" {
 			rawOption.HTTPSProxy = rawOption.HTTPProxy
 		}
-		if rawOption.HTTPProxy == "" && rawOption.HTTPSProxy == "" && rawOption.UseSystemProxy {
-			httpClientOptions = append(httpClientOptions, httpx.ClientOptionEnableProxy())
-		} else {
-			httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithProxy(rawOption.HTTPProxy, rawOption.HTTPSProxy, ""))
-		}
+		httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithProxy(rawOption.HTTPProxy, rawOption.HTTPSProxy, ""))
+		return httpClientOptions, nil
+	}
+
+	if rawOption.UseSystemProxy {
+		httpClientOptions = append(httpClientOptions, httpx.ClientOptionEnableProxy())
 	}
 	return httpClientOptions, nil
 }

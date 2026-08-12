@@ -15,7 +15,6 @@ import (
 	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/datasources/internal"
 	"github.com/duakc/lightddns/infra/netx/dialerx"
-	"github.com/duakc/lightddns/infra/netx/domains"
 	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/options/castoption"
@@ -40,14 +39,12 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 		option.Method = http.MethodGet
 	}
 
-	needDNS := option.URL.Raw != "" && domains.IsDomainName(option.URL.URL.Host)
-
 	connectDialer, err := castoption.BuildDialer(option.Connect)
 	if err != nil {
 		return nil, err
 	}
 
-	if needDNS {
+	if option.DNS.Enabled {
 		resolveDialer, err := castoption.BuildResolveDialer(option.DNS, connectDialer, logger)
 		if err != nil {
 			return nil, err
@@ -93,6 +90,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.HTTPDatasourceO
 			httpOptions...)
 		v6Request = &rc
 	}
+
 	if option.Connect.DialStrategy != dialerx.DialOnlyIPv6 {
 		rc := *requests
 		rc.requester = httpx.NewClient(&dialerx.NetworkDialer{Network: "tcp4", Dialer: connectDialer},

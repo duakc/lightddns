@@ -31,8 +31,6 @@ type TencentSignHTTPRequester struct {
 }
 
 func (tc *TencentSignHTTPRequester) Do(r *http.Request) (resp *http.Response, err error) {
-	defer httpx.NewHTTPRequestRecorder(tc.Logger, r, &resp, &err).Record()
-
 	common := Common{
 		Timestamp: time.Now().UTC().Unix(),
 	}

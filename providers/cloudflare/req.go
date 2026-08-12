@@ -16,7 +16,6 @@ type apiRequester struct {
 }
 
 func (c *apiRequester) Do(req *http.Request) (resp *http.Response, err error) {
-	defer httpx.NewHTTPRequestRecorder(c.Logger, req, &resp, &err).Record()
 
 	return (&httpx.TokenClient{
 		HTTPRequester: c.HTTPRequester,

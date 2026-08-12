@@ -121,8 +121,8 @@ func (r *systemDialer) DialContext(ctx context.Context, network string, address 
 		if addr, err = netip.ParseAddr(host); err != nil {
 			return nil, fmt.Errorf("parse address %s: %w", address, err)
 		}
-		if internal.IsIPv4(addr) && r.dialStrategy != DialOnlyIPv6 ||
-			internal.IsIPv6(addr) && r.dialStrategy != DialOnlyIPv4 {
+		if internal.IsIPv4(addr) && r.dialStrategy == DialOnlyIPv6 ||
+			internal.IsIPv6(addr) && r.dialStrategy == DialOnlyIPv4 {
 			return nil, fmt.Errorf("dialStrategy=%s,addr=%s: %w",
 				r.dialStrategy, addr, ErrNoAddressToDialer)
 		}

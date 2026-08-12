@@ -3,6 +3,7 @@ package transports
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"net/netip"
@@ -141,22 +142,21 @@ func WriteMessage(w io.Writer, messageID uint16, message *mDns.Msg) error {
 	exMessage := *message
 	exMessage.Id = messageID
 	exMessage.Compress = true
-	exMessageLen := exMessage.Len()
-	buf := freebuf.NewSerial()
-	defer buf.FreeMe()
-	buf.Grow(exMessage.Len())
-	if err := binary.Write(buf, binary.BigEndian, uint16(exMessageLen)); err != nil {
-		return err
-	}
-	packedMessage, err := exMessage.PackBuffer(buf.FreeBytes())
+
+	packedMessage, err := exMessage.Pack()
 	if err != nil {
 		return err
 	}
-	nn, err := w.Write(packedMessage)
-	if nn < len(packedMessage) && err == nil {
-		err = io.ErrShortWrite
+	if len(packedMessage) > mDns.MaxMsgSize {
+		return fmt.Errorf("dns message too large: %d", len(packedMessage))
 	}
-	return err
+
+	var messageLen [2]byte
+	binary.BigEndian.PutUint16(messageLen[:], uint16(len(packedMessage)))
+	if err := writeFull(w, messageLen[:]); err != nil {
+		return err
+	}
+	return writeFull(w, packedMessage)
 }
 
 func ReadMessage(r io.Reader) (*mDns.Msg, error) {
@@ -165,7 +165,7 @@ func ReadMessage(r io.Reader) (*mDns.Msg, error) {
 	if err != nil {
 		return nil, err
 	}
-	if responseLen < 10 {
+	if responseLen < 12 {
 		return nil, mDns.ErrShortRead
 	}
 	buffer := freebuf.NewSerial()
@@ -180,6 +180,20 @@ func ReadMessage(r io.Reader) (*mDns.Msg, error) {
 	var message mDns.Msg
 	err = message.Unpack(buffer.Bytes())
 	return &message, err
+}
+
+func writeFull(w io.Writer, p []byte) error {
+	for len(p) > 0 {
+		nn, err := w.Write(p)
+		if err != nil {
+			return err
+		}
+		if nn == 0 {
+			return io.ErrNoProgress
+		}
+		p = p[nn:]
+	}
+	return nil
 }
 
 func createLogger(logger *zap.Logger, transportType string) *zap.Logger {

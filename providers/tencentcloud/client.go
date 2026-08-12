@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 	"strconv"
+	"strings"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
 	"github.com/duakc/lightddns/adapter/providerx"
@@ -42,6 +43,10 @@ func (c *Client) ResolveZone(ctx context.Context, fqdn string) (ddnsx.Zone, erro
 
 func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone, error) {
 	const pageSize = 100
+
+	// remove fqdn suffix dot.
+	// tencent search operation doesn't support tail-dot.
+	keyword = strings.TrimSuffix(keyword, ".")
 
 	logger := c.logger.WithLazy(
 		zap.String("action", "SearchZones"),
