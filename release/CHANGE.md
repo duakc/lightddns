@@ -1,4 +1,4 @@
-# v0.0.1-alpha.2
+# v0.0.0-alpha.2
 In this release, we've completed basic testing and packaging for different Linux distributions.
 
 We've also written a Github CI script for automated deployment.
