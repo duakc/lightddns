@@ -85,34 +85,3 @@ rules:
 这条规则会保留不在这三个私有 IPv4 网段内的地址。
 
 由于多条规则之间是 OR 关系，混用反转规则和普通规则时要特别小心。范围很大的反转规则可能会匹配到你原本希望由其它规则排除的地址。
-
-
-## 示例
-
-只保留 IPv6 全局单播地址：
-
-```yaml
-datasources:
-  - type: filter
-    name: data-global-v6
-    datasources:
-      - data-all
-    rules:
-      - prefixes:
-          - 2000::/3
-```
-
-保留所有 IPv4 地址和 IPv6 全局单播地址：
-
-```yaml
-datasources:
-  - type: filter
-    name: data-v4-and-global-v6
-    datasources:
-      - data-all
-    rules:
-      - prefixes:
-          - 0.0.0.0/0
-      - prefixes:
-          - 2000::/3
-```
