@@ -21,6 +21,11 @@ all: toolchain clean generate test \
 	generate-schema build-all \
 	build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
 
+.PHONY: build-release
+build-release: clean generate generate-schema build-all \
+	build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
+
+
 .PHONY: test
 test: lint
 	@go test -v --tags debug ./...
@@ -57,7 +62,7 @@ clean:
 	@go mod tidy
 
 .PHONY: build-all
-build-all: build
+build-all: generate
 	@$(GO_SCRIPT) build --goarch '*' --goos '*'
 
 .PHONY: build-dev
@@ -80,23 +85,23 @@ build-docker:
 
 .PHONY: build-deb
 build-deb:
-	$(GO_SCRIPT) nfpm --format deb --goarch '*' --goos 'linux'
+	$(GO_SCRIPT) nfpm --format deb --goarch '*'
 
 .PHONY: build-rpm
 build-rpm:
-	$(GO_SCRIPT) nfpm --format rpm --goarch '*' --goos 'linux'
+	$(GO_SCRIPT) nfpm --format rpm --goarch '*'
 
 .PHONY: build-archlinux
 build-archlinux:
-	$(GO_SCRIPT) nfpm --format archlinux --goarch '*' --goos 'linux'
+	$(GO_SCRIPT) nfpm --format archlinux --goarch '*'
 
 .PHONY: build-alpine-apk
 build-alpine-apk:
-	$(GO_SCRIPT) nfpm --format alpine.apk --goarch '*' --goos 'linux'
+	$(GO_SCRIPT) nfpm --format alpine.apk --goarch '*'
 
 .PHONY: build-openwrt
 build-openwrt:
-	$(GO_SCRIPT) nfpm --format openwrt --goarch '*' --goos 'linux'
+	$(GO_SCRIPT) nfpm --format openwrt --goarch '*'
 
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
 # the package for the host system. The result lands under build/nix/result.
