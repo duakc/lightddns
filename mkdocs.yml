@@ -11,6 +11,8 @@ remote_branch: ci/docs
 edit_uri: ""
 nav:
   - Home: index.md
+  - Manual:
+      - Aliyun: manual/aliyun.md
   - Configuration:
       - Options: configuration/options.md
       - Log: configuration/log.md
@@ -89,6 +91,9 @@ plugins:
           default: false
           nav_translations:
             Home: 首页
+            Manual: 手册
+            Aliyun: 阿里云
+            TencentCloud: 腾讯云
             Configuration: 配置
             Options: 配置文件
             Log: 日志
@@ -105,10 +110,10 @@ plugins:
             Prometheus: Prometheus
             IPServer: IPServer
             Shared: 共享
-            ConnectOption: ConnectOption
-            HTTPOption: HTTPOption
-            DNSOption: DNSOption
-            MatchOption: MatchOption
+            ConnectOption: 连接选项
+            HTTPOption: HTTP选项
+            DNSOption: DNS选项
+            MatchOption: 匹配选项
 extra_css:
   - stylesheets/extra.css
 markdown_extensions:
