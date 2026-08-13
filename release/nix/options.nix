@@ -13,12 +13,19 @@
       type = (pkgs.formats.yaml { }).type;
       default = {
         log.level = "info";
+        datasources = [ ];
+        providers = [ ];
+        domains = [ ];
+        services = [ ];
       };
       example = lib.literalExpression ''
         {
           log.level = "info";
-          # providers / datasources / domains / services go here;
-          # see the docs for the full schema.
+          datasources = [ ];
+          providers = [ ];
+          domains = [ ];
+          services = [ ];
+          # Add at least one enabled domain or service before starting.
         }
       '';
       description = ''
@@ -29,8 +36,14 @@
         ```nix
         services."lightddns".settings = {
           log.level = "info";
+          datasources = [ ];
+          providers = [ ];
+          domains = [ ];
+          services = [ ];
         };
         ```
+
+        Add at least one enabled domain or service before enabling the daemon.
 
         For the full configuration schema and examples, see the documentation:
         <https://lightddns.duaky.com>.

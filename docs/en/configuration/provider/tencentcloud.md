@@ -9,8 +9,12 @@ name: prov-tc
 secretId: "{{ .Env.TENCENTCLOUD_SECRET_ID }}"
 secretKey: "{{ .Env.TENCENTCLOUD_SECRET_KEY }}"
 
-# ... ConnectOption
-# ... HTTPOption
+# optional
+dns: system
+connect:
+  # ... ConnectOption
+http:
+  # ... HTTPOption
 ```
 
 ## `secretId`

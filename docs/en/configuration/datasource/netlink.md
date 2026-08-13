@@ -22,7 +22,8 @@ includeBogon: false
 
 ## `ifName`
 
-Filter by network interface name.
+Filter by network interface name. At least one of `ifName` and `ifIndex` must
+be set.
 
 ```yaml
 ifName: eth0
@@ -30,7 +31,9 @@ ifName: eth0
 
 ## `ifIndex`
 
-Filter by network interface index. When both `ifName` and `ifIndex` are set, `ifIndex` takes priority; `ifName` is used as a fallback if the index lookup fails.
+Filter by network interface index. At least one of `ifName` and `ifIndex` must
+be set. When both are set, `ifIndex` takes priority; `ifName` is used as a
+fallback if the index lookup fails.
 
 ```yaml
 ifIndex: 2

@@ -27,7 +27,7 @@ type CommandDatasourceOption struct {
 
 	// Stdin's priority is higher than StdinContent.
 	Stdin        string `json:"stdin,omitempty"        yaml:"stdin,omitempty"`
-	StdinContent string `json:"stdinContent,omitempty" yaml:"stdinContent"`
+	StdinContent string `json:"stdinContent,omitempty" yaml:"stdinContent,omitempty"`
 
 	Sync bool `json:"sync,omitempty" yaml:"sync,omitempty"`
 

@@ -7,10 +7,10 @@
 type: ipserver
 name: svc-ip
 enabled: true
-port: 8080
 
 # optional
 listen: ""
+port: 9002
 path: /
 dump: false
 ```
@@ -26,7 +26,7 @@ dump: false
 
 ## `port`
 
-监听的 TCP 端口。必填，没有默认值。
+监听的 TCP 端口，可省略；省略时默认 `9002`。
 
 ## `listen`
 

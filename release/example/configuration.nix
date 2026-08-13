@@ -19,6 +19,10 @@
 
     settings = {
       log.level = "info";
+      datasources = [ ];
+      providers = [ ];
+      domains = [ ];
+      services = [ ];
     };
   };
 }

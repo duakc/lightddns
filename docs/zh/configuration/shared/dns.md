@@ -31,11 +31,11 @@ dns:
 
 ## `type`
 
-解析器类型。可选值：`system`（使用系统解析器）或 `tls`（DNS over TLS）。
+解析器类型枚举：`system`（使用系统解析器）或 `tls`（DNS over TLS）。
 
 ## `server`
 
-上游 DNS 服务器地址。仅在 `type` 为 `tls` 时使用。
+上游 DNS 服务器地址。启用 DNS 且 `type` 为 `tls` 时必填，其它情况下不使用。
 
 ## `port`
 

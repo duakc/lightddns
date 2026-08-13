@@ -11,13 +11,6 @@ remote_branch: ci/docs
 edit_uri: ""
 nav:
   - Home: index.md
-  - Manual:
-      - Overview: manual/index.md
-      - Cloudflare: manual/cloudflare.md
-      - Aliyun: manual/aliyun.md
-      - TencentCloud: manual/tencentcloud.md
-      - Groups: manual/groups.md
-      - Services: manual/services.md
   - Configuration:
       - Options: configuration/options.md
       - Log: configuration/log.md
@@ -95,13 +88,7 @@ plugins:
           build: true
           default: false
           nav_translations:
-            Home: Home
-            Manual: 手册
-            Overview: 总览
-            Cloudflare: Cloudflare
-            Aliyun: 阿里云
-            TencentCloud: 腾讯云
-            Groups: 分组数据源
+            Home: 首页
             Configuration: 配置
             Options: 配置文件
             Log: 日志

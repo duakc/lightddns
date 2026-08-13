@@ -17,15 +17,47 @@ providers:
     # ... Cloudflare Provider 配置
 
 domains:
-  - domain: example.com
+  - enabled: true
+    domain: example.com
     provider: prov-cf
     datasource: data-http
 
 services:
   - type: prometheus
     name: svc-metrics
+    enabled: true
     # ... Prometheus 导出器配置
 ```
+
+`datasources`、`providers` 和 `services` 都是带 `type` 的列表。如果
+`name` 留空，Lightddns 在加载配置时会自动补上。
+
+`options` 包中标记了 `omitempty` 的字段可以从 YAML 中省略。各顶层
+配置段及具体类型字段的必填关系如下：
+
+顶层的 `datasources`、`providers`、`domains`、`services` 没有使用
+`omitempty`，因此这些键必须存在；没有条目时写成 `[]`。程序要实际启动，
+至少需要一个设置了 `enabled: true` 的域名或服务。
+
+| 配置段 | 必填字段 | `type` 可选值 |
+|---|---|---|
+| `log` | 无 | 无类型 |
+| `datasources` | `type` 及下方各数据源要求的字段 | `http`、`netlink`、`command`、`sum`、`failover`、`filter` |
+| `providers` | `type` 及 Provider 凭据 | `cloudflare`、`aliyun`、`tencentcloud` |
+| `domains` | `enabled`、`domain` | 无类型 |
+| `services` | `type`、`enabled` | `prometheus`、`ipserver` |
+
+当前实现仍对以下标记了 `omitempty` 的字段附加了运行时条件：
+
+- `netlink` 至少需要填写 `ifName` 或 `ifIndex`，否则无法返回地址。
+- 只有在对应管理器中恰好配置了一个条目时，域名才可以省略 `provider`
+  或 `datasource`；多个条目时必须明确填写其 `name`。
+- 启用 DNS 且使用 `type: tls` 时，`server` 不能为空。
+- 若域名的 `interval` 小于默认 `timeout` `15s`，还必须显式设置不大于
+  `interval` 的 `timeout`。
+
+服务端口可以省略：`prometheus` 默认监听 `9001`，`ipserver` 默认监听
+`9002`。
 
 ## 工作目录
 
@@ -62,6 +94,10 @@ lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
 | [`sum`](datasource/sum.md) | 合并多个子数据源的 IP 地址。 |
 | [`failover`](datasource/failover.md) | 按优先级顺序查询子数据源，失败时自动切换。 |
 | [`filter`](datasource/filter.md) | 使用 CIDR 前缀规则过滤子数据源返回的 IP 地址。 |
+
+`command.output` 可用值为 `none`、`stdout`、`stderr`、`all`。
+`command.capture` 可用值为 `stdout`、`stderr`、`all`；省略 `capture` 时默认使用
+`stdout`。
 
 ## `providers`
 

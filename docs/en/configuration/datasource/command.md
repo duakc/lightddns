@@ -102,7 +102,6 @@ Controls which streams are captured and parsed for IP addresses.
 | `stdout` | Parse stdout. |
 | `stderr` | Parse stderr. |
 | `all` | Parse both stdout and stderr. |
-| `none` | Invalid for this datasource. |
 
 ```yaml
 capture: stdout

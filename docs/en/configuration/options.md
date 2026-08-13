@@ -17,15 +17,49 @@ providers:
     # ... Cloudflare provider config
 
 domains:
-  - domain: example.com
+  - enabled: true
+    domain: example.com
     provider: prov-cf
     datasource: data-http
 
 services:
   - type: prometheus
     name: svc-metrics
+    enabled: true
     # ... Prometheus exporter config
 ```
+
+`datasources`, `providers`, and `services` are typed lists. If `name` is
+omitted, Lightddns fills one in automatically when the config is loaded.
+
+Fields marked `omitempty` in the `options` package can be omitted from YAML.
+The following top-level fields and type-specific fields are required by their
+respective entries:
+
+The top-level `datasources`, `providers`, `domains`, and `services` keys are
+required because they do not use `omitempty`; use `[]` when a list has no
+entries. To start the runtime, at least one domain or service entry must have
+`enabled: true`.
+
+| Section | Required fields | Available `type` values |
+|---|---|---|
+| `log` | none | not typed |
+| `datasources` | `type` and the fields listed below | `http`, `netlink`, `command`, `sum`, `failover`, `filter` |
+| `providers` | `type` and provider credentials | `cloudflare`, `aliyun`, `tencentcloud` |
+| `domains` | `enabled`, `domain` | not typed |
+| `services` | `type`, `enabled` | `prometheus`, `ipserver` |
+
+The current runtime still places conditions on these `omitempty` fields:
+
+- `netlink` needs at least one of `ifName` or `ifIndex` to return addresses.
+- A domain may omit `provider` or `datasource` only when the corresponding
+  manager contains exactly one item; otherwise use its `name` explicitly.
+- An enabled DNS object with `type: tls` needs a non-empty `server`.
+- If a domain sets `interval` below the default `timeout` of `15s`, it must also
+  set `timeout` to a value no greater than `interval`.
+
+The service ports are optional. When omitted, `prometheus` listens on `9001`
+and `ipserver` listens on `9002`.
 
 ## Working Directory
 
@@ -62,6 +96,10 @@ A list of datasources. Each datasource discovers the current public IP address o
 | [`sum`](datasource/sum.md) | Merge IPs from multiple child datasources. |
 | [`failover`](datasource/failover.md) | Query child datasources in priority order, failing over on error. |
 | [`filter`](datasource/filter.md) | Filter IPs from child datasources with CIDR prefix rules. |
+
+The `command.output` values are `none`, `stdout`, `stderr`, and `all`.
+The `command.capture` values are `stdout`, `stderr`, and `all`; an omitted
+`capture` defaults to `stdout`.
 
 ## `providers`
 

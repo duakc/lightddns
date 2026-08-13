@@ -102,7 +102,6 @@ output: stderr
 | `stdout` | 解析 stdout。 |
 | `stderr` | 解析 stderr。 |
 | `all` | 同时解析 stdout 和 stderr。 |
-| `none` | 对此数据源无效。 |
 
 ```yaml
 capture: stdout

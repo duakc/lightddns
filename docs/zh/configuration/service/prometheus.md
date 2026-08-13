@@ -10,7 +10,7 @@ enabled: true
 
 # optional
 listen: ""
-port: 9090
+port: 9001
 path: /metrics
 ```
 
@@ -26,7 +26,7 @@ path: /metrics
 
 ## `port`
 
-监听的 TCP 端口。默认 `9090`。
+监听的 TCP 端口，可省略；省略时默认 `9001`。
 
 ## `path`
 

@@ -1,31 +1,23 @@
 package genschema
 
 import (
+	"encoding/json"
 	"reflect"
 	"slices"
 	"sync"
 
 	"github.com/duakc/lightddns/adapter"
+	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/badyaml"
 	"github.com/duakc/lightddns/infra/netx/dialerx"
+	"github.com/duakc/lightddns/infra/netx/resolvectl/transports"
 	"github.com/duakc/lightddns/options"
 	"github.com/duakc/lightddns/script/goscript/pkg/jsonschema"
+	ipserverservice "github.com/duakc/lightddns/services/ipserver"
+	prometheusservice "github.com/duakc/lightddns/services/prometheus"
 
 	"github.com/duakc/mt"
 )
-
-func dualStack(item *jsonschema.Schema) *jsonschema.Schema {
-	return &jsonschema.Schema{AnyOf: []*jsonschema.Schema{
-		item,
-		{
-			Type: JSONTypeObject,
-			Properties: map[string]*jsonschema.Schema{
-				"ipv4": item,
-				"ipv6": item,
-			},
-		},
-	}}
-}
 
 var (
 	optionsTypeMappingTable     = make(map[reflect.Type]*jsonschema.Schema)
@@ -37,9 +29,14 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.Listable[string]]()] = listAble(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.Listable[badyaml.Prefix]]()] = listAble(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.EnvironmentVariable]()] = listAble(JSONTypeString)
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.HTTPHeader]()] = listAble(JSONTypeString)
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.Prefix]()] = singleType(JSONTypeString)
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.HTTPHeader]()] = &jsonschema.Schema{
+			Type:                 JSONTypeObject,
+			AdditionalProperties: listAble(JSONTypeString),
+		}
 
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.HTTPMethod]()] = httpMethod()
+		setDefault(optionsTypeMappingTable[reflect.TypeFor[badyaml.HTTPMethod]()], "GET")
 
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.Duration]()] = singleType(JSONTypeString)
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.URL]()] = singleType(JSONTypeString)
@@ -48,32 +45,65 @@ func optionsTypeMapping() map[reflect.Type]*jsonschema.Schema {
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.JQ]()] = singleType(JSONTypeString)
 
 		optionsTypeMappingTable[reflect.TypeFor[badyaml.StringOrNumber]()] = stringOr(singleType(JSONTypeNumber))
-		optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()] = enumSchema(JSONTypeString, "debug", "info", "warn", "error", "panic", "fatal")
+		optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()] = enumSchema(
+			JSONTypeString, "debug", "info", "warn", "warning", "error", "dpanic", "panic", "fatal")
+		setDefault(optionsTypeMappingTable[reflect.TypeFor[badyaml.LogLevel]()], "info")
 
 		optionsTypeMappingTable[reflect.TypeFor[dialerx.DialStrategy]()] = enumSchema(JSONTypeString, mt.Map(
 			[]dialerx.DialStrategy{dialerx.DialOnlyIPv4, dialerx.DialOnlyIPv6, dialerx.DialPreferIPv4, dialerx.DialPreferIPv6},
 			func(s dialerx.DialStrategy) any {
 				return s.String()
 			})...)
+		setDefault(optionsTypeMappingTable[reflect.TypeFor[dialerx.DialStrategy]()],
+			dialerx.DialPreferIPv6.String())
 
-		optionsTypeMappingTable[reflect.TypeFor[options.DNSOption]()] = stringOr(
-			mt.Must(jsonschema.For[options.DNSOption](&jsonschema.ForOptions{
-				TypeSchemas: optionsTypeMappingTable,
-			})))
+		dnsObjectSchema := mt.Must(jsonschema.For[options.DNSOption](&jsonschema.ForOptions{
+			TypeSchemas: optionsTypeMappingTable,
+		}))
+		dnsObjectSchema.Properties["type"] = enumSchema(
+			JSONTypeString, transports.TransportTypeSystem, transports.TransportTypeTLS)
+		setDefault(dnsObjectSchema.Properties["type"], transports.TransportTypeSystem)
+		dnsObjectSchema.AllOf = append(dnsObjectSchema.AllOf, &jsonschema.Schema{
+			If: &jsonschema.Schema{
+				Properties: map[string]*jsonschema.Schema{
+					"enabled": constSchema(true),
+					"type":    constSchema(transports.TransportTypeTLS),
+				},
+				Required: []string{"enabled", "type"},
+			},
+			Then: &jsonschema.Schema{
+				Properties: map[string]*jsonschema.Schema{
+					"server": {Type: JSONTypeString, MinLength: new(1)},
+				},
+				Required: []string{"server"},
+			},
+		})
+		optionsTypeMappingTable[reflect.TypeFor[options.DNSOption]()] = &jsonschema.Schema{
+			AnyOf: []*jsonschema.Schema{
+				enumSchema(JSONTypeString, transports.TransportTypeSystem),
+				{Type: JSONTypeString, Pattern: `^tls://.+$`},
+				dnsObjectSchema,
+			},
+		}
 		optionsTypeMappingTable[reflect.TypeFor[options.CommandOutput]()] = enumSchema(JSONTypeString, mt.Map(
 			[]options.CommandOutput{
 				options.CommandOutputNone, options.CommandOutputStdout,
 				options.CommandOutputStderr, options.CommandOutputAll,
 			},
-			func(s options.CommandOutput) string {
-				return string(s)
-			}))
+			func(s options.CommandOutput) any {
+				return s
+			})...)
+		setDefault(optionsTypeMappingTable[reflect.TypeFor[options.CommandOutput]()],
+			options.CommandOutputNone)
 	})
 	return optionsTypeMappingTable
 }
 
 func GenSchema() ([]byte, error) {
-	rootSchema := new(jsonschema.Schema)
+	rootSchema := &jsonschema.Schema{
+		Type:                 JSONTypeObject,
+		AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+	}
 	var (
 		logTag    = lookupTagIn[options.Options, options.LogOption]()
 		domainTag = lookupTagIn[options.Options, options.DomainOption]()
@@ -84,14 +114,19 @@ func GenSchema() ([]byte, error) {
 	)
 	rootSchema.Properties = make(map[string]*jsonschema.Schema)
 	rootSchema.Properties[logTag] = mustFor[options.LogOption]()
+	setDefault(rootSchema.Properties[logTag].Properties["output"], "stdout")
 	rootSchema.Properties[domainTag] = mustFor[[]options.DomainOption]()
+	requireArray(rootSchema.Properties[domainTag], false)
+	rootSchema.Properties[domainTag].Items.Properties["domain"].MinLength = new(1)
+	setDefault(rootSchema.Properties[domainTag].Items.Properties["interval"],
+		constpkg.DefaultDomainUpdateInterval.String())
+	setDefault(rootSchema.Properties[domainTag].Items.Properties["timeout"],
+		constpkg.DefaultDomainTimeout.String())
 
 	rootSchema.Properties[providerTag] = providerSchema()
 	rootSchema.Properties[datasourceTag] = datasourceSchema()
 	rootSchema.Properties[servicesTag] = servicesSchema()
-
-	// rootSchema.Required = append(rootSchema.Required,
-	//	domainTag, providerTag, datasourceTag)
+	rootSchema.Required = []string{datasourceTag, providerTag, domainTag, servicesTag}
 
 	return rootSchema.MarshalJSON()
 }
@@ -130,9 +165,67 @@ func schemaFromRegistry(reg schemaRegistry) *jsonschema.Schema {
 			TypeSchemas: optionsTypeMapping(),
 		}))
 		variantSchema.Properties[typeTag].Const = new(any(typ))
+		customizeVariantSchema(typ, variantSchema)
 		rootSchema.Items.AnyOf = append(rootSchema.Items.AnyOf, variantSchema)
 	}
 	return rootSchema
+}
+
+func customizeVariantSchema(typ string, schema *jsonschema.Schema) {
+	switch typ {
+	case constpkg.DatasourceTypeCommand:
+		schema.Properties["cmd"].AnyOf[0].MinLength = new(1)
+		schema.Properties["cmd"].AnyOf[1].MinItems = new(1)
+		schema.Properties["capture"] = enumSchema(JSONTypeString,
+			options.CommandOutputStdout, options.CommandOutputStderr, options.CommandOutputAll)
+		setDefault(schema.Properties["capture"], options.CommandOutputStdout)
+	case constpkg.DatasourceTypeHTTP:
+		schema.Properties["url"].MinLength = new(1)
+		schema.Properties["url"].Pattern = `^https?://.+$`
+	case constpkg.DatasourceTypeNetlink:
+		one := 1.0
+		schema.Properties["ifName"].MinLength = new(1)
+		schema.Properties["ifIndex"].Minimum = &one
+		schema.AnyOf = []*jsonschema.Schema{
+			{Required: []string{"ifName"}},
+			{Required: []string{"ifIndex"}},
+		}
+	case constpkg.DatasourceGroupTypeSum, constpkg.DatasourceGroupTypeFailover:
+		requireArray(schema.Properties["datasources"], true)
+	case constpkg.DatasourceGroupFilter:
+		requireArray(schema.Properties["datasources"], false)
+		requireArray(schema.Properties["rules"], true)
+	case constpkg.ProviderTypeCloudflare:
+		schema.Properties["token"].MinLength = new(1)
+	case constpkg.ProviderTypeAliyun:
+		schema.Properties["accessKeyId"].MinLength = new(1)
+		schema.Properties["accessKeySecret"].MinLength = new(1)
+	case constpkg.ProviderTypeTencentCloud:
+		schema.Properties["secretId"].MinLength = new(1)
+		schema.Properties["secretKey"].MinLength = new(1)
+	case constpkg.ServiceTypePrometheus:
+		setDefault(schema.Properties["port"], prometheusservice.DefaultPort)
+		setDefault(schema.Properties["path"], prometheusservice.DefaultPath)
+	case constpkg.ServiceTypeIPServer:
+		setDefault(schema.Properties["port"], ipserverservice.DefaultPort)
+		setDefault(schema.Properties["path"], ipserverservice.DefaultPath)
+	}
+}
+
+func setDefault(schema *jsonschema.Schema, value any) {
+	schema.Default = json.RawMessage(mt.Must(json.Marshal(value)))
+}
+
+func constSchema(value any) *jsonschema.Schema {
+	return &jsonschema.Schema{Const: &value}
+}
+
+func requireArray(schema *jsonschema.Schema, nonEmpty bool) {
+	schema.Type = JSONTypeArray
+	schema.Types = nil
+	if nonEmpty {
+		schema.MinItems = new(1)
+	}
 }
 
 func mustFor[T any]() *jsonschema.Schema {

@@ -12,9 +12,10 @@ output: ""
 
 日志级别：
 
-可用值: `debug | info | warn | error | panic | fatal`。
+规范值：`debug | info | warn | error | dpanic | panic | fatal`。大小写不
+敏感，`warning` 也可作为 `warn` 的别名。
 
-留空使用 `info`
+省略时默认使用 `info`。
 
 ## `disabled`
 
@@ -22,7 +23,9 @@ output: ""
 
 ## `output`
 
-日志输出文件路径。为空时输出到标准输出（stdout）。相对路径会创建在 `lightddns -D/--workdir` 指定的全局工作目录下。
+日志输出目标。特殊值为 `stdout`（留空时的默认值）和 `stderr`；其它值
+都会被当作文件路径。相对路径会创建在 `lightddns -D/--workdir` 指定的
+全局工作目录下。
 
 ```yaml
 output: "/var/log/lightddns.log"

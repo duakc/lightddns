@@ -12,9 +12,10 @@ output: ""
 
 Log level. Uses [zap](https://github.com/uber-go/zap) levels:
 
-`debug | info | warn | error | panic | fatal`.
+Canonical values: `debug | info | warn | error | dpanic | panic | fatal`.
+They are case-insensitive, and `warning` is accepted as an alias for `warn`.
 
-When empty, defaults to `info`.
+When omitted, defaults to `info`.
 
 ## `disabled`
 
@@ -22,7 +23,9 @@ Disables all logging output when set to `true`.
 
 ## `output`
 
-Log output file path. When empty, logs are written to stdout. Relative paths are created under the global working directory from `lightddns -D/--workdir`.
+Log output destination. The special values are `stdout` (the default when
+empty) and `stderr`; any other value is treated as a file path. Relative paths
+are created under the global working directory from `lightddns -D/--workdir`.
 
 ```yaml
 output: "/var/log/lightddns.log"

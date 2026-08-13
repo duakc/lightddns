@@ -1,110 +1,80 @@
 # lightddns
 
-> `lightddns` is a lightweight, configuration-first DDNS service.
+`lightddns` is a configuration-first DDNS service.
+
+The name says lightweight, but the project is not really `light` anymore. It
+has grown into a broader toolset with multiple IP handling, reusable
+components, packaging, services, and structured logging.
 
 The project is still moving toward a stable release, so community testing is
-very welcome right now. Please try the packages, providers, `httpProxy`,
-`httpsProxy`, custom `dns`, and service startup behavior in real environments.
+welcome now. Please try package installs, provider updates, `httpProxy` /
+`httpsProxy`, custom `dns`, service startup, and end-to-end domain updates in
+real environments. Reports are most useful when they include the package
+format, operating system, sanitized logs, and a small configuration snippet.
 
-Useful reports usually include the package format, operating system, sanitized
-logs, and a small configuration snippet.
+---
 
+`lightddns` is built from reusable pieces.
 
-> `lightddns` is built around a few reusable ideas.
+A `datasource` discovers IPs. A `provider` applies DNS changes. A `domain`
+connects them. A `service` adds optional runtime features such as Prometheus
+metrics or the `ipserver` endpoint.
 
-A `datasource` discovers IP addresses. A `provider` applies DNS record updates.
-A `domain` connects a datasource with a provider. A `service` exposes optional
-runtime features that are useful around DDNS, such as `prometheus` metrics or an
-`ipserver` endpoint.
+That split keeps transport, DNS, HTTP, datasources, providers, and services
+reusable instead of locking them into one update path.
 
-This layout is meant to keep the project flexible. The same `connect`, `dns`,
-`http`, datasource, provider, and service pieces can be reused in different
-places instead of being locked inside one update path.
+---
 
+Compared with [`ddns-go`](https://github.com/jeessy2/ddns-go), the focus here
+is different.
 
-> The project is different from [`ddns-go`](https://github.com/jeessy2/ddns-go) in a few important ways.
+`ddns-go` is mature and very convenient for web-based setup. `lightddns` stays
+configuration-first and more composable. It is built to handle multiple IPs,
+keep clearer component boundaries, and make packaging and operational reuse
+easier. Release artifacts already cover `deb`, `rpm`, `pkg.zst`, and `Nix`,
+and the longer-term path is toward `AUR` and `nixpkgs` once the project
+settles.
 
-`ddns-go` is mature, popular, and very convenient for web-based configuration.
-`lightddns` is not trying to be a drop-in replacement for it. The main goal here
-is to make DDNS workflows easier to compose, test, package, and run from a
-configuration file.
+It also has structured logging and service abstractions, so the runtime is
+easier to inspect and reuse.
 
-`lightddns` can work with multiple IP addresses, not only one simple result. It
-also gives more structure to datasources and providers, so IP discovery,
-filtering, failover, and DNS record updates can be combined more freely.
+---
 
-The project also puts more attention on packaging. Release work already covers
-formats such as `deb`, `rpm`, `pkg.zst`, and `Nix`. When the project is stable
-enough, packages can move toward community repositories such as `AUR` and
-`nixpkgs`.
+## Known Limits
 
-Another difference is runtime visibility. `lightddns` has structured logging
-and service abstractions, so debugging datasource, provider, DNS, proxy, and
-transport behavior should be clearer over time.
+The current diff model mainly tracks IP addresses. Provider-specific record
+state is still incomplete, so things like Cloudflare `proxied` cannot be
+diffed reliably yet. The same limitation still applies to planned Tencent Cloud
+and Aliyun `line` support.
 
+The network layer still needs more field testing, especially around connection
+reuse, proxy behavior, DNS boundaries, transport retries, and how remote
+proxies should receive hostnames versus locally resolved IPs.
 
-## Current Limits
+Packaging exists, but it still needs wider testing from the community before it
+can be treated as boring.
 
-### The biggest known limitation is the diff model.
+The documentation is still growing. The configuration reference is available,
+but not every runtime path is documented yet.
 
-Right now, diffing mainly works on IP addresses. Provider-specific record state
-is not fully represented yet. For example, Cloudflare's `proxied` status cannot
-be reliably diffed and updated when the IP itself has not changed.
-
-The same limitation affects planned Tencent Cloud and Aliyun `line` support.
-Those features need the diff model to understand provider-specific record
-attributes, not only record IPs.
-
-
-### The network layer also needs more refinement.
-
-Connection reuse, `dns` boundaries, HTTP proxy behavior, transport behavior, and
-retry rules all need more real-world testing. One important rule is that when
-`httpProxy` or `httpsProxy` is enabled, target domains should be sent to the
-remote proxy. Local `dns` configuration is only expected to affect the address
-being dialed locally, such as the proxy host itself.
-
-
-### Packaging needs testing too.
-
-The release outputs exist, but they have not been tested by many users yet.
-Please test installation, upgrade, service startup, service restart, logs, and
-uninstall behavior for `deb`, `rpm`, `pkg.zst`, and `Nix`.
-
-
-### The documentation is not complete yet.
-
-The goal is to provide a full reference for every configuration option and
-runtime behavior. Until that is finished, some details may still require reading
-examples or source code.
-
+---
 
 ## Roadmap
 
-- [x] Add `prometheus` metrics.
-- [x] Add Tencent Cloud and Aliyun providers.
-- [x] Add `deb`, `rpm`, `Nix`, `pkg.zst`, and related release packaging.
-- [ ] Complete the configuration reference.
-- [ ] Add a web configuration generator in the documentation site.
-- [ ] Extend diffing to provider-specific record attributes.
-- [ ] Add reliable Tencent Cloud and Aliyun `line` support.
-- [ ] Continue improving network behavior, logs, and observability.
-- [ ] Don't stop maintain this project (most important)
+- Complete the configuration reference.
+- Finish the documentation site.
+- Extend diffing to provider-specific record attributes.
+- Add reliable Tencent Cloud and Aliyun `line` support.
+- Keep tightening network behavior, logs, and observability.
 
-## Considering
-
-Webhook integrations such as `Slack` or `Telegram` are still being considered.
-External alerting systems can already consume `prometheus` metrics, so native
-webhooks should only be added if they expose useful runtime state without making
-the core service unnecessarily complex.
+---
 
 ## License
 
-`lightddns` is licensed under the GNU General Public License v2.0. See
-[LICENSE](LICENSE) for details.
+`lightddns` is licensed under GPL-2.0. See [LICENSE](https://github.com/duakc/lightddns/blob/main/LICENSE).
 
-## Development Notice
+## Development Note
 
-Most code in this project is written and designed by humans. AI assistance is
-used for a limited part of the work, mainly some bug fixes, some test writing,
-and repetitive code.
+Most of the code in this project is written by humans. AI assistance is used
+for a limited part of the work, mainly bug fixes, some test writing, and
+repetitive code.

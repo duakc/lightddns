@@ -31,11 +31,12 @@ Whether custom DNS resolution is applied. The string form is always enabled; in 
 
 ## `type`
 
-Resolver type. Accepts `system` (use the system resolver) or `tls` (DNS over TLS).
+Resolver type enum: `system` (use the system resolver) or `tls` (DNS over TLS).
 
 ## `server`
 
-Upstream DNS server address. Only used when `type` is `tls`.
+Upstream DNS server address. Required when DNS is enabled with `type: tls`;
+otherwise it is unused.
 
 ## `port`
 

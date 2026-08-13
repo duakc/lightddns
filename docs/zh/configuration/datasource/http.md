@@ -112,7 +112,9 @@ url: https://api.ip.sb/ip
 
 HTTP 请求方法。留空时默认使用 `GET`。
 
-支持 `GET`、`POST`、`PUT`、`HEAD`、`DELETE`、`PATCH`、`CONNECT`、`OPTIONS`、`TRACE`，以及 `BREW`、`PROPFIND`、`WHEN`。
+规范值为 `GET`、`POST`、`PUT`、`HEAD`、`DELETE`、`PATCH`、`CONNECT`、
+`OPTIONS`、`TRACE`、`BREW`、`PROPFIND`、`WHEN`。输入不区分大小写，加载
+时会统一转换为大写。
 
 ---
 

@@ -1,10 +1,7 @@
 # yaml-language-server: $schema=__SCHEMA_URL__
 #
-# Minimal lightddns configuration.
-#
-# This is intentionally bare: it only sets the log level so the daemon starts
-# cleanly out of the box. Add what you need under the top-level sections -
-# providers, datasources, domains, services - per the docs:
+# Minimal lightddns configuration skeleton. Add at least one enabled domain or
+# service before starting the daemon. See the docs for complete examples:
 #
 #   Docs:    https://lightddns.duaky.com
 #
@@ -17,3 +14,8 @@
 
 log:
   level: info
+
+datasources: []
+providers: []
+domains: []
+services: []

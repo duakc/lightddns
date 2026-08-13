@@ -77,7 +77,8 @@ When both are left unset, IPv4 and IPv6 are both enabled.
 
 ## `interval`
 
-Polling interval for checking IP changes. Accepts Go duration strings (e.g. `5m`, `1h`, `300s`).
+Polling interval for checking IP changes. Accepts Go duration strings (e.g.
+`5m`, `1h`, `300s`). Optional; defaults to `30s`.
 
 ```yaml
 interval: 5m
@@ -86,6 +87,9 @@ interval: 5m
 ## `timeout`
 
 Timeout for each IP check and DNS update operation. Accepts Go duration strings.
+Optional; defaults to `15s`. It must not be greater than `interval`.
+When `interval` is less than `15s`, set `timeout` explicitly to a value no
+greater than that interval.
 
 ```yaml
 timeout: 30s

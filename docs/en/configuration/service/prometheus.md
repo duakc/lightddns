@@ -10,7 +10,7 @@ enabled: true
 
 # optional
 listen: ""
-port: 9090
+port: 9001
 path: /metrics
 ```
 
@@ -26,7 +26,7 @@ Bind address. Empty means "all interfaces" (`0.0.0.0` + `::`). Use `127.0.0.1` t
 
 ## `port`
 
-TCP port to listen on. Defaults to `9090`.
+TCP port to listen on. Optional; defaults to `9001` when omitted.
 
 ## `path`
 

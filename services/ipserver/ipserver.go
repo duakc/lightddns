@@ -37,6 +37,7 @@ var _ adapter.Service = (*IPServer)(nil)
 
 const (
 	ServiceType = constpkg.ServiceTypeIPServer
+	DefaultPort = 9002
 	DefaultPath = "/"
 )
 
@@ -54,7 +55,7 @@ func New(ctx context.Context, logger *zap.Logger, option options.IPServerService
 	}
 
 	if option.Port == 0 {
-		return nil, fmt.Errorf("missing port")
+		option.Port = DefaultPort
 	}
 
 	if option.Path == "" {

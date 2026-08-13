@@ -22,7 +22,7 @@ includeBogon: false
 
 ## `ifName`
 
-按网络接口名称过滤。
+按网络接口名称过滤。`ifName` 和 `ifIndex` 至少需要设置一个。
 
 ```yaml
 ifName: eth0
@@ -30,7 +30,8 @@ ifName: eth0
 
 ## `ifIndex`
 
-按网络接口索引过滤。若同时设置了 `ifName` 和 `ifIndex`，优先使用 `ifIndex`；当索引查找失败时，回退到 `ifName`。
+按网络接口索引过滤。`ifName` 和 `ifIndex` 至少需要设置一个。若同时配置，
+优先使用 `ifIndex`；当索引查找失败时，回退到 `ifName`。
 
 ```yaml
 ifIndex: 2

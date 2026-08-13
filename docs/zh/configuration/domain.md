@@ -78,7 +78,8 @@ ttl: 300
 
 ## `interval`
 
-检查 IP 变更的轮询间隔。支持 Go duration 字符串格式（如 `5m`、`1h`、`300s`）。
+检查 IP 变更的轮询间隔。支持 Go duration 字符串格式（如 `5m`、`1h`、
+`300s`）。可省略，默认 `30s`。
 
 ```yaml
 interval: 5m
@@ -87,6 +88,8 @@ interval: 5m
 ## `timeout`
 
 每次 IP 检查和 DNS 更新操作的超时时间。支持 Go duration 字符串格式。
+可省略，默认 `15s`，且不能大于 `interval`。
+如果 `interval` 小于 `15s`，必须显式设置一个不大于该间隔的 `timeout`。
 
 ```yaml
 timeout: 30s

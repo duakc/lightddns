@@ -1,15 +1,29 @@
 package ipserver
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/duakc/lightddns/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
+
+func TestNewUsesDefaultPort(t *testing.T) {
+	service, err := New(context.Background(), zap.NewNop(), options.IPServerServiceOption{
+		AbstractServiceOption: options.AbstractServiceOption{
+			Type: ServiceType,
+			Name: "test-ipserver",
+		},
+		Enabled: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, ":9002", service.(*IPServer).addr)
+}
 
 func newTestIPServer(dump bool) *IPServer {
 	return &IPServer{

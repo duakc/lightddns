@@ -112,7 +112,9 @@ url: https://api.ip.sb/ip
 
 HTTP request method. Empty defaults to `GET`.
 
-Supported values: `GET`, `POST`, `PUT`, `HEAD`, `DELETE`, `PATCH`, `CONNECT`, `OPTIONS`, `TRACE`, plus `BREW`, `PROPFIND`, `WHEN`.
+Canonical values: `GET`, `POST`, `PUT`, `HEAD`, `DELETE`, `PATCH`, `CONNECT`,
+`OPTIONS`, `TRACE`, `BREW`, `PROPFIND`, and `WHEN`. Input is
+case-insensitive and is normalized to uppercase.
 
 ---
 

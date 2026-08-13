@@ -15,11 +15,11 @@ services:
     name: svc-metrics
     enabled: true
     listen: "127.0.0.1"
-    port: 9090
+    port: 9001
     path: /metrics
 ```
 
-抓取 `http://127.0.0.1:9090/metrics`。所有指标都以 `lightddns_<subsystem>_*` 为前缀（如 `lightddns_domain_update_success_total`、`lightddns_provider_request_total`）。
+抓取 `http://127.0.0.1:9001/metrics`。所有指标都以 `lightddns_<subsystem>_*` 为前缀（如 `lightddns_domain_update_success_total`、`lightddns_provider_request_total`）。
 
 ## IP 回显服务
 
@@ -31,19 +31,19 @@ services:
     name: svc-ip
     enabled: true
     listen: "0.0.0.0"
-    port: 8080
+    port: 9002
     path: /
     dump: false
 ```
 
 ```bash
-$ curl http://localhost:8080/
+$ curl http://localhost:9002/
 203.0.113.5
 
-$ curl http://localhost:8080/?format=json
+$ curl http://localhost:9002/?format=json
 {"ip":"203.0.113.5","is_bogon":false}
 
-$ curl http://localhost:8080/?format=yaml
+$ curl http://localhost:9002/?format=yaml
 ip: 203.0.113.5
 is_bogon: false
 ```

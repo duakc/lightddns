@@ -24,7 +24,7 @@ import (
 const ServiceType = constpkg.ServiceTypePrometheus
 
 const (
-	DefaultPort = 9090
+	DefaultPort = 9001
 	DefaultPath = "/metrics"
 )
 

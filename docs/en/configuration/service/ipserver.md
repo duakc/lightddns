@@ -7,10 +7,10 @@ A tiny HTTP server that returns the caller's IP address. Useful as the upstream 
 type: ipserver
 name: svc-ip
 enabled: true
-port: 8080
 
 # optional
 listen: ""
+port: 9002
 path: /
 dump: false
 ```
@@ -26,7 +26,7 @@ Must be `true` for the service to start.
 
 ## `port`
 
-TCP port to listen on. Required — there is no default.
+TCP port to listen on. Optional; defaults to `9002` when omitted.
 
 ## `listen`
 
