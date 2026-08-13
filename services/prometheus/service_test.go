@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/duakc/lightddns/options"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )

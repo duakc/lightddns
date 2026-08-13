@@ -29,7 +29,6 @@ type RpcSignRequester struct {
 }
 
 func (c *RpcSignRequester) Do(r *http.Request) (resp *http.Response, err error) {
-
 	q := r.URL.Query()
 	q.Set(ParamAccessKeyId, c.SecretAccessKeyId)
 	q.Set(ParamSignatureMethod, RPCSignatureMethod)

@@ -4,6 +4,9 @@ SCRIPT_WORKDIR=$(shell cd script/goscript && pwd)
 
 BUILD_DIR="build"
 RELEASE_FILE_DIR="release"
+RELEASE_GOOS ?= '*'
+RELEASE_GOARCH ?= '*'
+RELEASE_PACKAGES ?= true
 
 GO_SCRIPT=GOSCRIPT_DRAFT_SUB_DIR="draft" \
 		GOSCRIPT_BUILD_DIR=$(BUILD_DIR) \
@@ -24,6 +27,22 @@ all: toolchain clean generate test \
 .PHONY: build-release
 build-release: clean generate generate-schema build-all \
 	build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
+
+.PHONY: build-release-target
+build-release-target: generate
+	@$(GO_SCRIPT) build --goarch '$(RELEASE_GOARCH)' --goos '$(RELEASE_GOOS)'
+	@if [ "$(RELEASE_PACKAGES)" = "true" ]; then \
+		$(MAKE) build-release-target-packages \
+			RELEASE_GOARCH='$(RELEASE_GOARCH)'; \
+	fi
+
+.PHONY: build-release-target-packages
+build-release-target-packages:
+	$(GO_SCRIPT) nfpm --format deb --goarch '$(RELEASE_GOARCH)'
+	$(GO_SCRIPT) nfpm --format rpm --goarch '$(RELEASE_GOARCH)'
+	$(GO_SCRIPT) nfpm --format archlinux --goarch '$(RELEASE_GOARCH)'
+	$(GO_SCRIPT) nfpm --format alpine.apk --goarch '$(RELEASE_GOARCH)'
+	$(GO_SCRIPT) nfpm --format openwrt --goarch '$(RELEASE_GOARCH)'
 
 
 .PHONY: test

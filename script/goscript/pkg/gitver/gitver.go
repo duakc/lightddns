@@ -2,6 +2,7 @@ package gitver
 
 import (
 	"context"
+	"os"
 	"strings"
 	"sync"
 
@@ -9,6 +10,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 )
+
+// EnvBranch overrides the Git branch stamped into release builds. This is
+// needed when CI checks out a tag, which leaves Git in detached HEAD state.
+const EnvBranch = "GOSCRIPT_GIT_BRANCH"
 
 var (
 	gitVersionOnce, gitBranchOnce, gitLocatableVersionOnce sync.Once
@@ -49,12 +54,19 @@ func Version(ctx context.Context) string {
 
 func Branch(ctx context.Context) string {
 	gitBranchOnce.Do(func() {
-		gitBranch = unknown
-		if b := git(ctx, "branch", "--show-current"); b != "" {
-			gitBranch = b
-		}
+		gitBranch = branch(ctx)
 	})
 	return gitBranch
+}
+
+func branch(ctx context.Context) string {
+	if b := os.Getenv(EnvBranch); b != "" {
+		return b
+	}
+	if b := git(ctx, "branch", "--show-current"); b != "" {
+		return b
+	}
+	return unknown
 }
 
 func LocatableVersion(ctx context.Context) string {

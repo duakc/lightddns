@@ -20,7 +20,6 @@ type RoaSignRequester struct {
 }
 
 func (c *RoaSignRequester) Do(r *http.Request) (resp *http.Response, err error) {
-
 	common := ROACommon{SecretSecurityToken: c.SecretSecurityToken}
 	httpx.ExtendHeadersOverride(r.Header, common.Headers())
 

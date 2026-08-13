@@ -16,7 +16,6 @@ type apiRequester struct {
 }
 
 func (c *apiRequester) Do(req *http.Request) (resp *http.Response, err error) {
-
 	return (&httpx.TokenClient{
 		HTTPRequester: c.HTTPRequester,
 		Token:         c.Token,

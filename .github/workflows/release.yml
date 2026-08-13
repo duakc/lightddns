@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   detect-release-tag:
     name: Detect release tag on HEAD
@@ -51,11 +55,89 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  publish:
-    name: Build and publish ${{ needs.detect-release-tag.outputs.tag }}
+  approve-release:
+    name: Approve publishing ${{ needs.detect-release-tag.outputs.tag }}
     needs: detect-release-tag
     if: needs.detect-release-tag.outputs.tag != ''
     runs-on: ubuntu-latest
+    environment:
+      name: release
+    steps:
+      - name: Await approval
+        run: echo "Publishing ${{ needs.detect-release-tag.outputs.tag }} after environment approval."
+
+  build:
+    name: Build ${{ matrix.id }}
+    needs:
+      - detect-release-tag
+      - approve-release
+    if: needs.detect-release-tag.outputs.tag != '' && needs.approve-release.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 14
+      matrix:
+        include:
+          - id: darwin
+            goos: darwin
+            goarch: '*'
+            packages: 'false'
+          - id: freebsd
+            goos: freebsd
+            goarch: '*'
+            packages: 'false'
+          - id: openbsd
+            goos: openbsd
+            goarch: '*'
+            packages: 'false'
+          - id: windows
+            goos: windows
+            goarch: '*'
+            packages: 'false'
+          - id: linux-amd64
+            goos: linux
+            goarch: amd64
+            packages: 'true'
+          - id: linux-arm
+            goos: linux
+            goarch: arm
+            packages: 'true'
+          - id: linux-arm64
+            goos: linux
+            goarch: arm64
+            packages: 'true'
+          - id: linux-mips
+            goos: linux
+            goarch: mips
+            packages: 'true'
+          - id: linux-mipsle
+            goos: linux
+            goarch: mipsle
+            packages: 'true'
+          - id: linux-mips64
+            goos: linux
+            goarch: mips64
+            packages: 'true'
+          - id: linux-mips64le
+            goos: linux
+            goarch: mips64le
+            packages: 'true'
+          - id: linux-386
+            goos: linux
+            goarch: '386'
+            packages: 'true'
+          - id: linux-loong64
+            goos: linux
+            goarch: loong64
+            packages: 'true'
+          - id: linux-riscv64
+            goos: linux
+            goarch: riscv64
+            packages: 'true'
+    env:
+      # Tag checkouts are detached; stamp the source release branch explicitly.
+      GOSCRIPT_GIT_BRANCH: ${{ github.ref_name }}
+      GOCACHE: ${{ github.workspace }}/.cache/go-build
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v5
@@ -67,16 +149,100 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
-      - name: Build release assets
-        run: make build-release
+      - name: Restore Go module cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: gomod-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+
+      - name: Restore target Go build cache
+        id: go-build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.GOCACHE }}
+          key: gocache-${{ runner.os }}-${{ matrix.id }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            gocache-${{ runner.os }}-${{ matrix.id }}-${{ hashFiles('go.sum') }}-
+
+      - name: Build release assets for ${{ matrix.id }}
+        run: >-
+          make build-release-target
+          RELEASE_GOOS='${{ matrix.goos }}'
+          RELEASE_GOARCH='${{ matrix.goarch }}'
+          RELEASE_PACKAGES='${{ matrix.packages }}'
 
       - name: Compress standalone binaries
         shell: bash
         run: |
           set -euo pipefail
           find build/bin -type f -print0 | xargs -0 -r gzip --best
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.id }}
+          path: |
+            build/bin/**
+            build/nfpm/**
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Save target Go build cache
+        if: always() && steps.go-build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.GOCACHE }}
+          key: ${{ steps.go-build-cache.outputs.cache-primary-key }}
+
+  publish:
+    name: Publish ${{ needs.detect-release-tag.outputs.tag }}
+    needs:
+      - detect-release-tag
+      - approve-release
+      - build
+    if: needs.detect-release-tag.outputs.tag != '' && needs.approve-release.result == 'success' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.detect-release-tag.outputs.tag }}
+
+      - name: Download release assets
+        uses: actions/download-artifact@v5
+        with:
+          pattern: release-assets-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Generate release schema
+        run: make generate-schema
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' binaries < <(find release-assets/bin -type f -name '*.gz' -print0)
+          mapfile -d '' packages < <(find release-assets/nfpm -type f -print0)
+
+          if [[ "${#binaries[@]}" -eq 0 ]]; then
+            echo 'No compressed binaries were built.' >&2
+            exit 1
+          fi
+          if [[ "${#packages[@]}" -eq 0 ]]; then
+            echo 'No Linux packages were built.' >&2
+            exit 1
+          fi
+          test -f release/schema.json
 
       - name: Generate release notes
         env:
@@ -134,23 +300,6 @@ jobs:
             git log "$commit_range" --format='- `%h` %s - %aN <%aE>'
           } > release-notes.md
 
-      - name: Verify release assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -d '' binaries < <(find build/bin -type f -name '*.gz' -print0)
-          mapfile -d '' packages < <(find build/nfpm -type f -print0)
-
-          if [[ "${#binaries[@]}" -eq 0 ]]; then
-            echo 'No compressed binaries were built.' >&2
-            exit 1
-          fi
-          if [[ "${#packages[@]}" -eq 0 ]]; then
-            echo 'No Linux packages were built.' >&2
-            exit 1
-          fi
-          test -f release/schema.json
-
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -163,10 +312,10 @@ jobs:
           assets=(release/schema.json)
           while IFS= read -r -d '' binary; do
             assets+=("$binary")
-          done < <(find build/bin -type f -name '*.gz' -print0)
+          done < <(find release-assets/bin -type f -name '*.gz' -print0)
           while IFS= read -r -d '' package; do
             assets+=("$package")
-          done < <(find build/nfpm -type f -print0)
+          done < <(find release-assets/nfpm -type f -print0)
 
           prerelease_args=()
           if [[ "$TAG" == *-* ]]; then
