@@ -5,6 +5,8 @@ on:
     branches:
       - ci_trigger/release
       - release
+    tags:
+      - "*"
   workflow_dispatch:
 
 # A release needs permission to create the GitHub Release and upload its assets.
@@ -12,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: publish-release-${{ github.ref }}
+  group: publish-release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -22,12 +24,12 @@ jobs:
     outputs:
       tag: ${{ steps.release-tag.outputs.tag }}
     steps:
-      - name: Checkout release HEAD
+      - name: Checkout event ref
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Find an unpublished tag on HEAD
+      - name: Find an unpublished tag on release HEAD
         id: release-tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,18 +38,32 @@ jobs:
           set -euo pipefail
 
           git fetch --force --tags origin
-          mapfile -t tags < <(git tag --points-at HEAD --sort=-version:refname)
+          git fetch --no-tags origin '+refs/heads/release:refs/remotes/origin/release'
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tags=("$GITHUB_REF_NAME")
+          else
+            mapfile -t tags < <(git tag --points-at "$GITHUB_SHA" --sort=-version:refname)
+          fi
 
           if [[ "${#tags[@]}" -eq 0 ]]; then
-            echo 'No tag points at the release branch HEAD; skipping release.'
+            echo 'No tag points at the pushed release branch HEAD; skipping release.'
             exit 0
           fi
+
           if [[ "${#tags[@]}" -gt 1 ]]; then
             printf 'More than one tag points at HEAD: %s\n' "${tags[*]}" >&2
             exit 1
           fi
 
           tag="${tags[0]}"
+          tag_commit="$(git rev-list -n 1 "refs/tags/$tag")"
+          release_head="$(git rev-parse origin/release)"
+          if [[ "$tag_commit" != "$release_head" ]]; then
+            echo "Tag $tag does not point at the current release branch HEAD; skipping release."
+            exit 0
+          fi
+
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists; skipping release."
             exit 0
