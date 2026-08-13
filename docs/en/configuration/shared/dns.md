@@ -1,11 +1,13 @@
+This document was translated from Chinese by AI.
+
 # DNSOption
 
-DNS resolution configuration, shared by datasources and Service Providers. It lives under the `dns:` key of a datasource or provider and can be written as a short string or as a full object.
+DNS resolution configuration.
 
-**String form** (recommended) — always enabled:
+**String form**
 
 ```yaml
-# system resolver
+# System resolver
 dns: system
 
 # DNS over TLS, default port 853
@@ -15,7 +17,7 @@ dns: tls://8.8.8.8
 dns: tls://8.8.8.8:853
 ```
 
-**Object form** — lets you toggle `enabled` while keeping the configuration:
+**Object form**
 
 ```yaml
 dns:
@@ -27,20 +29,25 @@ dns:
 
 ## `enabled`
 
-Whether custom DNS resolution is applied. The string form is always enabled; in the object form you set it explicitly.
+Whether custom DNS resolution is enabled.
+
+!!! note "Enabling DNS"
+    The string form is always enabled. In the object form, this must be explicitly set to `true` to enable it.
 
 ## `type`
 
-Resolver type enum: `system` (use the system resolver) or `tls` (DNS over TLS).
+Available values:
+
+- `system` uses the local system resolver (the default).
+- `tls` uses [DNS over TLS](https://en.wikipedia.org/wiki/DNS_over_TLS).
 
 ## `server`
 
-Upstream DNS server address. Required when DNS is enabled with `type: tls`;
-otherwise it is unused.
+The upstream DNS server address.
 
 ## `port`
 
-Upstream server port. Defaults to `853` for DNS over TLS when omitted.
+The upstream server port. When omitted, the default port for the selected `type` is used.
 
 !!! note
-    DNS config only takes effect when the target is a domain name — it is skipped when the target is an IP address.
+    DNS configuration only takes effect when the target address is a domain name. DNS resolution is skipped when the target is an IP address.

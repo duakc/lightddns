@@ -32,51 +32,61 @@ services:
 `datasources`、`providers` 和 `services` 都是带 `type` 的列表。如果
 `name` 留空，Lightddns 在加载配置时会自动补上。
 
-`options` 包中标记了 `omitempty` 的字段可以从 YAML 中省略。各顶层
-配置段及具体类型字段的必填关系如下：
+??? "name自动补全规则"
+    ```yaml
+    datasources:
+        - type: http
+        - type: command
+    providers:
+        - type: cloudflare
+        - type: aliyun
+    services:
+        - type: ipserver
+        - type: prometheus
+    ```
+    在自动补全后为
+    ```yaml    
+    datasources:
+        - type: http
+          name: datasource[0]
+        - type: command
+          name: datasource[1]
+    providers:
+        - type: cloudflare
+          name: provider[0]
+        - type: aliyun
+          name: provider[1]
+    services:
+        - type: ipserver
+          name: service[0]
+        - type: prometheus
+          name: service[1]
+    ```
 
-顶层的 `datasources`、`providers`、`domains`、`services` 没有使用
-`omitempty`，因此这些键必须存在；没有条目时写成 `[]`。程序要实际启动，
-至少需要一个设置了 `enabled: true` 的域名或服务。
+## Env 文件
+CLI 全局参数 `--env-file` 用于设置 Lightddns 额外读取的环境变量来源。
+文件需要符合 [标准dotenv](https://genkitlab.com/blog/dotenv-file-syntax/)
 
-| 配置段 | 必填字段 | `type` 可选值 |
-|---|---|---|
-| `log` | 无 | 无类型 |
-| `datasources` | `type` 及下方各数据源要求的字段 | `http`、`netlink`、`command`、`sum`、`failover`、`filter` |
-| `providers` | `type` 及 Provider 凭据 | `cloudflare`、`aliyun`、`tencentcloud` |
-| `domains` | `enabled`、`domain` | 无类型 |
-| `services` | `type`、`enabled` | `prometheus`、`ipserver` |
-
-当前实现仍对以下标记了 `omitempty` 的字段附加了运行时条件：
-
-- `netlink` 至少需要填写 `ifName` 或 `ifIndex`，否则无法返回地址。
-- 只有在对应管理器中恰好配置了一个条目时，域名才可以省略 `provider`
-  或 `datasource`；多个条目时必须明确填写其 `name`。
-- 启用 DNS 且使用 `type: tls` 时，`server` 不能为空。
-- 若域名的 `interval` 小于默认 `timeout` `15s`，还必须显式设置不大于
-  `interval` 的 `timeout`。
-
-服务端口可以省略：`prometheus` 默认监听 `9001`，`ipserver` 默认监听
-`9002`。
+```env
+# comment is allowed
+PROVIDER_TOKEN=this_is_some_random_token_here
+```
 
 ## 工作目录
 
-CLI 全局参数 `-D` / `--workdir` 用于设置 Lightddns 的工作目录，默认值是 `.`。
-
-这个值会影响：
-
-- 相对 `run -c/--config` 路径：`-c config.yaml` 会从工作目录读取。
-- 相对 `--env-file` 路径：`--env-file secrets.env` 会从工作目录读取。
-- 相对 `log.output` 路径：日志文件会创建在工作目录下。
-- `command` 数据源：`workDir` 留空时，命令在工作目录中执行；相对 `command.workDir` 会基于工作目录解析；相对 `command.stdin` 会基于命令的有效工作目录解析。
-
-绝对路径会按原样使用。
+CLI 全局参数 `-D` / `--workdir` 用于设置 Lightddns 的工作目录，默认是当前用户执行的文件夹。
+设置工作目录会影响程序中所有相对路径形成的绝对路径。
+程序中的绝对路径会按原样使用而不受 `-D` / `--workdir` 影响。
+例如
+```bash
+$ lightddns -D /path_to_your_dir/lightddns -c config.yaml
+```
+将会读取 /path_to_your_dir/lightddns/config.yaml
 
 ```bash
-lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
+lightddns -D /etc/lightddns  --env-file secrets.env run -c /etc/lightddns.yaml
 ```
-
-在这个例子中，`lightddns.yaml`、`secrets.env` 以及相对日志/命令路径都基于 `/etc/lightddns`。
+将会读取 /etc/lightddns/secrets.env 与 /etc/lightddns.yaml
 
 ## `log`
 
@@ -84,30 +94,26 @@ lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
 
 ## `datasources`
 
-数据源列表。每个数据源负责获取当前主机的公网 IP 地址。
+数据源列表。每个数据源负责获取当前主机的 IP 地址。
 
-| Type | 说明 |
-|---|---|
-| [`http`](datasource/http.md) | 通过 HTTP 请求获取公网 IP。支持 JSON（jq）和正则提取。 |
-| [`netlink`](datasource/netlink.md) | 从本地网络接口读取 IP 地址。 |
-| [`command`](datasource/command.md) | 通过执行 Shell 命令获取 IP 地址。 |
-| [`sum`](datasource/sum.md) | 合并多个子数据源的 IP 地址。 |
-| [`failover`](datasource/failover.md) | 按优先级顺序查询子数据源，失败时自动切换。 |
-| [`filter`](datasource/filter.md) | 使用 CIDR 前缀规则过滤子数据源返回的 IP 地址。 |
-
-`command.output` 可用值为 `none`、`stdout`、`stderr`、`all`。
-`command.capture` 可用值为 `stdout`、`stderr`、`all`；省略 `capture` 时默认使用
-`stdout`。
+| Type                                 | 说明                                               |
+|--------------------------------------|----------------------------------------------------|
+| [`http`](datasource/http.md)         | 通过 HTTP 请求获取 IP。支持 JSON（jq）和正则提取。 |
+| [`netlink`](datasource/netlink.md)   | 从本地网络接口读取 IP 地址。                       |
+| [`command`](datasource/command.md)   | 通过执行 Shell 命令获取 IP 地址。                  |
+| [`sum`](datasource/sum.md)           | 合并多个子数据源的 IP 地址。                       |
+| [`failover`](datasource/failover.md) | 按优先级顺序查询子数据源，失败时自动切换。         |
+| [`filter`](datasource/filter.md)     | 使用 CIDR 前缀规则过滤子数据源返回的 IP 地址。     |
 
 ## `providers`
 
-服务提供方列表。每个 Provider 负责将 IP 地址更新到对应的 DNS 服务商。
+服务提供方列表。每个 Provider 负责将 IP 地址比较并更新到对应的 DNS 服务商。
 
-| Type | 说明 |
-|---|---|
-| [`cloudflare`](provider/cloudflare.md) | 通过 Cloudflare API 更新 DNS 记录。支持 A/AAAA 记录和代理模式。 |
-| [`aliyun`](provider/aliyun.md) | 通过阿里云解析（alidns）更新 DNS 记录。 |
-| [`tencentcloud`](provider/tencentcloud.md) | 通过腾讯云 DNSPod 更新 DNS 记录。 |
+| Type                                       | 说明                           |
+|--------------------------------------------|--------------------------------|
+| [`cloudflare`](provider/cloudflare.md)     | 通过 Cloudflare API 更新。     |
+| [`aliyun`](provider/aliyun.md)             | 通过阿里云解析（alidns）更新。 |
+| [`tencentcloud`](provider/tencentcloud.md) | 通过腾讯云 DNSPod 更新。       |
 
 ## `domains`
 
@@ -119,7 +125,7 @@ lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
 
 后台 HTTP 服务列表。全部为可选项。
 
-| Type | 说明 |
-|---|---|
-| [`prometheus`](service/prometheus.md) | 以 Prometheus 格式导出内部指标。 |
-| [`ipserver`](service/ipserver.md) | 回显调用方的公网 IP — 用于搭建自定义的 HTTP 数据源等。 |
+| Type                                  | 说明                        |
+|---------------------------------------|-----------------------------|
+| [`prometheus`](service/prometheus.md) | 导出内部 Prometheus 指标。  |
+| [`ipserver`](service/ipserver.md)     | 一个轻量的 IP Echo 服务器。 |

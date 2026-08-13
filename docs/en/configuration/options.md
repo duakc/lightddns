@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # Configuration File
 
-Structure overview of the Lightddns configuration file. See sub-pages for detailed field references.
+An overview of the Lightddns configuration file structure. See the individual subsections for complete examples.
 
 ```yaml
 log:
@@ -9,12 +11,12 @@ log:
 datasources:
   - type: http
     name: data-http
-    # ... HTTP datasource config
+    # ... HTTP datasource configuration
 
 providers:
   - type: cloudflare
     name: prov-cf
-    # ... Cloudflare provider config
+    # ... Cloudflare provider configuration
 
 domains:
   - enabled: true
@@ -26,59 +28,69 @@ services:
   - type: prometheus
     name: svc-metrics
     enabled: true
-    # ... Prometheus exporter config
+    # ... Prometheus exporter configuration
 ```
 
-`datasources`, `providers`, and `services` are typed lists. If `name` is
-omitted, Lightddns fills one in automatically when the config is loaded.
+`datasources`, `providers`, and `services` are lists whose entries have a `type`. If `name` is empty, Lightddns automatically fills it in while loading the configuration.
 
-Fields marked `omitempty` in the `options` package can be omitted from YAML.
-The following top-level fields and type-specific fields are required by their
-respective entries:
+??? "Automatic `name` completion rules"
+    ```yaml
+    datasources:
+        - type: http
+        - type: command
+    providers:
+        - type: cloudflare
+        - type: aliyun
+    services:
+        - type: ipserver
+        - type: prometheus
+    ```
+    After automatic completion, this becomes:
+    ```yaml
+    datasources:
+        - type: http
+          name: datasource[0]
+        - type: command
+          name: datasource[1]
+    providers:
+        - type: cloudflare
+          name: provider[0]
+        - type: aliyun
+          name: provider[1]
+    services:
+        - type: ipserver
+          name: service[0]
+        - type: prometheus
+          name: service[1]
+    ```
 
-The top-level `datasources`, `providers`, `domains`, and `services` keys are
-required because they do not use `omitempty`; use `[]` when a list has no
-entries. To start the runtime, at least one domain or service entry must have
-`enabled: true`.
+## Env File
 
-| Section | Required fields | Available `type` values |
-|---|---|---|
-| `log` | none | not typed |
-| `datasources` | `type` and the fields listed below | `http`, `netlink`, `command`, `sum`, `failover`, `filter` |
-| `providers` | `type` and provider credentials | `cloudflare`, `aliyun`, `tencentcloud` |
-| `domains` | `enabled`, `domain` | not typed |
-| `services` | `type`, `enabled` | `prometheus`, `ipserver` |
+The global CLI option `--env-file` specifies an additional source of environment variables for Lightddns. The file must follow the [standard dotenv syntax](https://genkitlab.com/blog/dotenv-file-syntax/).
 
-The current runtime still places conditions on these `omitempty` fields:
-
-- `netlink` needs at least one of `ifName` or `ifIndex` to return addresses.
-- A domain may omit `provider` or `datasource` only when the corresponding
-  manager contains exactly one item; otherwise use its `name` explicitly.
-- An enabled DNS object with `type: tls` needs a non-empty `server`.
-- If a domain sets `interval` below the default `timeout` of `15s`, it must also
-  set `timeout` to a value no greater than `interval`.
-
-The service ports are optional. When omitted, `prometheus` listens on `9001`
-and `ipserver` listens on `9002`.
+```env
+# comment is allowed
+PROVIDER_TOKEN=this_is_some_random_token_here
+```
 
 ## Working Directory
 
-The CLI global flag `-D` / `--workdir` sets Lightddns' working directory. It defaults to `.`.
-
-This value affects:
-
-- Relative `run -c/--config` paths: `-c config.yaml` is read from the working directory.
-- Relative `--env-file` paths: `--env-file secrets.env` is read from the working directory.
-- Relative `log.output` paths: they are created under the working directory.
-- `command` datasources: when `workDir` is empty, commands run in the working directory; relative `command.workDir` values are resolved under it; relative `command.stdin` paths are resolved under the command's effective working directory.
-
-Absolute paths are used as-is.
+The global CLI options `-D` / `--workdir` set the Lightddns working directory. The default is the directory from which the user runs the program.
+Setting the working directory affects how all relative paths in the program are converted to absolute paths.
+Absolute paths are used as-is and are not affected by `-D` / `--workdir`.
+For example:
 
 ```bash
-lightddns -D /etc/lightddns run -c lightddns.yaml --env-file secrets.env
+$ lightddns -D /path_to_your_dir/lightddns -c config.yaml
 ```
 
-In this example, `lightddns.yaml`, `secrets.env`, and relative log/command paths are based on `/etc/lightddns`.
+This reads `/path_to_your_dir/lightddns/config.yaml`.
+
+```bash
+lightddns -D /etc/lightddns --env-file secrets.env run -c /etc/lightddns.yaml
+```
+
+This reads `/etc/lightddns/secrets.env` and `/etc/lightddns.yaml`.
 
 ## `log`
 
@@ -86,42 +98,38 @@ Global logging configuration. See [Log](log.md).
 
 ## `datasources`
 
-A list of datasources. Each datasource discovers the current public IP address of the host.
+A list of datasources. Each datasource obtains the current IP address of the host.
 
-| Type | Description |
-|---|---|
-| [`http`](datasource/http.md) | Discover public IP via HTTP request. Supports JSON (jq) and regex extraction. |
-| [`netlink`](datasource/netlink.md) | Read IP addresses from local network interfaces. |
-| [`command`](datasource/command.md) | Run shell commands to discover IP addresses. |
-| [`sum`](datasource/sum.md) | Merge IPs from multiple child datasources. |
-| [`failover`](datasource/failover.md) | Query child datasources in priority order, failing over on error. |
-| [`filter`](datasource/filter.md) | Filter IPs from child datasources with CIDR prefix rules. |
-
-The `command.output` values are `none`, `stdout`, `stderr`, and `all`.
-The `command.capture` values are `stdout`, `stderr`, and `all`; an omitted
-`capture` defaults to `stdout`.
+| Type                                 | Description                                                        |
+|--------------------------------------|--------------------------------------------------------------------|
+| [`http`](datasource/http.md)         | Obtains IP addresses through HTTP requests. Supports JSON (jq) and regular-expression extraction. |
+| [`netlink`](datasource/netlink.md)   | Reads IP addresses from local network interfaces.                  |
+| [`command`](datasource/command.md)   | Obtains IP addresses by running shell commands.                    |
+| [`sum`](datasource/sum.md)           | Merges IP addresses from multiple child datasources.               |
+| [`failover`](datasource/failover.md) | Queries child datasources in priority order and automatically switches on failure. |
+| [`filter`](datasource/filter.md)     | Filters IP addresses returned by child datasources using CIDR prefix rules. |
 
 ## `providers`
 
-A list of Service Providers. Each provider pushes IP updates to the corresponding DNS service.
+A list of service providers. Each provider compares IP addresses and updates them at the corresponding DNS provider.
 
-| Type | Description |
-|---|---|
-| [`cloudflare`](provider/cloudflare.md) | Update DNS records via the Cloudflare API. Supports A/AAAA records and proxy mode. |
-| [`aliyun`](provider/aliyun.md) | Update DNS records via Aliyun DNS (alidns). |
-| [`tencentcloud`](provider/tencentcloud.md) | Update DNS records via Tencent Cloud DNSPod. |
+| Type                                       | Description                              |
+|--------------------------------------------|------------------------------------------|
+| [`cloudflare`](provider/cloudflare.md)     | Updates through the Cloudflare API.      |
+| [`aliyun`](provider/aliyun.md)             | Updates through Aliyun DNS (alidns).     |
+| [`tencentcloud`](provider/tencentcloud.md) | Updates through Tencent Cloud DNSPod.    |
 
 ## `domains`
 
-A list of domain records. Each entry binds a domain, provider, and datasource together for automatic DDNS updates.
+A list of domain records. Each entry binds a domain, datasource, and service provider to perform automatic DDNS updates.
 
 See [Domain](domain.md).
 
 ## `services`
 
-A list of background HTTP services. All are optional.
+A list of background HTTP services. All entries are optional.
 
-| Type | Description |
-|---|---|
-| [`prometheus`](service/prometheus.md) | Expose internal metrics in Prometheus format. |
-| [`ipserver`](service/ipserver.md) | Echo the caller's public IP — useful for building your own HTTP datasource. |
+| Type                                  | Description                         |
+|---------------------------------------|-------------------------------------|
+| [`prometheus`](service/prometheus.md) | Exports internal Prometheus metrics. |
+| [`ipserver`](service/ipserver.md)     | A lightweight IP echo server.       |

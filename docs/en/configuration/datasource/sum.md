@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # Sum
 
-Merges IP addresses from multiple child datasources into a single result set.
+Merges IP addresses from multiple child datasources into one result set.
 
 ```yaml
 # required
@@ -12,11 +14,13 @@ datasources:
 ```
 
 ??? note "Behavior"
-    Child datasources are queried in order and their IP addresses are concatenated. The current implementation uses fast-fail behavior: if any child datasource returns an error, the sum datasource returns that error immediately.
+    Child datasources are queried in order, and the resulting IP addresses are concatenated.
+    If any child datasource returns an error, the sum datasource immediately returns that error.
+    To retry until a query succeeds, use [Failover](failover.md).
 
 ## `datasources`
 
-A list of datasource names to merge. Each name must reference a datasource defined in the `datasources` array of the config file. At least one datasource is required.
+The list of datasource names to merge. Each name must reference a datasource defined in the configuration file's `datasources` array. At least one datasource is required.
 
 ```yaml
 datasources:

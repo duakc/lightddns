@@ -27,5 +27,3 @@ datasources:
   - data-netlink     # 优先尝试（本地，速度快）
   - data-http        # 备用方案（远程 API）
 ```
-
----

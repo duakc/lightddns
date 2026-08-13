@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # HTTPOption
 
-HTTP client configuration, shared by datasources and Service Providers. These fields live under the `http:` key of a datasource or provider.
+HTTP client configuration.
 
 ```yaml
 http:
@@ -14,11 +16,11 @@ http:
 
 ## `useSystemProxy`
 
-Whether to use the system proxy. Ignored when `httpProxy` or `httpsProxy` is set.
+Whether to use the system proxy. This option is ignored if `httpProxy` or `httpsProxy` is configured.
 
 ## `httpProxy` / `httpsProxy`
 
-HTTP and HTTPS proxy addresses respectively. If only one is set, the other defaults to the same value.
+The HTTP and HTTPS proxy addresses, respectively. If only one is specified, the other automatically uses the same value.
 
 ```yaml
 httpProxy: "http://127.0.0.1:7890"
@@ -27,13 +29,15 @@ httpsProxy: "http://127.0.0.1:7890"
 
 ## `httpDebug`
 
-When `true`, the full HTTP request and response (method, URL, headers, body) are logged. Off by default.
+When set to `true`, complete HTTP requests and responses (method, URL, request headers, request body) are logged. Disabled by default.
 
 !!! note
-    Debug logging only takes effect when the global log [`level`](../log.md) is `debug`.
+    Debug logs only take effect when the global log [`level`](../log.md) is `debug`.
 
-!!! warning "Sensitive data & performance"
-    HTTP debug logging exposes sensitive information — API tokens, credentials, and request/response bodies are written to the log verbatim. It also causes a **severe performance drop** because every request and response is fully buffered and serialized. Leave it off unless you are actively debugging, and when sharing the resulting logs with others, review them for private data first.
+!!! warning "Sensitive information and performance"
+    HTTP debug logs expose sensitive information: API tokens, credentials, and request and response bodies are written to the log as-is.
+    They also cause a **severe performance degradation**, because every request and response is fully buffered and serialized.
+    Do not enable this unless necessary. Enable it only while debugging, and always check logs for private information before sharing them.
 
 ```yaml
 httpDebug: true

@@ -2,6 +2,8 @@
 
 通过阿里云解析（alidns）更新 DNS 记录。
 
+手册: [Manual](../../manual/provider/aliyun.md)
+
 ```yaml
 # required
 type: aliyun

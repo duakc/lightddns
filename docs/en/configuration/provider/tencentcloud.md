@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # Tencent Cloud
 
-Updates DNS records via Tencent Cloud DNSPod.
+Updates DNS records through Tencent Cloud DNSPod.
 
 ```yaml
 # required
@@ -19,17 +21,17 @@ http:
 
 ## `secretId`
 
-Tencent Cloud CAM secret ID.
+Tencent Cloud CAM Secret ID.
 
 ## `secretKey`
 
-Tencent Cloud CAM secret key.
+Tencent Cloud CAM Secret Key.
 
-!!! note "Permissions"
-    The credentials need `DescribeRecordList`, `CreateRecord`, `ModifyRecord`, and `DeleteRecord` on the parent zone. The pre-defined policy `QcloudDNSPodFullAccess` is sufficient.
+!!! note "Required permissions"
+    The credentials need permission to call `DescribeRecordList`, `CreateRecord`, `ModifyRecord`, and `DeleteRecord`. The predefined `QcloudDNSPodFullAccess` policy provides these permissions.
 
 !!! note "Empty zone"
-    A brand-new zone with no records returns `NoDataOfRecord`. Lightddns treats this as an empty record set and proceeds to create the first record automatically.
+    A new zone without any records returns `NoDataOfRecord`. Lightddns treats this as an empty record set and automatically creates the first record in the next step.
 
 ---
 

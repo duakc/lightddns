@@ -1,6 +1,6 @@
 # ConnectOption
 
-网络连接配置，被数据源和服务提供者复用。这些字段位于数据源或服务提供者的 `connect:` 键下。
+网络连接配置。
 
 ```yaml
 connect:

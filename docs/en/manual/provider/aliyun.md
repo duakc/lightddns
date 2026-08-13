@@ -23,11 +23,11 @@ There are two ways to obtain an AccessKeyId / AccessKeySecret pair: through an A
 
 Log in to your Aliyun account and hover (don't click) over the top-right area of the page, then click **AccessKey**.
 
-![Entry point for creating an AccessKey](img/aliyun/01.png)
+![Entry point for creating an AccessKey](../img/aliyun/01.png)
 
 You will be prompted to choose between `Use RAM User AccessKey` and `Use Cloud Account AccessKey`.
 
-![Choose between RAM user and Cloud account](img/aliyun/02.png)
+![Choose between RAM user and Cloud account](../img/aliyun/02.png)
 
 !!! note
 	Prefer the RAM user AccessKey over the cloud account AccessKey. See the
@@ -40,15 +40,15 @@ Click `Use RAM User AccessKey`.
 In the RAM user console, choose `Identity Management` -> `Users` -> `Create User` from the left sidebar.
 Fill in a login name — this guide uses `lightddns`.
 
-![Fill in the user info](img/aliyun/03.png)
+![Fill in the user info](../img/aliyun/03.png)
 
 Since we need the AccessKey to call the API, check `Permanent AccessKey access`.
 
-![Tick permanent AccessKey access](img/aliyun/04.png)
+![Tick permanent AccessKey access](../img/aliyun/04.png)
 
 You'll be redirected to the AccessKey page. Copy both the AccessKeyId and the AccessKeySecret into a local file, a `.env` file, or directly into the Lightddns config.
 
-![Copy the AccessKey](img/aliyun/05.png)
+![Copy the AccessKey](../img/aliyun/05.png)
 
 After creating the RAM user you still need to grant it permissions.
 Click `Permission Management` -> `Grant Permission` -> `Add Permission` in the left sidebar.
@@ -56,7 +56,7 @@ Click `Permission Management` -> `Grant Permission` -> `Add Permission` in the l
 In the panel that opens on the right, pick the RAM user you just created.
 Search for `DNS` and grant the user the `AliyunDNSFullAccess` policy.
 
-![Select the user](img/aliyun/06.png)
+![Select the user](../img/aliyun/06.png)
 
 ### Using the cloud account AccessKey
 Click `Use Cloud Account AccessKey`.

@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # ConnectOption
 
-Network connection configuration, shared by datasources and Service Providers. These fields live under the `connect:` key of a datasource or provider.
+Network connection configuration.
 
 ```yaml
 connect:
@@ -14,14 +16,14 @@ connect:
 
 ## `fwmark`
 
-Linux SO_MARK firewall mark for policy routing.
+Linux `SO_MARK` firewall mark, used for policy routing and similar scenarios.
 
-!!! warning "Only available on below platform"
+!!! warning "Supported platforms only"
     Linux
 
 ## `bindAddress4` / `bindAddress6`
 
-Bind to a local outgoing IP address. Useful in multi-homed scenarios.
+Binds a local outgoing IP address. This specifies which IP sends requests on systems with multiple network interfaces.
 
 ```yaml
 bindAddress4: "192.168.1.100"
@@ -30,16 +32,16 @@ bindAddress6: "::1"
 
 ## `bindInterface`
 
-Bind to a specific network interface. Accepts an interface name (e.g. `eth0`) or interface index (e.g. `1`).
+Binds to a specific network interface. The value can be an interface name such as `eth0` or an interface index such as `1`.
 
-!!! warning "Only available on below platform"
-    Linux, Macos, Windows
+!!! warning "Supported platforms only"
+    Linux, macOS, Windows
 
 ```yaml
-# By name
+# Bind by name
 bindInterface: eth0
 
-# By index
+# Bind by index
 bindInterface: 1
 ```
 
@@ -47,7 +49,7 @@ bindInterface: 1
 
 IP version (IPv4 / IPv6) selection strategy.
 
-- **`prefer_ipv6`** — Prefer IPv6, IPv4 enabled (default)
-- **`prefer_ipv4`** — Prefer IPv4, IPv6 enabled
-- **`ipv6_only`** — IPv6 only
-- **`ipv4_only`** — IPv4 only
+- **`prefer_ipv6`**: Prefer IPv6 while keeping IPv4 enabled (default)
+- **`prefer_ipv4`**: Prefer IPv4 while keeping IPv6 enabled
+- **`ipv6_only`**: Use IPv6 only
+- **`ipv4_only`**: Use IPv4 only

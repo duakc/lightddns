@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # Failover
 
-Queries child datasources in order, falling back to the next one on failure.
+Queries child datasources in order and automatically switches to the next one on failure.
 
 ```yaml
 # required
@@ -12,20 +14,18 @@ datasources:
 ```
 
 ??? note "Behavior"
-    Uses a **sticky success** strategy: once a datasource succeeds, subsequent queries start from that same datasource to avoid unnecessary retries. If it fails, the group walks forward through the list.
+    Uses a **sticky success** strategy: once a datasource succeeds, subsequent queries start from that datasource to avoid unnecessary retries. If it fails, traversal continues forward through the list to try the next datasource.
 
-    The walk is capped at half the list length to bound retry time. If all attempted datasources fail, the group returns an error.
+    The maximum number of traversals is half the list length, limiting retry time. If every attempted datasource fails, the group returns an error.
 
 ---
 
 ## `datasources`
 
-A prioritized list of datasource names. The first datasource is tried first; if it fails, the next one is tried, and so on. Each name must reference a datasource defined in the `datasources` array of the config file. At least one datasource is required.
+A list of datasource names in priority order. The first is tried first; on failure, the second is tried, and so on. Each name must reference a datasource defined in the configuration file's `datasources` array. At least one datasource is required.
 
 ```yaml
 datasources:
-  - data-netlink     # try first (fast, local)
-  - data-http        # fallback (remote API)
+  - data-netlink     # Tried first (local and fast)
+  - data-http        # Fallback (remote API)
 ```
-
----

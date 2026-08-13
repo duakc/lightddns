@@ -1,6 +1,10 @@
+This document was translated from Chinese by AI.
+
 # Aliyun
 
-Updates DNS records via Aliyun DNS (alidns).
+Updates DNS records through Aliyun DNS (alidns).
+
+Manual: [Manual](../../manual/provider/aliyun.md)
 
 ```yaml
 # required
@@ -25,11 +29,11 @@ Aliyun RAM access key ID.
 
 Aliyun RAM access key secret.
 
-!!! note "Permissions"
-    The credentials need `DescribeDomainRecords`, `AddDomainRecord`, `UpdateDomainRecord`, and `DeleteDomainRecord` on the parent zone. The pre-defined policy `AliyunDNSFullAccess` is sufficient.
+!!! note "Required permissions"
+    The credentials need permission to call `DescribeDomainRecords`, `AddDomainRecord`, `UpdateDomainRecord`, and `DeleteDomainRecord` for the target zone. The predefined `AliyunDNSFullAccess` policy provides these permissions.
 
-!!! note "Zone resolution"
-    Aliyun DNS resolves the parent zone from the FQDN — `home.example.com` maps to the zone `example.com`. The zone must already exist in your Aliyun DNS console.
+!!! note "Parent domain detection"
+    Aliyun DNS extracts the parent domain from the FQDN: the zone for `home.example.com` is `example.com`. Make sure this zone already exists in the Aliyun DNS console.
 
 ---
 

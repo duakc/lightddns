@@ -25,21 +25,12 @@ match:
 ??? note "行为说明"
     命令会按配置的参数列表直接执行，Lightddns 不会额外包一层隐式 shell。带参数的命令建议使用数组形式。若需要管道、重定向、环境变量展开、`&&` 等 shell 语法，请显式调用 shell。
 
-    `capture` 决定解析哪个输出流里的 IP 地址。`output` 只决定哪些输出流会同时转发到 Lightddns 进程自己的 stdout/stderr。
-
----
-
 ## `cmd`
 
 要执行的命令。
 
-**字符串形式**适合只有可执行文件名、没有参数的命令：
-
-```yaml
-cmd: my-ip-helper
-```
-
-**数组形式**适合带参数的命令，也是推荐形式：
+!!! note 
+    如果只有命令没有参数可以不写为数组。
 
 ```yaml
 cmd: ["curl", "-s", "https://api.ipify.org"]
@@ -51,8 +42,6 @@ cmd: ["curl", "-s", "https://api.ipify.org"]
 cmd: ["sh", "-c", "curl -s https://api.ipify.org | tr -d '\\n'"]
 ```
 
----
-
 ## `exitCode`
 
 期望的命令退出码。其它退出码都会被视为错误。
@@ -60,8 +49,6 @@ cmd: ["sh", "-c", "curl -s https://api.ipify.org | tr -d '\\n'"]
 ```yaml
 exitCode: 0
 ```
-
----
 
 ## `env`
 
@@ -73,41 +60,35 @@ env:
   - TOKEN={{ .Env.MY_TOKEN }}
 ```
 
----
-
 ## `output`
 
 控制哪些输出流转发到 Lightddns 自身的 stdout/stderr，便于观察命令执行情况。它不决定解析哪个输出流。
 
-| 值 | 行为 |
-|---|---|
-| `none` 或留空 | 不转发命令输出。 |
-| `stdout` | 转发 stdout。 |
-| `stderr` | 转发 stderr。 |
-| `all` | 同时转发 stdout 和 stderr。 |
+| 值            | 行为                        |
+|---------------|-----------------------------|
+| `none` 或留空 | 不转发命令输出。            |
+| `stdout`      | 转发 stdout。               |
+| `stderr`      | 转发 stderr。               |
+| `all`         | 同时转发 stdout 和 stderr。 |
 
 ```yaml
 output: stderr
 ```
 
----
-
 ## `capture`
 
 控制捕获并解析哪些输出流。
 
-| 值 | 行为 |
-|---|---|
-| 留空 | 等同于 `stdout`。 |
-| `stdout` | 解析 stdout。 |
-| `stderr` | 解析 stderr。 |
-| `all` | 同时解析 stdout 和 stderr。 |
+| 值       | 行为                        |
+|----------|-----------------------------|
+| 留空     | 等同于 `stdout`。           |
+| `stdout` | 解析 stdout。               |
+| `stderr` | 解析 stderr。               |
+| `all`    | 同时解析 stdout 和 stderr。 |
 
 ```yaml
 capture: stdout
 ```
-
----
 
 ## `stdin`
 
@@ -125,8 +106,6 @@ capture: stdout
 stdin: input.txt
 ```
 
----
-
 ## `stdinContent`
 
 内联标准输入内容。设置了 `stdin` 时此项会被忽略。
@@ -136,17 +115,16 @@ stdinContent: |
   query payload
 ```
 
----
-
 ## `sync`
 
 设为 `true` 时，同一个数据源的并发 IP 查询会串行执行。命令会读写共享本地状态时可以开启。
 
+??? note
+    该选项主要解决的是在并发时如果输出到 stdout会导致输出混乱，但是会导致 command 变为全程单线程。
+
 ```yaml
 sync: true
 ```
-
----
 
 ## `workDir`
 
@@ -160,11 +138,9 @@ workDir: scripts
 
 例如执行 `lightddns -D /etc/lightddns run -c config.yaml` 时，上面的配置会让命令在 `/etc/lightddns/scripts` 下运行。
 
----
-
 ## `match`
 
-可选的 IP 提取规则。参见 [MatchOption](../shared/match.md)。
+IP 提取规则。参见 [MatchOption](../shared/match.md)。
 
 ```yaml
 match:

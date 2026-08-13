@@ -40,6 +40,7 @@ ifIndex: 2
 ## `includeBogon`
 
 是否允许返回 bogon 地址 — 包括私有（RFC 1918）、链路本地、回环以及其他保留范围。设为 `false`（默认）时，仅返回全球单播地址。
+详见 [IPInfo Bogon](https://ipinfo.io/bogon)
 
 ```yaml
 includeBogon: false

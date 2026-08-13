@@ -1,3 +1,5 @@
+This document was translated from Chinese by AI.
+
 # Log
 
 Global logging configuration.
@@ -5,27 +7,27 @@ Global logging configuration.
 ```yaml
 level: info
 disabled: false
-output: ""
+output: "stdout"
 ```
 
 ## `level`
 
-Log level. Uses [zap](https://github.com/uber-go/zap) levels:
+Log level:
 
-Canonical values: `debug | info | warn | error | dpanic | panic | fatal`.
-They are case-insensitive, and `warning` is accepted as an alias for `warn`.
+Canonical values: `debug | info | warn | warning | error | dpanic | panic | fatal`.
 
-When omitted, defaults to `info`.
+> Values are case-insensitive.
+
+Defaults to `info` when omitted.
 
 ## `disabled`
 
-Disables all logging output when set to `true`.
+Setting this to `true` disables all log output.
 
 ## `output`
 
-Log output destination. The special values are `stdout` (the default when
-empty) and `stderr`; any other value is treated as a file path. Relative paths
-are created under the global working directory from `lightddns -D/--workdir`.
+`stdout` writes to standard output (the default).
+`stderr` writes to standard error.
 
 ```yaml
 output: "/var/log/lightddns.log"

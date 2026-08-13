@@ -31,20 +31,28 @@ domain: www.example.com
 
 ## `provider`
 
+??? note "配置简化"
+    当全局只有一个 `provider` 时，可以省略不写。
+
 通过 `name` 引用一个服务提供者，负责 DNS 记录的实际更新。
 
 ```yaml
 providers:
   - type: cloudflare
-    name: prov-cf
+    name: prov-main
     # ...
 
 domains:
-  - domain: example.com
-    provider: prov-cf
+  - enabled: true
+    domain: example.com
+    provider: prov-main
+    # ...
 ```
 
 ## `datasource`
+
+??? note "配置简化"
+    当全局只有一个 `datasource` 时，可以省略不写。
 
 通过 `name` 引用一个数据源，负责获取当前公网 IP 地址。
 
@@ -61,10 +69,11 @@ domains:
 
 ## `ttl`
 
-DNS 记录的 TTL，单位秒。 不设置时使用 provider 默认值。
+DNS 记录的 TTL，单位秒。 
 
 !!! note
     如果设置为0，根据不同的 provider 可能会有不同的默认TTL。
+    该值取决于不同的 provider 的实现。
 
 ```yaml
 ttl: 300
@@ -74,7 +83,6 @@ ttl: 300
 
 控制该域名要更新的 IP 版本（IPv4 / IPv6）。
 留空代表 IPv4 和 IPv6 同时启用。
-
 
 ## `interval`
 
@@ -88,7 +96,7 @@ interval: 5m
 ## `timeout`
 
 每次 IP 检查和 DNS 更新操作的超时时间。支持 Go duration 字符串格式。
-可省略，默认 `15s`，且不能大于 `interval`。
+默认 `15s`，且不能大于 `interval`。
 如果 `interval` 小于 `15s`，必须显式设置一个不大于该间隔的 `timeout`。
 
 ```yaml

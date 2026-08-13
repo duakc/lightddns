@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # IPServer
 
-A tiny HTTP server that returns the caller's IP address. Useful as the upstream for an HTTP datasource, or for debugging which header your reverse proxy is forwarding.
+A simple IP address echo server.
 
 ```yaml
 # required
@@ -16,40 +18,44 @@ dump: false
 ```
 
 ??? note "Behavior"
-    The server inspects request headers in this order and returns the first valid IP it finds: `Cf-Connecting-IP`, `True-Client-IP`, `X-Real-IP`, `X-Forwarded-For`. If none are present (or none parse as an IP), the TCP remote address is used.
+    The service reads request headers in the following order and uses the first value that can be parsed as a valid IP address: `Cf-Connecting-IP`, `True-Client-IP`, `X-Real-IP`, `X-Forwarded-For`. If none contains a valid address, it falls back to the remote TCP address.
 
-    Comma-separated header values (typical for `X-Forwarded-For`) take the first entry.
+    For comma-separated headers, such as `X-Forwarded-For`, it uses the first segment.
 
 ## `enabled`
 
-Must be `true` for the service to start.
+Controls whether the service is enabled.
 
 ## `port`
 
-TCP port to listen on. Optional; defaults to `9002` when omitted.
+The TCP listening port. Optional; defaults to `9002` when omitted.
 
 ## `listen`
 
-Bind address. Empty means "all interfaces" (`0.0.0.0` + `::`).
+The listening address. An empty value means all interfaces (`0.0.0.0` and `::`).
 
 ## `path`
 
-HTTP path served. Defaults to `/`.
+The HTTP path served by the service. Defaults to `/`.
 
 ## `dump`
 
-When `true`, every request (method, URI, headers) and response (status, headers, body) is logged at `debug` level. Off by default.
+!!! note
+    Debug logs only take effect when the global log [`level`](../log.md) is `debug`.
+
+When set to `true`, every request (method, URI, headers) and response (status code, headers, body) is logged at the `debug` level. Disabled by default.
 
 ---
 
-## Response formats
+## Response Format
 
 The endpoint accepts a `format` query parameter:
 
-| Query | Response | Content-Type |
-|---|---|---|
-| (none) | Plain IP | `text/plain` |
+| Query          | Response                        | Content-Type       |
+|----------------|---------------------------------|--------------------|
+| (omitted)      | Plain-text IP                   | `text/plain`       |
 | `?format=json` | `{"ip":"...","is_bogon":false}` | `application/json` |
-| `?format=yaml` | `ip: ...\nis_bogon: false` | `application/yaml` |
+| `?format=yaml` | `ip: ...\nis_bogon: false`      | `application/yaml` |
 
-`is_bogon` flags addresses that fall in private, reserved, or loopback ranges.
+`is_bogon` indicates whether the address belongs to a private, reserved, or loopback range.
+See [IPInfo Bogon](https://ipinfo.io/bogon) for details.

@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # HTTP
 
-Retrieves public IP addresses through an HTTP request. It supports plain-text responses, JSON extraction through `match.jq`, regex extraction through `match.regex`, and IPv4/IPv6 connection selection.
+Obtains IP addresses through HTTP requests.
 
 ```yaml
 # required
@@ -26,101 +28,31 @@ http:
 ??? note "Behavior"
     The HTTP datasource creates request contexts according to `connect.dialStrategy`:
 
-    - `prefer_ipv6` / `prefer_ipv4`: create both IPv4 and IPv6 request contexts, then merge results.
-    - `ipv4_only`: create only the IPv4 request context.
-    - `ipv6_only`: create only the IPv6 request context.
+    - `prefer_ipv6` / `prefer_ipv4`: creates both IPv4 and IPv6 request contexts and merges their results.
+    - `ipv4_only`: creates only an IPv4 request context.
+    - `ipv6_only`: creates only an IPv6 request context.
 
-    Each request context uses the same `url`, `method`, `headers`, and `match` settings, but its network dialer is pinned to `tcp4` or `tcp6`.
-
----
-
-## Common Services
-
-These examples show the expected config shape for common public IP endpoints. Provider availability, rate limits, and returned address family are controlled by those external services.
-
-### Plain Text
-
-Use no `match` block when the response body is only an IP address.
-
-```yaml
-- type: http
-  name: ip-sb
-  url: https://api.ip.sb/ip
-```
-
-```yaml
-- type: http
-  name: ipify-v4
-  url: https://api.ipify.org
-  connect:
-    dialStrategy: ipv4_only
-```
-
-```yaml
-- type: http
-  name: ipify-v6
-  url: https://api6.ipify.org
-  connect:
-    dialStrategy: ipv6_only
-```
-
-### JSON
-
-Use `match.jq` for JSON endpoints.
-
-```yaml
-- type: http
-  name: ipinfo
-  url: https://ipinfo.io
-  match:
-    jq: ".ip"
-```
-
-```yaml
-- type: http
-  name: ipify-json
-  url: https://api64.ipify.org?format=json
-  match:
-    jq: ".ip"
-```
-
-### Text With Labels
-
-Use `match.regex` when the page includes text around the address.
-
-```yaml
-- type: http
-  name: ipip
-  url: https://myip.ipip.net
-  match:
-    regex: "当前 IP：\\s*(.+?)\\s*来自于："
-```
+    Each request context uses the same `url`, `method`, `headers`, and `match` settings, but its network dialer is fixed to `tcp4` or `tcp6`.
 
 ---
 
 ## `url`
 
-The request URL for retrieving the IP address. It must include the `http://` or `https://` scheme.
+The request URL used to obtain IP addresses. It must include an `http://` or `https://` scheme.
 
 ```yaml
 url: https://api.ip.sb/ip
 ```
 
----
-
 ## `method`
 
-HTTP request method. Empty defaults to `GET`.
+The HTTP request method. Defaults to `GET` when empty.
 
-Canonical values: `GET`, `POST`, `PUT`, `HEAD`, `DELETE`, `PATCH`, `CONNECT`,
-`OPTIONS`, `TRACE`, `BREW`, `PROPFIND`, and `WHEN`. Input is
-case-insensitive and is normalized to uppercase.
-
----
+Canonical values are `GET`, `POST`, `PUT`, `HEAD`, `DELETE`, `PATCH`, `CONNECT`, `OPTIONS`, `TRACE`, `BREW`, `PROPFIND`, and `WHEN`. Input is case-insensitive and is converted to uppercase when loaded.
 
 ## `headers`
 
-Custom HTTP request headers. Values can be a single string or an array. If `User-Agent` is omitted, Lightddns adds its default User-Agent.
+Custom HTTP request headers. Each value can be a single string or an array. If `User-Agent` is not configured, Lightddns adds its default User-Agent.
 
 ```yaml
 headers:
@@ -131,15 +63,11 @@ headers:
     - value2
 ```
 
----
-
 ## `match`
 
-Optional extraction rules. See [MatchOption](../shared/match.md).
+Optional IP extraction rules. See [MatchOption](../shared/match.md).
 
-For HTTP specifically, JSON `Content-Type` plus `match.jq` disables fallback to regex/plain text. This prevents a broken JSON endpoint from being accidentally accepted through unrelated response text.
-
----
+The HTTP datasource has one special rule: when the response `Content-Type` is JSON and `match.jq` is configured, it does not fall back to a regular expression or plain text. This prevents unrelated response text from being mistaken for a valid result when a JSON endpoint is broken.
 
 ## `connect`
 

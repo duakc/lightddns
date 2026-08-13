@@ -1,7 +1,8 @@
+This document was translated from Chinese by AI.
+
 # Cloudflare
 
-Updates DNS records via the [Cloudflare API](https://developers.cloudflare.com/api/).
-Supports A and AAAA records with optional proxy (orange cloud) mode.
+Updates DNS records through the [Cloudflare API](https://developers.cloudflare.com/api/).
 
 ```yaml
 # required
@@ -21,10 +22,10 @@ http:
 
 ## `token`
 
-Cloudflare API token. Create one in the [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens) with the following permissions:
+Cloudflare API token. Create it in the [Cloudflare dashboard](https://dash.cloudflare.com/profile/api-tokens) with the following permissions:
 
-- **Zone** — `DNS:Edit`
-- **Zone** — `Zone:Read`
+- **Zone**: `DNS:Edit`
+- **Zone**: `Zone:Read`
 
 ```yaml
 token: "your-cloudflare-api-token"
@@ -34,7 +35,7 @@ token: "your-cloudflare-api-token"
 
 ## `proxy`
 
-Enables Cloudflare's proxy (orange cloud) for DNS records.
+Whether to enable the Cloudflare proxy (orange cloud).
 
 ```yaml
 proxy: true

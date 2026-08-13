@@ -12,23 +12,27 @@ edit_uri: ""
 nav:
   - Home: index.md
   - Manual:
-      - Aliyun: manual/aliyun.md
+      - Provider:
+        - Aliyun: manual/provider/aliyun.md
+      - Datasource:
+        - HTTP: manual/datasource/http.md
+        - Filter: manual/datasource/filter.md
   - Configuration:
       - Options: configuration/options.md
       - Log: configuration/log.md
       - Domain: configuration/domain.md
-      - Datasources:
+      - Datasource:
           - HTTP: configuration/datasource/http.md
           - Netlink: configuration/datasource/netlink.md
           - Command: configuration/datasource/command.md
           - Sum: configuration/datasource/sum.md
           - Failover: configuration/datasource/failover.md
           - Filter: configuration/datasource/filter.md
-      - Providers:
+      - Provider:
           - Cloudflare: configuration/provider/cloudflare.md
           - Aliyun: configuration/provider/aliyun.md
           - TencentCloud: configuration/provider/tencentcloud.md
-      - Services:
+      - Service:
           - Prometheus: configuration/service/prometheus.md
           - IPServer: configuration/service/ipserver.md
       - Shared:
@@ -98,15 +102,15 @@ plugins:
             Options: 配置文件
             Log: 日志
             Domain: 域名
-            Datasources: 数据源
+            Datasource: 数据源
             HTTP: HTTP
             Netlink: Netlink
             Command: Command
             Sum: Sum
             Failover: Failover
             Filter: Filter
-            Providers: 服务提供方
-            Services: 服务
+            Provider: 服务提供方
+            Service: 服务
             Prometheus: Prometheus
             IPServer: IPServer
             Shared: 共享

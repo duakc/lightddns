@@ -1,7 +1,6 @@
 # Cloudflare
 
 通过 [Cloudflare API](https://developers.cloudflare.com/api/) 更新 DNS 记录。
-可选开启代理（橙色云）模式。
 
 ```yaml
 # required

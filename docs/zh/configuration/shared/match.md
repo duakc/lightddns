@@ -1,6 +1,6 @@
 # MatchOption
 
-用于从命令输出或 HTTP 响应体中提取 IP 地址的共享规则。字段位于数据源的 `match:` 键下。
+用于从命令输出或 HTTP 响应体中提取 IP 地址的共享规则。
 
 ```yaml
 match:
@@ -8,11 +8,13 @@ match:
   regex: "IP:\\s+(\\S+)"
 ```
 
-两个字段都是可选项。省略 `match` 时，Lightddns 仍会尝试纯文本解析。
+省略 `match` 时，Lightddns 仍会尝试纯文本解析。
 
 ## `jq`
 
-`jq` 指的是 [jq manual](https://jqlang.org/manual/) 描述的查询语言。Lightddns 自身不实现这套语言；当前使用 Go 实现 [gojq](https://github.com/itchyny/gojq) 执行该字段。因此写法上按 jq 过滤器理解，但语法解析和运行时兼容性以 `gojq` 为准。
+[jq manual](https://jqlang.org/manual/) 描述的查询语言。
+当前使用 Go 实现 [gojq](https://github.com/itchyny/gojq) 。
+写法上按 [jq manual](https://jqlang.org/manual/) 理解，但语法解析和运行时兼容性以 [`gojq`]([gojq](https://github.com/itchyny/gojq)) 为准。
 
 ```yaml
 match:
@@ -44,7 +46,7 @@ match:
 match:
   regex: "IP=(\\S+)"
 
-# 错误：没有可供 Lightddns 解析的捕获组。
+# 错误：没有捕获组。
 match:
   regex: "IP=\\S+"
 ```
@@ -57,14 +59,8 @@ match:
 
 ```text
 203.0.113.10
+ some_garbage_but_has_space_near
 2001:db8::10
-```
-
-这种输出需要 `regex` 或 `jq`：
-
-```text
-ip=203.0.113.10
-"203.0.113.10"
 ```
 
 ## 顺序
@@ -81,4 +77,6 @@ HTTP 数据源额外参考响应的 `Content-Type`：
 1. 如果响应 `Content-Type` 是 JSON 且配置了 `match.jq`，HTTP 只使用 jq；不会继续回退到正则或纯文本。
 2. 否则，HTTP 会先尝试 `match.regex`，再尝试纯文本。
 
-JSON 端点应使用 `match.jq`。带有说明文字的文本页面应使用 `match.regex`。如果响应体只有一个或多个按空白分隔的 IP 字面量，可以省略 `match`。
+JSON 端点应使用 `match.jq`。
+带有说明文字的文本页面应使用 `match.regex`。
+如果响应体只有一个或多个按空白分隔的 IP 字面量，可以省略 `match`。

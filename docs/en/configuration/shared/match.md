@@ -1,6 +1,8 @@
+This document was translated from Chinese by AI.
+
 # MatchOption
 
-Shared IP extraction rules for datasources that parse command output or HTTP response bodies. These fields live under the `match:` key.
+Shared rules for extracting IP addresses from command output or HTTP response bodies.
 
 ```yaml
 match:
@@ -8,77 +10,75 @@ match:
   regex: "IP:\\s+(\\S+)"
 ```
 
-Both fields are optional. If `match` is omitted, Lightddns still tries the plain-text fallback.
+When `match` is omitted, Lightddns still attempts plain-text parsing.
 
 ## `jq`
 
-`jq` is the query language described by the [jq manual](https://jqlang.org/manual/). Lightddns does not implement the language itself; it currently evaluates this field with the Go implementation [gojq](https://github.com/itchyny/gojq). In practice, write jq filters as you would for jq, but parsing and runtime compatibility are determined by `gojq`.
+The query language described in the [jq manual](https://jqlang.org/manual/).
+The current implementation uses [gojq](https://github.com/itchyny/gojq), a Go implementation.
+Expressions should be understood according to the [jq manual](https://jqlang.org/manual/), but syntax parsing and runtime compatibility are determined by [`gojq`](https://github.com/itchyny/gojq).
 
 ```yaml
 match:
   jq: ".ip"
 ```
 
-The expression may emit one or more values:
+An expression can produce one or more values:
 
 ```yaml
 match:
   jq: ".addresses[]"
 ```
 
-Only string results are parsed as IP addresses. Non-string jq results are ignored. If a string result is not a valid IP literal, that jq extraction fails.
+Only string results are parsed as IP addresses. Objects, arrays, numbers, booleans, and `null` are ignored. If a string result is not a valid IP literal, that jq extraction fails.
 
 ## `regex`
 
-Extracts IP addresses with a regular expression.
+Uses a regular expression to extract IP addresses.
 
 ```yaml
 match:
   regex: "Current IP:\\s+(\\S+)"
 ```
 
-The expression must contain a capture group. For every regex match, Lightddns parses the first capture group as the IP address. The full match is not parsed.
+The expression must contain a capture group. After each regular-expression match, Lightddns parses only the first capture group as an IP address, not the full match.
 
 ```yaml
-# Good: the first capture group is only the address.
+# Correct: the first capture group contains only the address.
 match:
   regex: "IP=(\\S+)"
 
-# Wrong: there is no capture group for Lightddns to parse.
+# Incorrect: there is no capture group.
 match:
   regex: "IP=\\S+"
 ```
 
 ## Plain Text
 
-When no earlier rule returns an address, Lightddns trims the input, splits it by Unicode whitespace, and parses each token as an IP address.
+When the preceding rules return no addresses, Lightddns trims leading and trailing whitespace, splits the input on Unicode whitespace, and parses every segment as an IP address.
 
-This works:
+The following output can be parsed directly:
 
 ```text
 203.0.113.10
+ some_garbage_but_has_space_near
 2001:db8::10
-```
-
-This needs `regex` or `jq`:
-
-```text
-ip=203.0.113.10
-"203.0.113.10"
 ```
 
 ## Order
 
-Datasources using the default matcher, such as `command`, use this order:
+Datasources that use the default matcher, such as `command`, extract addresses in this order:
 
-1. If `jq` is set, parse the input as JSON and run the jq expression. Return immediately only when jq returns at least one IP address.
-2. If `regex` is set and jq did not return an address, parse the first capture group from every regex match. Return immediately only when regex returns at least one IP address.
+1. If `jq` is configured, parse the input as JSON and run the jq expression. Return immediately only if jq returns at least one IP address.
+2. If `regex` is configured and jq returned no addresses, parse the first capture group of every regular-expression match. Return immediately only if the regular expression returns at least one IP address.
 3. If no address has been found, use plain-text parsing.
-4. If every enabled strategy fails to produce an address, return the collected extraction errors.
+4. If all enabled strategies return no addresses, return the collected extraction errors.
 
-The HTTP datasource adds one rule because HTTP responses have a `Content-Type` header:
+The HTTP datasource also considers the response `Content-Type`:
 
-1. If the response `Content-Type` is JSON and `match.jq` is set, HTTP uses jq only. It does not fall back to regex or plain text.
-2. Otherwise, HTTP tries `match.regex` when set, then plain text.
+1. If the response `Content-Type` is JSON and `match.jq` is configured, HTTP uses jq only; it does not fall back to a regular expression or plain text.
+2. Otherwise, HTTP tries `match.regex` first, then plain-text parsing.
 
-Use `match.jq` for JSON endpoints. Use `match.regex` for text pages that include labels or extra words. Omit `match` when the body is only one or more whitespace-separated IP literals.
+Use `match.jq` for JSON endpoints.
+Use `match.regex` for text pages that contain explanatory text.
+If the response body contains only one or more whitespace-separated IP literals, `match` can be omitted.
