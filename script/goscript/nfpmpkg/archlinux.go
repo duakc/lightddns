@@ -4,6 +4,7 @@ import (
 	"context"
 
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
@@ -19,6 +20,11 @@ import (
 const archLinuxReleaseVersion = "1"
 
 func buildArchLinux(ctx context.Context, targets []target.Target) {
+	if len(targets) == 0 {
+		common.Warnf("skip archlinux package build: no matching targets")
+		return
+	}
+
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "archlinux"))
 	defer outputDir.Close()
 
@@ -55,7 +61,7 @@ func buildArchLinux(ctx context.Context, targets []target.Target) {
 				},
 			},
 		}
-		archLinuxVersion(info, gitver.Semver(ctx))
+		archLinuxVersion(info, buildinfo.Semver())
 
 		file, err := writeToFile(outputDir, archLinuxName(info, tgt), packing.PackageArchLinux, info)
 		if err != nil {

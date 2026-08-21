@@ -65,7 +65,7 @@ func TestTargets(t *testing.T) {
 
 func TestPackageTargets(t *testing.T) {
 	t.Run("openwrt arm64", func(t *testing.T) {
-		targets := OpenWrtTargets(All(), "linux", "arm64")
+		targets := OpenWrtTargets(All(), "arm64")
 		require.Len(t, targets, 1)
 		assert.True(t, targets[0].OpenWrt)
 		assert.Contains(t, targets[0].OpenWrtArch, "aarch64_cortex-a53")
@@ -73,7 +73,7 @@ func TestPackageTargets(t *testing.T) {
 	})
 
 	t.Run("openwrt all", func(t *testing.T) {
-		targets := OpenWrtTargets(All(), "linux", "*")
+		targets := OpenWrtTargets(All(), "*")
 		assert.GreaterOrEqual(t, len(targets), 13)
 		for _, tgt := range targets {
 			assert.True(t, tgt.OpenWrt)
@@ -82,14 +82,14 @@ func TestPackageTargets(t *testing.T) {
 	})
 
 	t.Run("openwrt mipsle", func(t *testing.T) {
-		targets := OpenWrtTargets(All(), "linux", "mipsle")
+		targets := OpenWrtTargets(All(), "mipsle")
 		require.Len(t, targets, 2)
 		assert.Contains(t, targets[0].OpenWrtArch, "mipsel_24kc")
 		assert.Contains(t, targets[1].OpenWrtArch, "mipsel_24kc_24kf")
 	})
 
 	t.Run("alpine explicit arch", func(t *testing.T) {
-		targets := AlpineAPKTargets(All(), "linux", "*")
+		targets := AlpineAPKTargets(All(), "*")
 		for _, tgt := range targets {
 			assert.True(t, tgt.Alpine)
 			assert.NotEmpty(t, tgt.AlpineArch)
@@ -106,13 +106,13 @@ func TestPackageTargets(t *testing.T) {
 
 func TestPackageArchFields(t *testing.T) {
 	t.Run("deb and rpm arch fields", func(t *testing.T) {
-		debTargets := DEBTargets(All(), "linux", "amd64")
+		debTargets := DEBTargets(All(), "amd64")
 		require.Len(t, debTargets, 4)
 		assert.Equal(t, "amd64", debTargets[0].DEBArch)
 		assert.Equal(t, "amd64", debTargets[0].DEBArchVariant)
 		assert.Equal(t, "amd64v3", debTargets[3].DEBArchVariant)
 
-		rpmTargets := RPMTargets(All(), "linux", "arm64")
+		rpmTargets := RPMTargets(All(), "arm64")
 		require.Len(t, rpmTargets, 1)
 		assert.Equal(t, "aarch64", rpmTargets[0].RPMArch)
 	})

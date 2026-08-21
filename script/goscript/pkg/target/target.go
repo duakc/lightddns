@@ -243,54 +243,56 @@ func Host() (Target, bool) {
 	return Target{}, false
 }
 
-func DEBTargets(tgt []Target, goos, goarch string) []Target {
+const packageGOOS = "linux"
+
+func DEBTargets(tgt []Target, goarch string) []Target {
 	var filtered []Target
 	for _, target := range tgt {
 		if target.DEB {
 			filtered = append(filtered, target)
 		}
 	}
-	return FilterTargets(filtered, goos, goarch)
+	return FilterTargets(filtered, packageGOOS, goarch)
 }
 
-func RPMTargets(tgt []Target, goos, goarch string) []Target {
+func RPMTargets(tgt []Target, goarch string) []Target {
 	var filtered []Target
 	for _, target := range tgt {
 		if target.RPM {
 			filtered = append(filtered, target)
 		}
 	}
-	return FilterTargets(filtered, goos, goarch)
+	return FilterTargets(filtered, packageGOOS, goarch)
 }
 
-func ArchLinuxTargets(tgt []Target, goos, goarch string) []Target {
+func ArchLinuxTargets(tgt []Target, goarch string) []Target {
 	var filtered []Target
 	for _, target := range tgt {
 		if target.ArchLinux {
 			filtered = append(filtered, target)
 		}
 	}
-	return FilterTargets(filtered, goos, goarch)
+	return FilterTargets(filtered, packageGOOS, goarch)
 }
 
-func OpenWrtTargets(tgt []Target, goos, goarch string) []Target {
+func OpenWrtTargets(tgt []Target, goarch string) []Target {
 	var filtered []Target
 	for _, target := range tgt {
 		if target.OpenWrt {
 			filtered = append(filtered, target)
 		}
 	}
-	return FilterTargets(filtered, goos, goarch)
+	return FilterTargets(filtered, packageGOOS, goarch)
 }
 
-func AlpineAPKTargets(tgt []Target, goos, goarch string) []Target {
+func AlpineAPKTargets(tgt []Target, goarch string) []Target {
 	var filtered []Target
 	for _, target := range tgt {
 		if target.Alpine {
 			filtered = append(filtered, target)
 		}
 	}
-	return FilterTargets(filtered, goos, goarch)
+	return FilterTargets(filtered, packageGOOS, goarch)
 }
 
 func FilterTargets(tgt []Target, goos, goarch string) []Target {

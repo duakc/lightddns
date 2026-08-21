@@ -4,6 +4,7 @@ import (
 	"context"
 
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
@@ -19,6 +20,11 @@ import (
 const openWrtReleaseVersion = "1"
 
 func buildOpenWrtIPK(ctx context.Context, targets []target.Target) {
+	if len(targets) == 0 {
+		common.Warnf("skip openwrt ipk package build: no matching targets")
+		return
+	}
+
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "openwrt", "ipk"))
 	defer outputDir.Close()
 
@@ -55,7 +61,7 @@ func buildOpenWrtIPK(ctx context.Context, targets []target.Target) {
 					},
 				},
 			}
-			openWrtVersion(info, gitver.Semver(ctx))
+			openWrtVersion(info, buildinfo.Semver())
 
 			file, err := writeToFile(outputDir, openWrtName(info, packing.PackageIPK, arch), packing.PackageIPK, info)
 			if err != nil {
@@ -71,6 +77,11 @@ func buildOpenWrtIPK(ctx context.Context, targets []target.Target) {
 }
 
 func buildOpenWrtAPK(ctx context.Context, targets []target.Target) {
+	if len(targets) == 0 {
+		common.Warnf("skip openwrt apk package build: no matching targets")
+		return
+	}
+
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "openwrt", "apk"))
 	defer outputDir.Close()
 
@@ -104,7 +115,7 @@ func buildOpenWrtAPK(ctx context.Context, targets []target.Target) {
 					Arch: arch,
 				},
 			}
-			openWrtVersion(info, gitver.Semver(ctx))
+			openWrtVersion(info, buildinfo.Semver())
 
 			file, err := writeToFile(outputDir, openWrtName(info, packing.PackageOpenWrtAPK, arch), packing.PackageOpenWrtAPK, info)
 			if err != nil {

@@ -18,7 +18,7 @@ import (
 	"runtime"
 
 	constpkg "github.com/duakc/lightddns/constant"
-	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
 
@@ -32,8 +32,6 @@ import (
 	_ "github.com/goreleaser/nfpm/v2/rpm"
 )
 
-const nfpmGOOS = "linux"
-
 func Run(ctx context.Context) {
 	var (
 		goarch string
@@ -41,44 +39,47 @@ func Run(ctx context.Context) {
 		format   string
 		buildAll bool
 	)
+
 	flag.StringVar(&goarch, "goarch", runtime.GOARCH, "target architecture")
 	flag.StringVar(&format, "format", "", "package format: deb|rpm|archlinux|ipk|openwrt.apk|alpine.apk|openwrt")
 	flag.BoolVar(&buildAll, "all", false, "build every package format")
 	flag.Parse()
 
+	allTargets := target.All()
+
 	if packing.PackageDEB.String() == format || buildAll {
-		debTargets := target.DEBTargets(target.All(), nfpmGOOS, goarch)
+		debTargets := target.DEBTargets(allTargets, goarch)
 		buildDeb(ctx, debTargets)
 	}
 
 	if packing.PackageRPM.String() == format || buildAll {
-		rpmTargets := target.RPMTargets(target.All(), nfpmGOOS, goarch)
+		rpmTargets := target.RPMTargets(allTargets, goarch)
 		buildRPM(ctx, rpmTargets)
 	}
 
 	if packing.PackageArchLinux.String() == format || buildAll {
-		archLinuxTargets := target.ArchLinuxTargets(target.All(), nfpmGOOS, goarch)
+		archLinuxTargets := target.ArchLinuxTargets(allTargets, goarch)
 		buildArchLinux(ctx, archLinuxTargets)
 	}
 
 	if packing.PackageAlpineAPK.String() == format || buildAll {
-		apkTargets := target.AlpineAPKTargets(target.All(), nfpmGOOS, goarch)
+		apkTargets := target.AlpineAPKTargets(allTargets, goarch)
 		buildAlpineAPK(ctx, apkTargets)
 	}
 
 	if format == "openwrt" || buildAll {
-		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
+		openWrtTargets := target.OpenWrtTargets(allTargets, goarch)
 		buildOpenWrtIPK(ctx, openWrtTargets)
 		buildOpenWrtAPK(ctx, openWrtTargets)
 	}
 
 	if packing.PackageIPK.String() == format {
-		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
+		openWrtTargets := target.OpenWrtTargets(allTargets, goarch)
 		buildOpenWrtIPK(ctx, openWrtTargets)
 	}
 
 	if packing.PackageOpenWrtAPK.String() == format {
-		openWrtTargets := target.OpenWrtTargets(target.All(), nfpmGOOS, goarch)
+		openWrtTargets := target.OpenWrtTargets(allTargets, goarch)
 		buildOpenWrtAPK(ctx, openWrtTargets)
 	}
 }
@@ -94,7 +95,7 @@ func BaseInfo(goarch string) *nfpm.Info {
 		Priority:      "optional",
 
 		Arch:    goarch,
-		Version: gitver.Version(context.Background()),
+		Version: buildinfo.Version(),
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
@@ -21,6 +22,11 @@ const (
 )
 
 func buildRPM(ctx context.Context, targets []target.Target) {
+	if len(targets) == 0 {
+		common.Warnf("skip rpm package build: no matching targets")
+		return
+	}
+
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "rpm"))
 	defer outputDir.Close()
 
@@ -53,7 +59,7 @@ func buildRPM(ctx context.Context, targets []target.Target) {
 			},
 		}
 
-		rpmVersion(info, gitver.Semver(ctx))
+		rpmVersion(info, buildinfo.Semver())
 
 		file, err := writeToFile(outputDir, rpmName(info, tgt), packing.PackageRPM, info)
 		if err != nil {

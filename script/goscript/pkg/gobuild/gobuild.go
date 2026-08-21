@@ -5,56 +5,38 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
-	"strconv"
 	"strings"
-	"unicode"
 
-	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
-	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/target"
-
-	goyaml "github.com/goccy/go-yaml"
 )
 
-const EnvBuildProfilePath = "RELEASE_BUILD_PROFILE"
-
 type Params struct {
-	Version string `yaml:"version"`
-	Branch  string `yaml:"branch"`
+	WorkingDir string // package to build (go build target dir)
+	OutputDir  string // directory the binary is written into
+	BinaryName string // base binary name
 
-	WorkingDir string `yaml:"workingDir"` // package to build (go build target dir)
-	OutputDir  string `yaml:"outputDir"`  // directory the binary is written into
-	BinaryName string `yaml:"binaryName"` // base binary name
+	ExtraTags []string
+	ExtraEnv  []string
+	ExtraArgs []string
 
-	ExtraTags []string `yaml:"tags"`
-	ExtraEnv  []string `yaml:"env"`
-
-	// LDFlags are the raw ldflag templates from the build profile. They may use
-	// ${VAR} placeholders (see buildVarExpander) so the linker symbol paths stay
-	// in the profile, not hard-coded in this builder.
-	LDFlags []string `yaml:"ldflags"`
+	LDFlags []string
 
 	// Qualified writes the platform-qualified name (lightddns-linux-amd64);
 	// otherwise the plain BinaryName is used (single-target build).
-	Qualified bool `yaml:"qualified"`
-}
-
-func DefaultParams() Params {
-	p, err := loadBuildProfile()
-	if err != nil {
-		common.Fatalf("load build profile: %s", err)
-	}
-	return p
+	Qualified bool
 }
 
 func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	const main = "."
 	goos, goarch := tgt.GOOS, tgt.GOARCH
+	if err := p.validate(); err != nil {
+		return "", err
+	}
 
-	// ldflags: target defaults + the stamps configured in the build profile.
+	// ldflags: target defaults plus the caller-supplied build flags.
 	ldflags := append([]string{}, tgt.LDFlags...)
 	ldflags = append(ldflags, p.LDFlags...)
 
@@ -86,8 +68,7 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 
 	args := []string{"build", "-C", main}
 
-	// platform-qualified name; debug/.exe are build-mode suffixes.
-	name := tgt.BinaryName(p.BinaryName)
+	name := binaryName(tgt, p, buildinfo.Version())
 	if debug {
 		name += "-debug"
 		if !slices.Contains(tags, "debug") {
@@ -103,26 +84,17 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 		args = append(args, "-tags", joinedTags)
 	}
 
-	// Expand ${VAR} placeholders so the profile owns the symbol paths.
-	expand := buildVarExpander(p, tgt, joinedTags)
-	for i := range ldflags {
-		ldflags[i] = os.Expand(ldflags[i], expand)
-	}
 	if len(ldflags) > 0 {
 		args = append(args, "-ldflags", strings.Join(ldflags, " "))
 	}
 
-	if !p.Qualified {
-		name = p.BinaryName
-	}
-
-	if goos == "windows" {
-		name += ".exe"
-	}
-
 	outPath := filepath.Join(p.OutputDir, name)
+	if err := os.MkdirAll(p.OutputDir, 0o755); err != nil {
+		return "", fmt.Errorf("create output directory %s: %w", p.OutputDir, err)
+	}
 
 	env = append(env, p.ExtraEnv...)
+	args = append(args, p.ExtraArgs...)
 	args = append(args, "-o", outPath, p.WorkingDir)
 
 	if err := common.CommandStream(ctx, common.Cmd{Name: "go", Args: args, Env: env}); err != nil {
@@ -131,107 +103,42 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	return outPath, nil
 }
 
-func Plain(ctx context.Context, tgt target.Target, outputDir string) (string, error) {
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return "", err
+func binaryName(tgt target.Target, p Params, version string) string {
+	name := p.BinaryName
+	if p.Qualified {
+		name = tgt.BinaryName(name)
 	}
-	p := DefaultParams()
-	p.OutputDir = outputDir
-	p.Qualified = false
-	p.Version = gitver.Version(ctx)
-	p.Branch = gitver.Branch(ctx)
-	return Binary(ctx, tgt, p)
+	if version = versionSuffix(version); version != "" {
+		name += version
+	}
+	if tgt.GOOS == "windows" {
+		name += ".exe"
+	}
+	return name
 }
 
-// buildVarExpander resolves ${VAR} placeholders in the profile ldflags from the
-// exported fields of Params and Target (Version -> PARAM_BUILD_VERSION, GOARCH ->
-// TARGET_GOARCH), plus REPO_NAME and the effective PARAM_BUILD_TAGS. Unknown keys
-// fall back to the environment.
-func buildVarExpander(p Params, tgt target.Target, tags string) func(string) string {
-	vars := map[string]string{
-		"REPO_NAME":        constpkg.Repo,
-		"PARAM_BUILD_TAGS": tags,
+func versionSuffix(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" || version == "(unknown)" {
+		return ""
 	}
-	for _, src := range []struct {
-		prefix string
-		val    reflect.Value
-	}{
-		{"PARAM_BUILD", reflect.ValueOf(p)},
-		{"TARGET", reflect.ValueOf(tgt)},
-	} {
-		t := src.val.Type()
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			if !f.IsExported() {
-				continue
-			}
-			var s string
-			switch fv := src.val.Field(i); fv.Kind() {
-			case reflect.String:
-				s = fv.String()
-			case reflect.Bool:
-				s = strconv.FormatBool(fv.Bool())
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				s = strconv.FormatInt(fv.Int(), 10)
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				s = strconv.FormatUint(fv.Uint(), 10)
-			case reflect.Slice:
-				if fv.Type().Elem().Kind() != reflect.String {
-					continue
-				}
-				parts := make([]string, fv.Len())
-				for j := range parts {
-					parts[j] = fv.Index(j).String()
-				}
-				s = strings.Join(parts, ",")
-			default:
-				continue
-			}
-			vars[src.prefix+"_"+screamingSnake(f.Name)] = s
-		}
-	}
-	return func(key string) string {
-		if v, ok := vars[key]; ok {
-			return v
-		}
-		return os.Getenv(key)
-	}
+	version = strings.NewReplacer(
+		"/", "-",
+		"\\", "-",
+		" ", "-",
+	).Replace(version)
+	return "-" + version
 }
 
-// screamingSnake converts a Go field name to SCREAMING_SNAKE_CASE, keeping
-// acronyms intact: WorkingDir -> WORKING_DIR, GOAMD64Version -> GOAMD64_VERSION.
-func screamingSnake(s string) string {
-	var b strings.Builder
-	runes := []rune(s)
-	for i, r := range runes {
-		if i > 0 && unicode.IsUpper(r) {
-			prev := runes[i-1]
-			nextLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
-			if unicode.IsLower(prev) || unicode.IsDigit(prev) || nextLower {
-				b.WriteByte('_')
-			}
-		}
-		b.WriteRune(unicode.ToUpper(r))
+func (p Params) validate() error {
+	if p.WorkingDir == "" {
+		return fmt.Errorf("missing --%s", buildParamFlagName("workdir"))
 	}
-	return b.String()
-}
-
-func loadBuildProfile() (Params, error) {
-	path := buildProfilePath()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Params{}, err
+	if p.OutputDir == "" {
+		return fmt.Errorf("missing --%s", buildParamFlagName("output"))
 	}
-	var p Params
-	if err := goyaml.Unmarshal(data, &p); err != nil {
-		return Params{}, fmt.Errorf("parse %s: %w", path, err)
+	if p.BinaryName == "" {
+		return fmt.Errorf("missing --%s", buildParamFlagName("binary_name"))
 	}
-	return p, nil
-}
-
-func buildProfilePath() string {
-	if p := os.Getenv(EnvBuildProfilePath); p != "" {
-		return p
-	}
-	return common.ReleaseDir("build.yaml")
+	return nil
 }

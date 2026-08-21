@@ -9,7 +9,6 @@ const unknown = "(unknown)"
 
 var (
 	Version = unknown
-	Branch  = unknown
 
 	Tags = unknown
 )

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
@@ -19,6 +20,11 @@ import (
 const alpineReleaseVersion = "1"
 
 func buildAlpineAPK(ctx context.Context, targets []target.Target) {
+	if len(targets) == 0 {
+		common.Warnf("skip alpine apk package build: no matching targets")
+		return
+	}
+
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "alpine", "apk"))
 	defer outputDir.Close()
 
@@ -48,7 +54,7 @@ func buildAlpineAPK(ctx context.Context, targets []target.Target) {
 				Arch: tgt.AlpineArch,
 			},
 		}
-		alpineVersion(info, gitver.Semver(ctx))
+		alpineVersion(info, buildinfo.Semver())
 
 		file, err := writeToFile(outputDir, alpineAPKName(info, tgt), packing.PackageAlpineAPK, info)
 		if err != nil {

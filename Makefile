@@ -1,12 +1,33 @@
-NAME="lightddns"
+NAME=lightddns
+MODULE=github.com/duakc/lightddns
 MAIN_WORKDIR=$(shell cd cmd/$(NAME) && pwd)
 SCRIPT_WORKDIR=$(shell cd script/goscript && pwd)
 
-BUILD_DIR="build"
-RELEASE_FILE_DIR="release"
-RELEASE_GOOS ?= '*'
-RELEASE_GOARCH ?= '*'
-RELEASE_PACKAGES ?= true
+BUILD_DIR=build
+RELEASE_FILE_DIR=release
+
+BUILD_GOOS ?= *
+BUILD_GOARCH ?= *
+
+BUILD_VERSION ?= $(shell git describe --tags --dirty)
+BUILD_BRANCH ?= $(shell git branch --show-current)
+
+BUILDINFO_ARGS=--buildinfo_version '$(BUILD_VERSION)' \
+	--buildinfo_branch '$(BUILD_BRANCH)'
+
+GOBUILD_TAGS ?=
+GOBUILD_ENV ?=
+GOBUILD_EXTRA_ARGS ?=
+GOBUILD_LDFLAGS ?= -X "$(MODULE)/constant.Version=$(patsubst v%,%,$(BUILD_VERSION))" \
+	-X "$(MODULE)/constant.Tags=$(GOBUILD_TAGS)"
+
+GOBUILD_ARGS=--gobuild_workdir '$(MAIN_WORKDIR)' \
+	--gobuild_output '$(BUILD_DIR)/bin' \
+	--gobuild_binary_name '$(NAME)' \
+	--gobuild_tags '$(GOBUILD_TAGS)' \
+	--gobuild_env '$(GOBUILD_ENV)' \
+	--gobuild_ldflags '$(GOBUILD_LDFLAGS)' \
+	--gobuild_extra_args '$(GOBUILD_EXTRA_ARGS)'
 
 GO_SCRIPT=GOSCRIPT_DRAFT_SUB_DIR="draft" \
 		GOSCRIPT_BUILD_DIR=$(BUILD_DIR) \
@@ -21,29 +42,20 @@ endif
 
 .PHONY: all
 all: toolchain clean generate test \
-	generate-schema build-all \
-	build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
+	generate-schema build-release-binary build-release-package build-all
 
 .PHONY: build-release
-build-release: clean generate generate-schema build-all \
-	build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
+build-release: clean generate generate-schema build-release-binary build-release-package
 
-.PHONY: build-release-target
-build-release-target: generate
-	@$(GO_SCRIPT) build --goarch '$(RELEASE_GOARCH)' --goos '$(RELEASE_GOOS)'
-	@if [ "$(RELEASE_PACKAGES)" = "true" ]; then \
-		$(MAKE) build-release-target-packages \
-			RELEASE_GOARCH='$(RELEASE_GOARCH)'; \
-	fi
+.PHONY: build-release-package
+build-release-package: build-deb build-rpm build-archlinux build-alpine-apk build-openwrt
 
-.PHONY: build-release-target-packages
-build-release-target-packages:
-	$(GO_SCRIPT) nfpm --format deb --goarch '$(RELEASE_GOARCH)'
-	$(GO_SCRIPT) nfpm --format rpm --goarch '$(RELEASE_GOARCH)'
-	$(GO_SCRIPT) nfpm --format archlinux --goarch '$(RELEASE_GOARCH)'
-	$(GO_SCRIPT) nfpm --format alpine.apk --goarch '$(RELEASE_GOARCH)'
-	$(GO_SCRIPT) nfpm --format openwrt --goarch '$(RELEASE_GOARCH)'
-
+.PHONY: build-release-binary
+build-release-binary: build-all
+	find "$(BUILD_DIR)/bin" -type f \
+	-not -name '*.gz' \
+	-not -name '*.exe' \
+	-print0 | xargs -0 -r gzip --best;
 
 .PHONY: test
 test: lint
@@ -81,18 +93,25 @@ clean:
 	@go mod tidy
 
 .PHONY: build-all
+build-all: override GOBUILD_ARGS += --gobuild_qualified
 build-all: generate
-	@$(GO_SCRIPT) build --goarch '*' --goos '*'
+	@$(GO_SCRIPT) build $(BUILDINFO_ARGS) $(GOBUILD_ARGS) \
+		--goarch '$(BUILD_GOARCH)' \
+		--goos '$(BUILD_GOOS)'
 
 .PHONY: build-dev
+comma := ,
+build-dev: override GOBUILD_TAGS := $(if $(strip $(GOBUILD_TAGS)),$(GOBUILD_TAGS)$(comma),)debug
 build-dev: generate
-	@$(GO_SCRIPT) build --tags debug --goarch $(shell go env GOARCH) \
-		--goos $(shell go env GOOS)
+	@$(GO_SCRIPT) build $(BUILDINFO_ARGS) $(GOBUILD_ARGS) \
+		--goarch '$(shell go env GOARCH)' \
+		--goos '$(shell go env GOOS)'
 
 .PHONY: build
 build: generate
-	@$(GO_SCRIPT) build --goarch $(shell go env GOARCH) \
-		--goos $(shell go env GOOS)
+	@$(GO_SCRIPT) build $(BUILDINFO_ARGS) $(GOBUILD_ARGS) \
+		--goarch '$(shell go env GOARCH)' \
+		--goos '$(shell go env GOOS)'
 
 .PHONY: build-docs
 build-docs:
@@ -103,24 +122,24 @@ build-docker:
 	$(DOCKER_CLI) build -t $(NAME):latest -f Dockerfile .
 
 .PHONY: build-deb
-build-deb:
-	$(GO_SCRIPT) nfpm --format deb --goarch '*'
+build-deb: generate
+	$(GO_SCRIPT) nfpm $(BUILDINFO_ARGS) $(GOBUILD_ARGS) --format deb --goarch '$(BUILD_GOARCH)'
 
 .PHONY: build-rpm
-build-rpm:
-	$(GO_SCRIPT) nfpm --format rpm --goarch '*'
+build-rpm: generate
+	$(GO_SCRIPT) nfpm $(BUILDINFO_ARGS) $(GOBUILD_ARGS) --format rpm --goarch '$(BUILD_GOARCH)'
 
 .PHONY: build-archlinux
-build-archlinux:
-	$(GO_SCRIPT) nfpm --format archlinux --goarch '*'
+build-archlinux: generate
+	$(GO_SCRIPT) nfpm $(BUILDINFO_ARGS) $(GOBUILD_ARGS) --format archlinux --goarch '$(BUILD_GOARCH)'
 
 .PHONY: build-alpine-apk
-build-alpine-apk:
-	$(GO_SCRIPT) nfpm --format alpine.apk --goarch '*'
+build-alpine-apk: generate
+	$(GO_SCRIPT) nfpm $(BUILDINFO_ARGS) $(GOBUILD_ARGS) --format alpine.apk --goarch '$(BUILD_GOARCH)'
 
 .PHONY: build-openwrt
-build-openwrt:
-	$(GO_SCRIPT) nfpm --format openwrt --goarch '*'
+build-openwrt: generate
+	$(GO_SCRIPT) nfpm $(BUILDINFO_ARGS) $(GOBUILD_ARGS) --format openwrt --goarch '$(BUILD_GOARCH)'
 
 # Nix is declarative: the flake (release/nix, symlinked as ./flake.nix) builds
 # the package for the host system. The result lands under build/nix/result.

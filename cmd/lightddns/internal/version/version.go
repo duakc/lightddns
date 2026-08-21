@@ -32,7 +32,6 @@ func init() {
 type Info struct {
 	Name       string
 	Version    string
-	Branch     string
 	Tags       []string
 	Debug      bool
 	Datasource []string
@@ -67,7 +66,6 @@ func NewInfo() Info {
 	return Info{
 		Name:    constpkg.Project,
 		Version: constpkg.Version,
-		Branch:  constpkg.Branch,
 		Tags:    displayTags(constpkg.TagList()),
 
 		Debug:      debug.Enabled,
@@ -104,9 +102,6 @@ func (I Info) Plain() {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "%s %s", I.Name, I.Version)
-	if I.Branch != "" {
-		fmt.Fprintf(&b, " (branch %s)", I.Branch)
-	}
 	fmt.Fprintf(&b, " debug=%t\n", I.Debug)
 
 	line := func(key, value string) {
@@ -115,6 +110,7 @@ func (I Info) Plain() {
 		}
 		fmt.Fprintf(&b, "%s: %s\n", key, value)
 	}
+
 	line("tags", strings.Join(I.Tags, ","))
 	line("datasources", strings.Join(I.Datasource, ","))
 	line("providers", strings.Join(I.Provider, ","))

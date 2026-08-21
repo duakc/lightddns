@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 
 	"github.com/duakc/lightddns/infra/gos"
@@ -9,6 +10,8 @@ import (
 	"github.com/duakc/lightddns/script/goscript/gendoc"
 	"github.com/duakc/lightddns/script/goscript/genschema"
 	"github.com/duakc/lightddns/script/goscript/nfpmpkg"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
+	"github.com/duakc/lightddns/script/goscript/pkg/gobuild"
 )
 
 // Thin dispatcher:
@@ -23,6 +26,9 @@ func main() {
 	// re-shape os.Args so each command's flag.Parse sees only its own flags.
 	command := os.Args[1]
 	os.Args = os.Args[1:]
+
+	buildinfo.RegisterFlags(flag.CommandLine)
+	gobuild.RegisterBuildFlags(flag.CommandLine)
 
 	ctx, cancel := gos.InterruptSignalContext(context.Background())
 	defer cancel()

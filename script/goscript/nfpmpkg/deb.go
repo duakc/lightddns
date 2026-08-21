@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	constpkg "github.com/duakc/lightddns/constant"
+	"github.com/duakc/lightddns/script/goscript/pkg/buildinfo"
 	"github.com/duakc/lightddns/script/goscript/pkg/common"
 	"github.com/duakc/lightddns/script/goscript/pkg/gitver"
 	"github.com/duakc/lightddns/script/goscript/pkg/packing"
@@ -23,6 +24,11 @@ const (
 )
 
 func buildDeb(ctx context.Context, targets []target.Target) {
+	if len(targets) == 0 {
+		common.Warnf("skip deb package build: no matching targets")
+		return
+	}
+
 	outputDir := filehelper.MustNew(common.BuildDir("nfpm", "deb"))
 	defer outputDir.Close()
 
@@ -55,7 +61,7 @@ func buildDeb(ctx context.Context, targets []target.Target) {
 			},
 		}
 
-		debVersion(info, gitver.Semver(ctx))
+		debVersion(info, buildinfo.Semver())
 
 		file, err := writeToFile(outputDir, debName(info, tgt), packing.PackageDEB, info)
 		if err != nil {

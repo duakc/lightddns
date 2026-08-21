@@ -146,8 +146,8 @@ func (ld *LightDDNS) setupPrometheus(reg metrics.Registry) {
 	reg.GaugeVec(
 		prometheus.BuildFQName(metricx.Namespace, "", metricBuildInfo),
 		"Build information. Value is always 1.",
-		[]string{constpkg.MetricLabelVersion, constpkg.MetricLabelBranch},
-	).With(constpkg.Version, constpkg.Branch).Set(1)
+		[]string{constpkg.MetricLabelVersion},
+	).With(constpkg.Version).Set(1)
 }
 
 func (ld *LightDDNS) Close() error {
