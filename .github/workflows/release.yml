@@ -177,6 +177,9 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Fetch release tags
+        run: git fetch --force --tags origin
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
