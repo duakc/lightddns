@@ -34,6 +34,7 @@ func (r *Response[T]) UnmarshalJSON(data []byte) error {
 	if meta.Error != nil {
 		meta.Error.RequestID = meta.RequestID
 		r.Error = meta.Error
+		//nolint:nilerr
 		return nil
 	}
 	if err := json.Unmarshal(outer.Resp, &r.Data); err != nil {
