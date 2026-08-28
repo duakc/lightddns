@@ -3,6 +3,7 @@ package aliyun
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -30,6 +31,13 @@ const (
 	AlidnsActionAddDomainRecord       = "AddDomainRecord"
 	AlidnsActionUpdateDomainRecord    = "UpdateDomainRecord"
 	AlidnsActionDeleteDomainRecord    = "DeleteDomainRecord"
+
+	// AlidnsErrCodeInvalidParameterLine is returned when the requested line
+	// cannot be used for the record (for example, before the default line has
+	// been created).
+	AlidnsErrCodeInvalidParameterLine = "InvalidParameter.Line"
+
+	AlidnsErrorCodeURL = "https://api.aliyun.com/document/Alidns/2015-01-09/errorCode"
 )
 
 const (
@@ -86,14 +94,26 @@ func (c *defaultAPIClient) DescribeDomainRecords(ctx context.Context,
 func (c *defaultAPIClient) AddDomainRecord(ctx context.Context,
 	req AddDomainRecordRequest,
 ) (resp AddDomainRecordResponse, err error) {
-	return doAction[AddDomainRecordResponse](ctx, c, AlidnsActionAddDomainRecord, req.Query())
+	resp, err = doAction[AddDomainRecordResponse](ctx, c, AlidnsActionAddDomainRecord, req.Query())
+	if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.Code == AlidnsErrCodeInvalidParameterLine {
+		err = fmt.Errorf("%w: Aliyun rejected line %q (%s: %s). This can happen when the %q line record does not exist. Add %q to the provider's \"lines\" configuration and create/update that default record first; otherwise the default record will not be updated on later startups: %w",
+			ErrDefaultRecordLineRequired, req.Line, apiErr.Code, apiErr.Message,
+			DefaultRecordLine, DefaultRecordLine, err)
+	}
+	return resp, err
 }
 
 // UpdateDomainRecord — https://help.aliyun.com/document_detail/29773.html
 func (c *defaultAPIClient) UpdateDomainRecord(ctx context.Context,
 	req UpdateDomainRecordRequest,
 ) (resp UpdateDomainRecordResponse, err error) {
-	return doAction[UpdateDomainRecordResponse](ctx, c, AlidnsActionUpdateDomainRecord, req.Query())
+	resp, err = doAction[UpdateDomainRecordResponse](ctx, c, AlidnsActionUpdateDomainRecord, req.Query())
+	if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.Code == AlidnsErrCodeInvalidParameterLine {
+		err = fmt.Errorf("%w: Aliyun rejected line %q (%s: %s). This can happen when the %q line record does not exist. Add %q to the provider's \"lines\" configuration and create/update that default record first; otherwise the default record will not be updated on later startups: %w",
+			ErrDefaultRecordLineRequired, req.Line, apiErr.Code, apiErr.Message,
+			DefaultRecordLine, DefaultRecordLine, err)
+	}
+	return resp, err
 }
 
 // DeleteDomainRecord — https://help.aliyun.com/document_detail/29771.html

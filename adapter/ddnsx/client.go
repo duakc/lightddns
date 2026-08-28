@@ -2,6 +2,7 @@ package ddnsx
 
 import (
 	"context"
+	"net/netip"
 )
 
 type RecordType string
@@ -49,8 +50,17 @@ type RecordWriter[T DDNSRecordComparable[T]] interface {
 	Delete(ctx context.Context, key RecordKey, existing T) error
 }
 
+// DDNSDiffBuilder lets a provider replace the generic address diff when its
+// records need provider-specific reconciliation (for example, one record per
+// configured line and address).
+type DDNSDiffBuilder[T DDNSRecordComparable[T]] interface {
+	BuildDiffs(ctx context.Context, key RecordKey, target []netip.Addr, ttl uint32,
+		reader RecordReader[T]) ([]Diff[T], error)
+}
+
 type DDNSClient[T DDNSRecordComparable[T]] interface {
 	ZoneResolver
 	RecordReader[T]
 	RecordWriter[T]
+	DDNSDiffBuilder[T]
 }

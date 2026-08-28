@@ -200,15 +200,56 @@ func customizeVariantSchema(typ string, schema *jsonschema.Schema) {
 	case constpkg.ProviderTypeAliyun:
 		schema.Properties["accessKeyId"].MinLength = new(1)
 		schema.Properties["accessKeySecret"].MinLength = new(1)
+		setProviderLineCompletions(schema.Properties["lines"],
+			"default", "telecom", "unicom", "mobile", "oversea", "edu", "drpeng")
 	case constpkg.ProviderTypeTencentCloud:
 		schema.Properties["secretId"].MinLength = new(1)
 		schema.Properties["secretKey"].MinLength = new(1)
+		setProviderLineCompletions(schema.Properties["lines"],
+			"默认", "电信", "联通", "移动", "教育网", "境外")
 	case constpkg.ServiceTypePrometheus:
 		setDefault(schema.Properties["port"], prometheusservice.DefaultPort)
 		setDefault(schema.Properties["path"], prometheusservice.DefaultPath)
 	case constpkg.ServiceTypeIPServer:
 		setDefault(schema.Properties["port"], ipserverservice.DefaultPort)
 		setDefault(schema.Properties["path"], ipserverservice.DefaultPath)
+	}
+}
+
+// setProviderLineCompletions adds the provider's commonly used line values to
+// the schema while keeping arbitrary strings valid. Providers can expose more
+// lines than this stable, documented subset, and those values must remain
+// usable without waiting for a schema update.
+func setProviderLineCompletions(schema *jsonschema.Schema, lines ...string) {
+	if schema == nil {
+		return
+	}
+	for _, variant := range schema.AnyOf {
+		if variant == nil {
+			continue
+		}
+		switch variant.Type {
+		case JSONTypeString:
+			setLineValueCompletions(variant, lines...)
+		case JSONTypeArray:
+			setLineValueCompletions(variant.Items, lines...)
+		}
+	}
+	if schema.Items != nil {
+		setLineValueCompletions(schema.Items, lines...)
+	}
+}
+
+func setLineValueCompletions(schema *jsonschema.Schema, lines ...string) {
+	if schema == nil {
+		return
+	}
+	schema.MinLength = new(1)
+	freeForm := singleType(JSONTypeString)
+	freeForm.MinLength = new(1)
+	schema.AnyOf = []*jsonschema.Schema{
+		enumSchema(JSONTypeString, mt.Map(lines, func(line string) any { return line })...),
+		freeForm,
 	}
 }
 

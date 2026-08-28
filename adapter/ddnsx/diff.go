@@ -113,6 +113,20 @@ func BuildDiffs[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
 	target []netip.Addr, ttl uint32, reader RecordReader[T],
 	buildTarget func(netip.Addr, uint32) T,
 ) ([]Diff[T], error) {
+	return BuildDiffsWith(ctx, key, target, ttl, reader,
+		func(key RecordKey, existing []T, target []netip.Addr, ttl uint32) ([]Diff[T], error) {
+			want := make([]T, len(target))
+			for i, addr := range target {
+				want[i] = buildTarget(addr, ttl)
+			}
+			return Compare(key.FQDN, existing, want), nil
+		})
+}
+
+func BuildDiffsWith[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
+	target []netip.Addr, ttl uint32, reader RecordReader[T],
+	compare func(RecordKey, []T, []netip.Addr, uint32) ([]Diff[T], error),
+) ([]Diff[T], error) {
 	normalized := make([]netip.Addr, len(target))
 	for i, addr := range target {
 		if !addr.IsValid() {
@@ -121,11 +135,19 @@ func BuildDiffs[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
 		normalized[i] = addr.Unmap()
 	}
 
-	ipv4, ipv6 := netx.SplitIPv4AndIPv6(normalized)
+	var ipv4, ipv6 []netip.Addr
+	for _, addr := range normalized {
+		if netx.IsIPv4(addr) {
+			ipv4 = append(ipv4, addr)
+		} else if netx.IsIPv6(addr) {
+			ipv6 = append(ipv6, addr)
+		}
+	}
+
 	var diffs []Diff[T]
 	if len(ipv4) > 0 || len(target) == 0 {
 		key.Type = RecordTypeA
-		part, err := fetchAndCompare(ctx, key, ipv4, ttl, reader, buildTarget)
+		part, err := fetchAndCompareWith(ctx, key, ipv4, ttl, reader, compare)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +155,7 @@ func BuildDiffs[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
 	}
 	if len(ipv6) > 0 || len(target) == 0 {
 		key.Type = RecordTypeAAAA
-		part, err := fetchAndCompare(ctx, key, ipv6, ttl, reader, buildTarget)
+		part, err := fetchAndCompareWith(ctx, key, ipv6, ttl, reader, compare)
 		if err != nil {
 			return nil, err
 		}
@@ -142,19 +164,18 @@ func BuildDiffs[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
 	return diffs, nil
 }
 
-func fetchAndCompare[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
+func fetchAndCompareWith[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
 	target []netip.Addr, ttl uint32, reader RecordReader[T],
-	buildTarget func(netip.Addr, uint32) T,
+	compare func(RecordKey, []T, []netip.Addr, uint32) ([]Diff[T], error),
 ) ([]Diff[T], error) {
 	existing, err := reader.Records(ctx, key)
 	if err != nil {
 		return nil, err
 	}
-	want := make([]T, len(target))
-	for i, addr := range target {
-		want[i] = buildTarget(addr, ttl)
+	diffs, err := compare(key, existing, target, ttl)
+	if err != nil {
+		return nil, err
 	}
-	diffs := Compare(key.FQDN, existing, want)
 	for i := range diffs {
 		diffs[i].Type = key.Type
 	}

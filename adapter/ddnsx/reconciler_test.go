@@ -43,6 +43,15 @@ func (c *reconcileClient) Delete(context.Context, RecordKey, testComparedRecord)
 	return nil
 }
 
+func (c *reconcileClient) BuildDiffs(ctx context.Context, key RecordKey, target []netip.Addr,
+	ttl uint32, reader RecordReader[testComparedRecord],
+) ([]Diff[testComparedRecord], error) {
+	return BuildDiffs(ctx, key, target, ttl, reader,
+		func(addr netip.Addr, ttl uint32) testComparedRecord {
+			return testComparedRecord{Addr: addr, TTL: ttl}
+		})
+}
+
 func TestReconcilerReportsPartialSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -55,11 +64,7 @@ func TestReconcilerReportsPartialSuccess(t *testing.T) {
 		deleteErr: mutationErr,
 	}
 
-	changed, err := NewReconciler[testComparedRecord](nil, client,
-		func(addr netip.Addr, ttl uint32) testComparedRecord {
-			return testComparedRecord{Addr: addr, TTL: ttl}
-		},
-	).Update(
+	changed, err := NewReconciler[testComparedRecord](nil, client).Update(
 		context.Background(), "Host.Example.COM.", 300, nil,
 	)
 	require.True(t, changed)

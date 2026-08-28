@@ -39,9 +39,8 @@
 
 ## 已知限制
 
-现在的 diff 模型主要还是围绕 IP 地址。Provider 自身的一些记录状态还
-不完整，所以像 Cloudflare 的 `proxied` 暂时还不能稳定地做 diff 并更新。
-Tencent Cloud 和 Aliyun 的 `line` 也还卡在同样的问题上。
+现在的 diff 模型支持 Provider 自定义的记录属性。Cloudflare 的 `proxied`
+以及 Tencent Cloud、Aliyun 的 `lines` 都可以参与 diff。
 
 网络层还需要更多实测，尤其是连接复用、代理行为、DNS 边界、transport
 重试，以及远端代理到底应该收到域名还是本地解析后的 IP。
@@ -56,8 +55,7 @@ Tencent Cloud 和 Aliyun 的 `line` 也还卡在同样的问题上。
 
 - 补全配置参考。
 - 继续完善文档站点。
-- 扩展到 provider 级别的记录属性 diff。
-- 把 Tencent Cloud 和 Aliyun 的 `line` 支持补稳。
+- 继续扩展 provider 级别的记录属性 diff。
 - 继续收紧网络行为、日志和可观测性。
 
 ---

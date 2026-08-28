@@ -1,11 +1,58 @@
 package cloudflare
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"net/netip"
 
 	"github.com/duakc/mt"
+
+	"go.uber.org/zap/zapcore"
 )
+
+type ComparedRecord struct {
+	Record         Record
+	Addr           netip.Addr
+	TTL            uint32
+	Proxied        bool
+	PrivateRouting bool
+}
+
+func (r ComparedRecord) Address() netip.Addr { return r.Addr }
+
+func (r ComparedRecord) Compare(other ComparedRecord) int {
+	if c := r.Addr.Compare(other.Addr); c != 0 {
+		return c
+	}
+	if c := cmp.Compare(r.TTL, other.TTL); c != 0 {
+		return c
+	}
+	if r.Proxied != other.Proxied {
+		if r.Proxied {
+			return 1
+		}
+		return -1
+	}
+	if r.PrivateRouting == other.PrivateRouting {
+		return 0
+	}
+	if r.PrivateRouting {
+		return 1
+	}
+	return -1
+}
+
+func (r ComparedRecord) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("address", r.Addr.String())
+	enc.AddUint32("ttl", r.TTL)
+	enc.AddBool("proxied", r.Proxied)
+	enc.AddBool("private_routing", r.PrivateRouting)
+	if r.Record.ID != "" {
+		enc.AddString("record_id", r.Record.ID)
+	}
+	return nil
+}
 
 type BaseError struct {
 	Code    int    `json:"code"`

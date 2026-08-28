@@ -42,10 +42,8 @@ easier to inspect and reuse.
 
 ## Known Limits
 
-The current diff model mainly tracks IP addresses. Provider-specific record
-state is still incomplete, so things like Cloudflare `proxied` cannot be
-diffed reliably yet. The same limitation still applies to planned Tencent Cloud
-and Aliyun `line` support.
+The diff model supports provider-defined record attributes. Cloudflare
+`proxied`, and Tencent Cloud and Aliyun `lines`, can participate in diffing.
 
 The network layer still needs more field testing, especially around connection
 reuse, proxy behavior, DNS boundaries, transport retries, and how remote
@@ -63,8 +61,7 @@ but not every runtime path is documented yet.
 
 - Complete the configuration reference.
 - Finish the documentation site.
-- Extend diffing to provider-specific record attributes.
-- Add reliable Tencent Cloud and Aliyun `line` support.
+- Keep extending provider-specific record attributes.
 - Keep tightening network behavior, logs, and observability.
 
 ---

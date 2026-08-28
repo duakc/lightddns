@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -26,16 +27,25 @@ type ComparedRecord struct {
 	Line   string
 }
 
+var ErrDefaultRecordLineRequired = errors.New("tencentcloud default record line is required")
+
 func (r ComparedRecord) Address() netip.Addr { return r.Addr }
 
 func (r ComparedRecord) Compare(other ComparedRecord) int {
+	if c := cmp.Compare(lineRank(r.Line), lineRank(other.Line)); c != 0 {
+		return c
+	}
 	if c := r.Addr.Compare(other.Addr); c != 0 {
 		return c
 	}
-	if c := cmp.Compare(r.TTL, other.TTL); c != 0 {
-		return c
+	return cmp.Compare(r.TTL, other.TTL)
+}
+
+func lineRank(line string) string {
+	if line == DefaultRecordLine {
+		return ""
 	}
-	return cmp.Compare(r.Line, other.Line)
+	return line
 }
 
 func (r ComparedRecord) MarshalLogObject(enc zapcore.ObjectEncoder) error {
@@ -48,23 +58,58 @@ func (r ComparedRecord) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+var _ APIClient = (*defaultAPIClient)(nil)
+
+type ComparedRecordDDNSClient ddnsx.DDNSClient[ComparedRecord]
+
 var (
-	_ APIClient                        = (*defaultAPIClient)(nil)
-	_ ddnsx.DDNSClient[ComparedRecord] = (*Client)(nil)
-	_ ddnsx.ZoneSearcher               = (*Client)(nil)
+	_ ComparedRecordDDNSClient = (*Client)(nil)
+	_ ddnsx.ZoneSearcher       = (*Client)(nil)
 )
 
 type Client struct {
 	logger *zap.Logger
 	api    APIClient
 	zones  ddnsx.ZoneCache
+	lines  []string
 }
 
-func NewClient(logger *zap.Logger, api APIClient) *Client {
+func NewClient(logger *zap.Logger, api APIClient, lines []string) *Client {
 	return &Client{
 		logger: zaplog.DoNotPanic(logger).Named("client"),
 		api:    api,
+		lines:  configuredLines(lines),
 	}
+}
+
+func (c *Client) BuildDiffs(ctx context.Context, key ddnsx.RecordKey, target []netip.Addr,
+	ttl uint32, reader ddnsx.RecordReader[ComparedRecord],
+) ([]ddnsx.Diff[ComparedRecord], error) {
+	lines := c.lines
+	return ddnsx.BuildDiffsWith(ctx, key, target, ttl, reader,
+		func(key ddnsx.RecordKey, existing []ComparedRecord, target []netip.Addr, ttl uint32) ([]ddnsx.Diff[ComparedRecord], error) {
+			if len(existing) == 0 && slices.ContainsFunc(lines, func(line string) bool {
+				return line != DefaultRecordLine
+			}) {
+				return nil, fmt.Errorf("%w: the %q line record is required during initialization; add %q to the provider's \"lines\" configuration and create that default record first",
+					ErrDefaultRecordLineRequired, DefaultRecordLine, DefaultRecordLine)
+			}
+			var diffs []ddnsx.Diff[ComparedRecord]
+			for _, line := range lines {
+				var current []ComparedRecord
+				for _, record := range existing {
+					if record.Line == line {
+						current = append(current, record)
+					}
+				}
+				want := make([]ComparedRecord, len(target))
+				for i, addr := range target {
+					want[i] = ComparedRecord{Addr: addr, TTL: ttl, Line: line}
+				}
+				diffs = append(diffs, ddnsx.Compare(key.FQDN, current, want)...)
+			}
+			return diffs, nil
+		})
 }
 
 func (c *Client) ResolveZone(ctx context.Context, fqdn string) (ddnsx.Zone, error) {
@@ -82,6 +127,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 		zap.String("action", "SearchZones"),
 		zap.String("keyword", keyword),
 	)
+
 	logger.Info("search domain id from upstream")
 
 	var zones []ddnsx.Zone
@@ -128,7 +174,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ComparedRe
 		})
 		if err != nil {
 			if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.Code == DNSPodErrCodeNoDataOfRecord {
-				return records, nil
+				break
 			}
 			return nil, fmt.Errorf("DescribeRecordList: %w", err)
 		}
@@ -149,9 +195,15 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ComparedRe
 		}
 		offset += len(page.RecordList)
 		if len(page.RecordList) == 0 || offset >= page.RecordCountInfo.TotalCount {
-			return records, nil
+			break
 		}
 	}
+	if len(records) > 0 && !slices.ContainsFunc(records, func(record ComparedRecord) bool {
+		return record.Line == DefaultRecordLine
+	}) {
+		return nil, fmt.Errorf("%w: upstream returned records without the %q line; create that default record first", ErrDefaultRecordLineRequired, DefaultRecordLine)
+	}
+	return records, nil
 }
 
 func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec, desired ComparedRecord) error {
@@ -200,6 +252,39 @@ func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, existing Compa
 		RecordId: existing.Record.RecordId,
 	})
 	return err
+}
+
+func configuredLines(lines []string) []string {
+	if len(lines) == 0 {
+		return []string{DefaultRecordLine}
+	}
+
+	result := make([]string, 0, len(lines))
+	seen := make(map[string]struct{}, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		if _, ok := seen[line]; ok {
+			continue
+		}
+		seen[line] = struct{}{}
+		result = append(result, line)
+	}
+
+	slices.SortStableFunc(result, func(a, b string) int {
+		if a == DefaultRecordLine {
+			return -1
+		}
+		if b == DefaultRecordLine {
+			return 1
+		}
+		return cmp.Compare(a, b)
+	})
+	if len(result) == 0 {
+		return []string{DefaultRecordLine}
+	}
+	return result
 }
 
 func relativeSubDomain(fqdn, zone string) (string, error) {

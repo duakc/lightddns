@@ -80,6 +80,38 @@ func TestGeneratedSchemaIncludesServiceDefaults(t *testing.T) {
 	require.JSONEq(t, `"/metrics"`, string(prometheus.Properties["path"].Default))
 }
 
+func TestGeneratedSchemaProvidesProviderLineCompletions(t *testing.T) {
+	providers := providerSchema()
+
+	aliyun := findVariant(t, providers, constpkg.ProviderTypeAliyun)
+	aliyunLines := aliyun.Properties["lines"]
+	require.Len(t, aliyunLines.AnyOf, 2)
+	aliyunLineValues := aliyunLines.AnyOf[0]
+	require.Len(t, aliyunLineValues.AnyOf, 2)
+	require.Equal(t,
+		[]string{"default", "telecom", "unicom", "mobile", "oversea", "edu", "drpeng"},
+		enumStrings(aliyunLineValues.AnyOf[0]))
+	require.Equal(t, JSONTypeString, aliyunLineValues.AnyOf[1].Type)
+	require.Equal(t, 1, *aliyunLineValues.AnyOf[1].MinLength)
+	require.Equal(t, JSONTypeArray, aliyunLines.AnyOf[1].Type)
+	require.Equal(t, 1, *aliyunLines.AnyOf[1].Items.MinLength)
+	require.Equal(t, aliyunLineValues.AnyOf[0].Enum, aliyunLines.AnyOf[1].Items.AnyOf[0].Enum)
+
+	tencent := findVariant(t, providers, constpkg.ProviderTypeTencentCloud)
+	tencentLines := tencent.Properties["lines"]
+	require.Len(t, tencentLines.AnyOf, 2)
+	tencentLineValues := tencentLines.AnyOf[0]
+	require.Len(t, tencentLineValues.AnyOf, 2)
+	require.Equal(t,
+		[]string{"默认", "电信", "联通", "移动", "教育网", "境外"},
+		enumStrings(tencentLineValues.AnyOf[0]))
+	require.Equal(t, JSONTypeString, tencentLineValues.AnyOf[1].Type)
+	require.Equal(t, 1, *tencentLineValues.AnyOf[1].MinLength)
+	require.Equal(t, JSONTypeArray, tencentLines.AnyOf[1].Type)
+	require.Equal(t, 1, *tencentLines.AnyOf[1].Items.MinLength)
+	require.Equal(t, tencentLineValues.AnyOf[0].Enum, tencentLines.AnyOf[1].Items.AnyOf[0].Enum)
+}
+
 func TestGeneratedSchemaRequiresNonOptionalTopLevelFields(t *testing.T) {
 	data, err := GenSchema()
 	require.NoError(t, err)

@@ -10,6 +10,8 @@ type: aliyun
 name: prov-ali
 accessKeyId: "{{ .Env.ALIYUN_ACCESS_KEY_ID }}"
 accessKeySecret: "{{ .Env.ALIYUN_ACCESS_KEY_SECRET }}"
+# optional: one line, or multiple lines applied to every address
+lines: [default]
 
 # optional
 dns: system
@@ -26,6 +28,16 @@ http:
 ## `accessKeySecret`
 
 阿里云 RAM 访问密钥 Secret。
+
+## `lines`
+
+要为 DNS 记录指定线路时使用字符串或字符串数组。未配置或使用空数组时使用 `default`；只有一个值时，该线路用于所有 IP；有多个值时，每条线路都会应用到每个 IP。
+
+只配置一条非 `default` 线路是允许的，但前提是所需的 `default` 记录已经存在。阿里云要求同一个主机名和记录类型先存在 `default` 线路记录，才能创建或更新其它线路。空 Zone 初始化时，请先创建 `default` 记录（例如先只配置 `default`），再加入其它线路；同时建议把 `default` 保留在线路列表中，使后续启动时也会继续更新它。若 API 返回线路错误，Lightddns 会保留云端错误并提示先创建 `default` 线路记录。
+
+线路代码请以阿里云 API 文档为准，参见 [AddDomainRecord 的 Line 参数](https://help.aliyun.com/document_detail/29772.html)；控制台显示名称不一定等于 API 代码。
+
+生成的配置 schema 会提供常用线路代码用于编辑器补全；阿里云支持的其它线路值也仍然有效。
 
 !!! note "权限要求"
     凭据需要对目标 Zone 的 `DescribeDomainRecords`、`AddDomainRecord`、`UpdateDomainRecord`、`DeleteDomainRecord` 调用权限。预置策略 `AliyunDNSFullAccess` 即可满足。

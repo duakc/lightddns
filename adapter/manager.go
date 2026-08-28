@@ -49,7 +49,9 @@ type Manager[T ManagedType] interface {
 	LookupAll(...string) ([]T, error)
 }
 
-var _ Manager[ManagedType] = (*DefaultManager[ManagedType])(nil)
+type ManagedTypeManager Manager[ManagedType]
+
+var _ ManagedTypeManager = (*DefaultManager[ManagedType])(nil)
 
 type DefaultManager[T ManagedType] struct {
 	access sync.RWMutex

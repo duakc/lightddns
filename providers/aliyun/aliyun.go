@@ -51,17 +51,15 @@ func New(ctx context.Context, logger *zap.Logger, option options.AliyunProviderO
 		option.AccessKeyId, option.AccessKeySecret, "",
 	)
 
+	client := NewClient(logger, apiClient, option.Lines.Value)
 	observedClient := providerx.NewMetricsClientFromContext[ComparedRecord](
-		ctx, option.Name, ProviderType, NewClient(logger, apiClient),
+		ctx, option.Name, ProviderType, client,
 	)
 
 	return &Aliyun{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
 		reconciler: ddnsx.NewReconciler[ComparedRecord](
 			logger.Named("client"), observedClient,
-			func(addr netip.Addr, ttl uint32) ComparedRecord {
-				return ComparedRecord{Addr: addr.Unmap(), TTL: ttl, Line: DefaultRecordLine}
-			},
 		),
 	}, nil
 }

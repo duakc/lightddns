@@ -12,18 +12,17 @@ import (
 )
 
 type Reconciler[T DDNSRecordComparable[T]] struct {
-	logger      *zap.Logger
-	client      DDNSClient[T]
-	buildTarget func(netip.Addr, uint32) T
+	logger *zap.Logger
+	client DDNSClient[T]
 }
 
-func NewReconciler[T DDNSRecordComparable[T]](logger *zap.Logger, client DDNSClient[T],
-	buildTarget func(netip.Addr, uint32) T,
-) *Reconciler[T] {
+func NewReconciler[T DDNSRecordComparable[T]](logger *zap.Logger, client DDNSClient[T]) *Reconciler[T] {
 	return &Reconciler[T]{
-		logger:      zaplog.DoNotPanic(logger).Named("reconciler"),
-		client:      client,
-		buildTarget: buildTarget,
+		logger: zaplog.
+			DoNotPanic(logger).
+			Named("reconciler"),
+
+		client: client,
 	}
 }
 
@@ -46,7 +45,7 @@ func (r *Reconciler[T]) Update(ctx context.Context, fqdn string, ttl uint32, add
 		return false, err
 	}
 
-	diffs, err := BuildDiffs(ctx, key, addr, ttl, r.client, r.buildTarget)
+	diffs, err := r.client.BuildDiffs(ctx, key, addr, ttl, r.client)
 	if err != nil {
 		return false, fmt.Errorf("diff: %w", err)
 	}
@@ -70,7 +69,7 @@ func (r *Reconciler[T]) diffs(ctx context.Context, fqdn string, ttl uint32, addr
 	if err != nil {
 		return nil, err
 	}
-	return BuildDiffs(ctx, key, addr, ttl, r.client, r.buildTarget)
+	return r.client.BuildDiffs(ctx, key, addr, ttl, r.client)
 }
 
 func (r *Reconciler[T]) resolve(ctx context.Context, fqdn string) (RecordKey, error) {
@@ -94,11 +93,15 @@ func (r *Reconciler[T]) applyDiff(ctx context.Context, logger *zap.Logger,
 	}
 	switch diff.Action {
 	case DDNSActionCreate:
-		fields = append(fields, zap.Any("target", diff.Target))
+		fields = append(fields,
+			zap.Any("target", diff.Target))
 	case DDNSActionUpdate:
-		fields = append(fields, zap.Any("source", diff.Source), zap.Any("target", diff.Target))
+		fields = append(fields,
+			zap.Any("source", diff.Source),
+			zap.Any("target", diff.Target))
 	case DDNSActionDelete:
-		fields = append(fields, zap.Any("source", diff.Source))
+		fields = append(fields,
+			zap.Any("source", diff.Source))
 	}
 	logger = logger.WithLazy(fields...)
 	key.Type = diff.Type

@@ -2,6 +2,7 @@ package providerx
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
@@ -24,6 +25,14 @@ type MetricsClient[T ddnsx.DDNSRecordComparable[T]] struct {
 	create      operationMetrics
 	update      operationMetrics
 	delete      operationMetrics
+}
+
+// BuildDiffs delegates provider-specific comparison while keeping record reads
+// routed through this metrics wrapper.
+func (c *MetricsClient[T]) BuildDiffs(ctx context.Context, key ddnsx.RecordKey,
+	target []netip.Addr, ttl uint32, reader ddnsx.RecordReader[T],
+) ([]ddnsx.Diff[T], error) {
+	return c.next.BuildDiffs(ctx, key, target, ttl, reader)
 }
 
 func NewMetricsClientFromContext[T ddnsx.DDNSRecordComparable[T]](

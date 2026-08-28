@@ -55,14 +55,6 @@ func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProvi
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
 		reconciler: ddnsx.NewReconciler[ComparedRecord](
 			logger.Named("client"), observedClient,
-			func(addr netip.Addr, ttl uint32) ComparedRecord {
-				return ComparedRecord{
-					Addr:           addr.Unmap(),
-					TTL:            ttl,
-					Proxied:        option.Proxy,
-					PrivateRouting: false,
-				}
-			},
 		),
 	}, nil
 }

@@ -3,6 +3,7 @@ package providerx
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"testing"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
@@ -25,6 +26,12 @@ func (c metricsTestClient) ResolveZone(context.Context, string) (ddnsx.Zone, err
 }
 
 func (metricsTestClient) Records(context.Context, ddnsx.RecordKey) ([]metricsRecord, error) {
+	return nil, nil
+}
+
+func (metricsTestClient) BuildDiffs(context.Context, ddnsx.RecordKey, []netip.Addr, uint32,
+	ddnsx.RecordReader[metricsRecord],
+) ([]ddnsx.Diff[metricsRecord], error) {
 	return nil, nil
 }
 

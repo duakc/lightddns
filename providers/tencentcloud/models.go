@@ -16,8 +16,8 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("tencentcloud api error: code=%s message=%s request_id=%s",
-		e.Code, e.Message, e.RequestID)
+	return fmt.Sprintf("tencentcloud api error: code=%s message=%s request_id=%s details=%s",
+		e.Code, e.Message, e.RequestID, DNSPodErrorCodeURL)
 }
 
 type Common struct {

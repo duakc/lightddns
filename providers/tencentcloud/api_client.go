@@ -3,6 +3,7 @@ package tencentcloud
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	urlpkg "net/url"
@@ -31,6 +32,12 @@ const (
 	// DNSPodErrCodeNoDataOfRecord is returned by DescribeRecordList when the
 	// domain exists but has no records matching the filter.
 	DNSPodErrCodeNoDataOfRecord = "ResourceNotFound.NoDataOfRecord"
+
+	// DNSPodErrCodeMustAddDefaultLineFirst is returned when a non-default line
+	// is requested before the default line has been created.
+	DNSPodErrCodeMustAddDefaultLineFirst = "FailedOperation.MustAddDefaultLineFirst"
+
+	DNSPodErrorCodeURL = "https://cloud.tencent.com/document/api/1427/56188"
 )
 
 const (
@@ -98,14 +105,26 @@ func (c *defaultAPIClient) DescribeRecordList(ctx context.Context,
 func (c *defaultAPIClient) CreateRecord(ctx context.Context,
 	req CreateRecordRequest,
 ) (resp CreateRecordResponse, err error) {
-	return doAction[CreateRecordResponse](ctx, c, DNSPodActionCreateRecord, req)
+	resp, err = doAction[CreateRecordResponse](ctx, c, DNSPodActionCreateRecord, req)
+	if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.Code == DNSPodErrCodeMustAddDefaultLineFirst {
+		err = fmt.Errorf("%w: Tencent Cloud rejected line %q (%s: %s). This can happen when the %q line record does not exist. Add %q to the provider's \"lines\" configuration and create/update that default record first; otherwise the default record will not be updated on later startups: %w",
+			ErrDefaultRecordLineRequired, req.RecordLine, apiErr.Code, apiErr.Message,
+			DefaultRecordLine, DefaultRecordLine, err)
+	}
+	return resp, err
 }
 
 // ModifyRecord — https://cloud.tencent.com/document/api/1427/56157
 func (c *defaultAPIClient) ModifyRecord(ctx context.Context,
 	req ModifyRecordRequest,
 ) (resp ModifyRecordResponse, err error) {
-	return doAction[ModifyRecordResponse](ctx, c, DNSPodActionModifyRecord, req)
+	resp, err = doAction[ModifyRecordResponse](ctx, c, DNSPodActionModifyRecord, req)
+	if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.Code == DNSPodErrCodeMustAddDefaultLineFirst {
+		err = fmt.Errorf("%w: Tencent Cloud rejected line %q (%s: %s). This can happen when the %q line record does not exist. Add %q to the provider's \"lines\" configuration and create/update that default record first; otherwise the default record will not be updated on later startups: %w",
+			ErrDefaultRecordLineRequired, req.RecordLine, apiErr.Code, apiErr.Message,
+			DefaultRecordLine, DefaultRecordLine, err)
+	}
+	return resp, err
 }
 
 // DeleteRecord — https://cloud.tencent.com/document/api/1427/56176
@@ -158,6 +177,7 @@ func doAction[Resp any](ctx context.Context, c *defaultAPIClient, action string,
 			zap.String("request_id", out.RequestID))
 		return zero, out.Error
 	}
+
 	return out.Data, nil
 }
 

@@ -49,17 +49,15 @@ func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudPro
 	}
 
 	apiClient := NewAPIClient(logger, httpClient, option.SecretId, option.SecretKey)
-	client := NewClient(logger, apiClient)
+	client := NewClient(logger, apiClient, option.Lines.Value)
 	observed := providerx.NewMetricsClientFromContext[ComparedRecord](
 		ctx, option.Name, ProviderType, client,
 	)
+
 	return &TencentCloud{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
 		reconciler: ddnsx.NewReconciler[ComparedRecord](
 			logger, observed,
-			func(addr netip.Addr, ttl uint32) ComparedRecord {
-				return ComparedRecord{Addr: addr.Unmap(), TTL: ttl, Line: DefaultRecordLine}
-			},
 		),
 	}, nil
 }

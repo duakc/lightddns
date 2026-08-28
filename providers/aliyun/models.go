@@ -15,19 +15,25 @@ const DefaultRecordLine = "default"
 const ApexRecordHost = "@"
 
 // APIError is the error envelope Aliyun returns when an action fails. The
-// HTTP status code is 4xx / 5xx in this case and the JSON body carries Code
-// / Message / RequestId. It is the authoritative failure signal.
+// HTTP status code is 4xx / 5xx in this case and the JSON body carries Code,
+// Message, RequestId, and sometimes a Recommend details URL. It is the
+// authoritative failure signal.
 type APIError struct {
 	StatusCode int    `json:"-"`
 	Code       string `json:"Code"`
 	Message    string `json:"Message"`
+	Recommend  string `json:"Recommend"`
 	RequestID  string `json:"RequestId"`
 	HostID     string `json:"HostId"`
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("aliyun api error: status=%d code=%s message=%s request_id=%s",
-		e.StatusCode, e.Code, e.Message, e.RequestID)
+	details := e.Recommend
+	if details == "" {
+		details = AlidnsErrorCodeURL
+	}
+	return fmt.Sprintf("aliyun api error: status=%d code=%s message=%s request_id=%s details=%s",
+		e.StatusCode, e.Code, e.Message, e.RequestID, details)
 }
 
 // Domain is one zone returned by DescribeDomains.

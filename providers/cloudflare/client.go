@@ -1,7 +1,6 @@
 package cloudflare
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"net/netip"
@@ -12,59 +11,18 @@ import (
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const (
-	pageSize = 50
+	defaultPageSize = 50
 )
 
-type ComparedRecord struct {
-	Record         Record
-	Addr           netip.Addr
-	TTL            uint32
-	Proxied        bool
-	PrivateRouting bool
-}
+type ComparedRecordDDNSClient ddnsx.DDNSClient[ComparedRecord]
 
-func (r ComparedRecord) Address() netip.Addr { return r.Addr }
-
-func (r ComparedRecord) Compare(other ComparedRecord) int {
-	if c := r.Addr.Compare(other.Addr); c != 0 {
-		return c
-	}
-	if c := cmp.Compare(r.TTL, other.TTL); c != 0 {
-		return c
-	}
-	if r.Proxied != other.Proxied {
-		if r.Proxied {
-			return 1
-		}
-		return -1
-	}
-	if r.PrivateRouting == other.PrivateRouting {
-		return 0
-	}
-	if r.PrivateRouting {
-		return 1
-	}
-	return -1
-}
-
-func (r ComparedRecord) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("address", r.Addr.String())
-	enc.AddUint32("ttl", r.TTL)
-	enc.AddBool("proxied", r.Proxied)
-	enc.AddBool("private_routing", r.PrivateRouting)
-	if r.Record.ID != "" {
-		enc.AddString("record_id", r.Record.ID)
-	}
-	return nil
-}
-
+// Client implements ddnsx.DDNSClient[ComparedRecord] and ddnsx.ZoneSearcher.
 var (
-	_ ddnsx.DDNSClient[ComparedRecord] = (*Client)(nil)
-	_ ddnsx.ZoneSearcher               = (*Client)(nil)
+	_ ComparedRecordDDNSClient = (*Client)(nil)
+	_ ddnsx.ZoneSearcher       = (*Client)(nil)
 )
 
 type Client struct {
@@ -75,7 +33,6 @@ type Client struct {
 
 	proxied        bool
 	privateRouting bool
-	comment        string
 }
 
 func NewClient(logger *zap.Logger, api APIClient,
@@ -87,6 +44,20 @@ func NewClient(logger *zap.Logger, api APIClient,
 		proxied:        proxied,
 		privateRouting: privateRouting,
 	}
+}
+
+func (c *Client) BuildDiffs(ctx context.Context, key ddnsx.RecordKey, target []netip.Addr,
+	ttl uint32, reader ddnsx.RecordReader[ComparedRecord],
+) ([]ddnsx.Diff[ComparedRecord], error) {
+	return ddnsx.BuildDiffs(ctx, key, target, ttl, reader,
+		func(addr netip.Addr, ttl uint32) ComparedRecord {
+			return ComparedRecord{
+				Addr:           addr.Unmap(),
+				TTL:            ttl,
+				Proxied:        c.proxied,
+				PrivateRouting: c.privateRouting,
+			}
+		})
 }
 
 func (c *Client) ResolveZone(ctx context.Context, fqdn string) (ddnsx.Zone, error) {
@@ -101,7 +72,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 		page, err := c.api.ListZones(ctx, ListZonesRequest{
 			Status:  ZoneStatusActive,
 			Page:    pageNumber,
-			PerPage: pageSize,
+			PerPage: defaultPageSize,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("list zones: %w", err)
@@ -129,7 +100,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ComparedRe
 			Name:    name,
 			Type:    key.Type.String(),
 			Page:    pageNumber,
-			PerPage: pageSize,
+			PerPage: defaultPageSize,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("list DNS records: %w", err)
@@ -193,13 +164,12 @@ func (c *Client) recordRequest(target ddnsx.RecordSpec, desired ComparedRecord) 
 		Comment: providerx.UpdateMessage(""),
 
 		Name: name,
+		Type: target.Type.String(),
 
-		Ttl:     desired.TTL,
-		Type:    target.Type.String(),
-		Content: desired.Addr.Unmap().String(),
-
-		PrivateRouting: desired.PrivateRouting,
+		Ttl:            desired.TTL,
+		Content:        desired.Addr.Unmap().String(),
 		Proxied:        desired.Proxied,
+		PrivateRouting: desired.PrivateRouting,
 	}, nil
 }
 
@@ -210,5 +180,5 @@ func pageDone(info ResultInfo, pageNumber, resultCount int) bool {
 	if info.TotalPages > 0 {
 		return pageNumber >= info.TotalPages
 	}
-	return resultCount < pageSize
+	return resultCount < defaultPageSize
 }
