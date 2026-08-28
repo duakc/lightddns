@@ -30,7 +30,7 @@ var _ adapter.Provider = (*Cloudflare)(nil)
 type Cloudflare struct {
 	adapter.AbstractManagedType
 
-	reconciler *ddnsx.Reconciler[Record]
+	reconciler *ddnsx.Reconciler[ComparedRecord]
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProviderOption) (adapter.Provider, error) {
@@ -47,20 +47,30 @@ func New(ctx context.Context, logger *zap.Logger, option options.CloudflareProvi
 	apiClient := NewAPIClient(logger, httpClient, option.Token)
 	client := NewClient(logger, apiClient,
 		option.Proxy, false)
-	observedClient := providerx.NewMetricsClientFromContext[Record](
+	observedClient := providerx.NewMetricsClientFromContext[ComparedRecord](
 		ctx, option.Name, ProviderType, client,
 	)
 
 	return &Cloudflare{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		reconciler:          ddnsx.NewReconciler[Record](logger.Named("client"), observedClient),
+		reconciler: ddnsx.NewReconciler[ComparedRecord](
+			logger.Named("client"), observedClient,
+			func(addr netip.Addr, ttl uint32) ComparedRecord {
+				return ComparedRecord{
+					Addr:           addr.Unmap(),
+					TTL:            ttl,
+					Proxied:        option.Proxy,
+					PrivateRouting: false,
+				}
+			},
+		),
 	}, nil
 }
 
 func (c *Cloudflare) Close() error { return nil }
 
-func (c *Cloudflare) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
-	return c.reconciler.Diff(ctx, domain, addr)
+func (c *Cloudflare) Diff(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
+	return c.reconciler.Diff(ctx, domain, ttl, addr)
 }
 
 func (c *Cloudflare) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {

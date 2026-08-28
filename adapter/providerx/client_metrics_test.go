@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type metricsRecord struct{}
+
+func (metricsRecord) Compare(metricsRecord) int { return 0 }
+
 type metricsTestClient struct {
 	resolveErr error
 }
@@ -20,19 +24,19 @@ func (c metricsTestClient) ResolveZone(context.Context, string) (ddnsx.Zone, err
 	return ddnsx.Zone{}, c.resolveErr
 }
 
-func (metricsTestClient) Records(context.Context, ddnsx.RecordKey) ([]ddnsx.Existing[int], error) {
+func (metricsTestClient) Records(context.Context, ddnsx.RecordKey) ([]metricsRecord, error) {
 	return nil, nil
 }
 
-func (metricsTestClient) Create(context.Context, ddnsx.RecordSpec) error {
+func (metricsTestClient) Create(context.Context, ddnsx.RecordSpec, metricsRecord) error {
 	return nil
 }
 
-func (metricsTestClient) Update(context.Context, ddnsx.RecordSpec, int) error {
+func (metricsTestClient) Update(context.Context, ddnsx.RecordSpec, metricsRecord, metricsRecord) error {
 	return nil
 }
 
-func (metricsTestClient) Delete(context.Context, ddnsx.RecordKey, int) error {
+func (metricsTestClient) Delete(context.Context, ddnsx.RecordKey, metricsRecord) error {
 	return nil
 }
 
@@ -40,7 +44,7 @@ func TestMetricsClientRecordsLogicalOperation(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.New(true)
-	client := NewMetricsClient[int](
+	client := NewMetricsClient[metricsRecord](
 		metricx.NewProviderFactory(registry),
 		"primary", "test", metricsTestClient{resolveErr: errors.New("unavailable")},
 	)

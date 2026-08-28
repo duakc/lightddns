@@ -8,8 +8,6 @@ import (
 	"slices"
 
 	"github.com/duakc/lightddns/infra/netx"
-
-	"github.com/duakc/mt"
 )
 
 type DDNSAction uint8
@@ -32,72 +30,89 @@ func (a DDNSAction) String() string {
 	return fmt.Sprintf("DDNSAction(%d)", uint8(a))
 }
 
-type Existing[R any] struct {
-	Addr   netip.Addr
-	Record R
+type Diff[T DDNSRecordComparable[T]] struct {
+	Domain string
+	Type   RecordType
+	Action DDNSAction
+
+	Source T
+	Target T
 }
 
-type Diff[R any] struct {
-	Domain         string
-	Type           RecordType
-	Source, Target netip.Addr
-	Action         DDNSAction
-	Record         R
-}
-
-func Compare[R any](domain string, existing []Existing[R], target []netip.Addr) []Diff[R] {
+// Compare returns the operations needed to make existing equal target. The
+// provider comparison object is the only equality definition; == is never
+// used for matching records.
+func Compare[T DDNSRecordComparable[T]](domain string, existing []T, target []T) []Diff[T] {
 	if len(existing) == 0 && len(target) == 0 {
 		return nil
 	}
 
-	targetSet := mt.Set(target)
-	unmatched := make([]Existing[R], 0, len(existing))
-	for _, record := range existing {
-		if targetSet[record.Addr] {
-			delete(targetSet, record.Addr)
-			continue
+	old := slices.Clone(existing)
+	slices.SortStableFunc(old, func(a, b T) int {
+		return a.Compare(b)
+	})
+
+	want := slices.Clone(target)
+	slices.SortStableFunc(want, func(a, b T) int {
+		return a.Compare(b)
+	})
+
+	// Remove records that already compare equal. The remaining values are
+	// deterministic because both sides are sorted by the provider comparator.
+	var unmatchedOld []T
+	var unmatchedWant []T
+	for i, j := 0, 0; i < len(old) || j < len(want); {
+		switch {
+		case i == len(old):
+			unmatchedWant = append(unmatchedWant, want[j:]...)
+			j = len(want)
+		case j == len(want):
+			for ; i < len(old); i++ {
+				unmatchedOld = append(unmatchedOld, old[i])
+			}
+		case old[i].Compare(want[j]) == 0:
+			i++
+			j++
+		case old[i].Compare(want[j]) < 0:
+			unmatchedOld = append(unmatchedOld, old[i])
+			i++
+		default:
+			unmatchedWant = append(unmatchedWant, want[j])
+			j++
 		}
-		unmatched = append(unmatched, record)
 	}
 
-	leftover := make([]netip.Addr, 0, len(targetSet))
-	for ip := range targetSet {
-		leftover = append(leftover, ip)
-	}
-	slices.SortFunc(leftover, netip.Addr.Compare)
-
-	diffs := make([]Diff[R], 0, len(unmatched)+len(leftover))
-	pair := min(len(unmatched), len(leftover))
+	diffs := make([]Diff[T], 0, len(unmatchedOld)+len(unmatchedWant))
+	pair := min(len(unmatchedOld), len(unmatchedWant))
 	for i := range pair {
-		diffs = append(diffs, Diff[R]{
+		diffs = append(diffs, Diff[T]{
 			Domain: domain,
-			Source: unmatched[i].Addr,
-			Target: leftover[i],
+			Source: unmatchedOld[i],
+			Target: unmatchedWant[i],
 			Action: DDNSActionUpdate,
-			Record: unmatched[i].Record,
 		})
 	}
-	for i := pair; i < len(unmatched); i++ {
-		diffs = append(diffs, Diff[R]{
+	for i := pair; i < len(unmatchedOld); i++ {
+		diffs = append(diffs, Diff[T]{
 			Domain: domain,
-			Source: unmatched[i].Addr,
+			Source: unmatchedOld[i],
 			Action: DDNSActionDelete,
-			Record: unmatched[i].Record,
 		})
 	}
-	for i := pair; i < len(leftover); i++ {
-		diffs = append(diffs, Diff[R]{
+	for i := pair; i < len(unmatchedWant); i++ {
+		diffs = append(diffs, Diff[T]{
 			Domain: domain,
-			Target: leftover[i],
+			Target: unmatchedWant[i],
 			Action: DDNSActionCreate,
 		})
 	}
 	return diffs
 }
 
-func BuildDiffs[R any](ctx context.Context, key RecordKey,
-	target []netip.Addr, reader RecordReader[R],
-) ([]Diff[R], error) {
+func BuildDiffs[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
+	target []netip.Addr, ttl uint32, reader RecordReader[T],
+	buildTarget func(netip.Addr, uint32) T,
+) ([]Diff[T], error) {
 	normalized := make([]netip.Addr, len(target))
 	for i, addr := range target {
 		if !addr.IsValid() {
@@ -107,10 +122,10 @@ func BuildDiffs[R any](ctx context.Context, key RecordKey,
 	}
 
 	ipv4, ipv6 := netx.SplitIPv4AndIPv6(normalized)
-	var diffs []Diff[R]
+	var diffs []Diff[T]
 	if len(ipv4) > 0 || len(target) == 0 {
 		key.Type = RecordTypeA
-		part, err := fetchAndCompare(ctx, key, ipv4, reader)
+		part, err := fetchAndCompare(ctx, key, ipv4, ttl, reader, buildTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +133,7 @@ func BuildDiffs[R any](ctx context.Context, key RecordKey,
 	}
 	if len(ipv6) > 0 || len(target) == 0 {
 		key.Type = RecordTypeAAAA
-		part, err := fetchAndCompare(ctx, key, ipv6, reader)
+		part, err := fetchAndCompare(ctx, key, ipv6, ttl, reader, buildTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -127,14 +142,19 @@ func BuildDiffs[R any](ctx context.Context, key RecordKey,
 	return diffs, nil
 }
 
-func fetchAndCompare[R any](ctx context.Context, key RecordKey,
-	target []netip.Addr, reader RecordReader[R],
-) ([]Diff[R], error) {
+func fetchAndCompare[T DDNSRecordComparable[T]](ctx context.Context, key RecordKey,
+	target []netip.Addr, ttl uint32, reader RecordReader[T],
+	buildTarget func(netip.Addr, uint32) T,
+) ([]Diff[T], error) {
 	existing, err := reader.Records(ctx, key)
 	if err != nil {
 		return nil, err
 	}
-	diffs := Compare(key.FQDN, existing, target)
+	want := make([]T, len(target))
+	for i, addr := range target {
+		want[i] = buildTarget(addr, ttl)
+	}
+	diffs := Compare(key.FQDN, existing, want)
 	for i := range diffs {
 		diffs[i].Type = key.Type
 	}

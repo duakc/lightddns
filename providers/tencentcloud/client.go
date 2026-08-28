@@ -16,12 +16,42 @@ import (
 
 	mDns "github.com/miekg/dns"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
+type ComparedRecord struct {
+	Record Record
+	Addr   netip.Addr
+	TTL    uint32
+	Line   string
+}
+
+func (r ComparedRecord) Address() netip.Addr { return r.Addr }
+
+func (r ComparedRecord) Compare(other ComparedRecord) int {
+	if c := r.Addr.Compare(other.Addr); c != 0 {
+		return c
+	}
+	if c := cmp.Compare(r.TTL, other.TTL); c != 0 {
+		return c
+	}
+	return cmp.Compare(r.Line, other.Line)
+}
+
+func (r ComparedRecord) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("address", r.Addr.String())
+	enc.AddUint32("ttl", r.TTL)
+	enc.AddString("line", r.Line)
+	if r.Record.RecordId != 0 {
+		enc.AddUint64("record_id", r.Record.RecordId)
+	}
+	return nil
+}
+
 var (
-	_ APIClient                = (*defaultAPIClient)(nil)
-	_ ddnsx.DDNSClient[Record] = (*Client)(nil)
-	_ ddnsx.ZoneSearcher       = (*Client)(nil)
+	_ APIClient                        = (*defaultAPIClient)(nil)
+	_ ddnsx.DDNSClient[ComparedRecord] = (*Client)(nil)
+	_ ddnsx.ZoneSearcher               = (*Client)(nil)
 )
 
 type Client struct {
@@ -78,7 +108,7 @@ func (c *Client) SearchZones(ctx context.Context, keyword string) ([]ddnsx.Zone,
 	}
 }
 
-func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Existing[Record], error) {
+func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ComparedRecord, error) {
 	const pageSize = 100
 
 	domain := domains.FqdnToDomain(key.Zone.Fqdn)
@@ -87,7 +117,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 		return nil, err
 	}
 
-	var records []ddnsx.Existing[Record]
+	var records []ComparedRecord
 	for offset := 0; ; {
 		page, err := c.api.DescribeRecordList(ctx, DescribeRecordListRequest{
 			Domain:     domain,
@@ -110,9 +140,11 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 			if err != nil {
 				return nil, fmt.Errorf("record %d: not an address: %s: %w", record.RecordId, record.Value, err)
 			}
-			records = append(records, ddnsx.Existing[Record]{
-				Addr:   address.Unmap(),
+			records = append(records, ComparedRecord{
 				Record: record,
+				Addr:   address.Unmap(),
+				TTL:    record.TTL,
+				Line:   cmp.Or(record.Line, DefaultRecordLine),
 			})
 		}
 		offset += len(page.RecordList)
@@ -122,7 +154,7 @@ func (c *Client) Records(ctx context.Context, key ddnsx.RecordKey) ([]ddnsx.Exis
 	}
 }
 
-func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
+func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec, desired ComparedRecord) error {
 	domain := domains.FqdnToDomain(target.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
@@ -133,15 +165,15 @@ func (c *Client) Create(ctx context.Context, target ddnsx.RecordSpec) error {
 		Domain:     domain,
 		SubDomain:  subdomain,
 		RecordType: target.Type.String(),
-		RecordLine: DefaultRecordLine,
-		Value:      target.Address.Unmap().String(),
-		TTL:        target.TTL,
+		RecordLine: desired.Line,
+		Value:      desired.Addr.Unmap().String(),
+		TTL:        desired.TTL,
 		Remark:     providerx.UpdateMessage(""),
 	})
 	return err
 }
 
-func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, record Record) error {
+func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, desired, existing ComparedRecord) error {
 	domain := domains.FqdnToDomain(target.Zone.Fqdn)
 	subdomain, err := relativeSubDomain(target.FQDN, target.Zone.Fqdn)
 	if err != nil {
@@ -150,22 +182,22 @@ func (c *Client) Update(ctx context.Context, target ddnsx.RecordSpec, record Rec
 
 	_, err = c.api.ModifyRecord(ctx, ModifyRecordRequest{
 		Domain:     domain,
-		RecordId:   record.RecordId,
+		RecordId:   existing.Record.RecordId,
 		SubDomain:  subdomain,
 		RecordType: target.Type.String(),
-		RecordLine: cmp.Or(record.Line, DefaultRecordLine),
-		Value:      target.Address.Unmap().String(),
-		TTL:        target.TTL,
+		RecordLine: desired.Line,
+		Value:      desired.Addr.Unmap().String(),
+		TTL:        desired.TTL,
 		Remark:     providerx.UpdateMessage(""),
 	})
 	return err
 }
 
-func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, record Record) error {
+func (c *Client) Delete(ctx context.Context, key ddnsx.RecordKey, existing ComparedRecord) error {
 	domain := domains.FqdnToDomain(key.Zone.Fqdn)
 	_, err := c.api.DeleteRecord(ctx, DeleteRecordRequest{
 		Domain:   domain,
-		RecordId: record.RecordId,
+		RecordId: existing.Record.RecordId,
 	})
 	return err
 }

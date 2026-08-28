@@ -55,8 +55,11 @@ type Zone struct {
 
 // Record is one DNS record returned by ListDNSRecords.
 type Record struct {
-	ID      string `json:"id"`
-	Content string `json:"content"`
+	ID             string `json:"id"`
+	Content        string `json:"content"`
+	Ttl            uint32 `json:"ttl"`
+	Proxied        bool   `json:"proxied"`
+	PrivateRouting bool   `json:"private_routing"`
 }
 
 type DNSRecordRequest struct {

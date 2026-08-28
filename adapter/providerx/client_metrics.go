@@ -16,10 +16,8 @@ type operationMetrics struct {
 	duration interface{ Observe(float64) }
 }
 
-var _ ddnsx.DDNSClient[int] = (*MetricsClient[int])(nil)
-
-type MetricsClient[R any] struct {
-	next ddnsx.DDNSClient[R]
+type MetricsClient[T ddnsx.DDNSRecordComparable[T]] struct {
+	next ddnsx.DDNSClient[T]
 
 	resolveZone operationMetrics
 	listRecords operationMetrics
@@ -28,21 +26,21 @@ type MetricsClient[R any] struct {
 	delete      operationMetrics
 }
 
-func NewMetricsClientFromContext[R any](
+func NewMetricsClientFromContext[T ddnsx.DDNSRecordComparable[T]](
 	ctx context.Context,
 	clientName, clientType string,
-	next ddnsx.DDNSClient[R],
-) *MetricsClient[R] {
+	next ddnsx.DDNSClient[T],
+) *MetricsClient[T] {
 	return NewMetricsClient(
 		services.Lookup[metricx.ProviderFactory](ctx), clientName, clientType, next,
 	)
 }
 
-func NewMetricsClient[R any](
+func NewMetricsClient[T ddnsx.DDNSRecordComparable[T]](
 	factory metricx.ProviderFactory,
 	clientName, clientType string,
-	next ddnsx.DDNSClient[R],
-) *MetricsClient[R] {
+	next ddnsx.DDNSClient[T],
+) *MetricsClient[T] {
 	operation := func(name string) operationMetrics {
 		return operationMetrics{
 			total:    factory.OperationTotal(clientName, clientType, name),
@@ -50,7 +48,7 @@ func NewMetricsClient[R any](
 			duration: factory.OperationDuration(clientName, clientType, name, nil),
 		}
 	}
-	return &MetricsClient[R]{
+	return &MetricsClient[T]{
 		next:        next,
 		resolveZone: operation(OperationResolveZone),
 		listRecords: operation(OperationListRecords),
@@ -60,37 +58,37 @@ func NewMetricsClient[R any](
 	}
 }
 
-func (c *MetricsClient[R]) ResolveZone(ctx context.Context, fqdn string) (zone ddnsx.Zone, err error) {
+func (c *MetricsClient[T]) ResolveZone(ctx context.Context, fqdn string) (zone ddnsx.Zone, err error) {
 	done := c.record(c.resolveZone)
 	defer done(&err)
 	return c.next.ResolveZone(ctx, fqdn)
 }
 
-func (c *MetricsClient[R]) Records(ctx context.Context, key ddnsx.RecordKey) (records []ddnsx.Existing[R], err error) {
+func (c *MetricsClient[T]) Records(ctx context.Context, key ddnsx.RecordKey) (records []T, err error) {
 	done := c.record(c.listRecords)
 	defer done(&err)
 	return c.next.Records(ctx, key)
 }
 
-func (c *MetricsClient[R]) Create(ctx context.Context, target ddnsx.RecordSpec) (err error) {
+func (c *MetricsClient[T]) Create(ctx context.Context, target ddnsx.RecordSpec, desired T) (err error) {
 	done := c.record(c.create)
 	defer done(&err)
-	return c.next.Create(ctx, target)
+	return c.next.Create(ctx, target, desired)
 }
 
-func (c *MetricsClient[R]) Update(ctx context.Context, target ddnsx.RecordSpec, record R) (err error) {
+func (c *MetricsClient[T]) Update(ctx context.Context, target ddnsx.RecordSpec, desired T, existing T) (err error) {
 	done := c.record(c.update)
 	defer done(&err)
-	return c.next.Update(ctx, target, record)
+	return c.next.Update(ctx, target, desired, existing)
 }
 
-func (c *MetricsClient[R]) Delete(ctx context.Context, key ddnsx.RecordKey, record R) (err error) {
+func (c *MetricsClient[T]) Delete(ctx context.Context, key ddnsx.RecordKey, record T) (err error) {
 	done := c.record(c.delete)
 	defer done(&err)
 	return c.next.Delete(ctx, key, record)
 }
 
-func (*MetricsClient[R]) record(metrics operationMetrics) func(*error) {
+func (*MetricsClient[T]) record(metrics operationMetrics) func(*error) {
 	started := time.Now()
 	return func(errp *error) {
 		metrics.total.Inc()

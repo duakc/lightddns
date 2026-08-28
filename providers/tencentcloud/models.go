@@ -70,6 +70,7 @@ type Record struct {
 	Type     string `json:"Type"`
 	Line     string `json:"Line"`
 	Value    string `json:"Value"`
+	TTL      uint32 `json:"TTL"`
 
 	// uncomment when needed.
 	// Name          string `json:"Name"`          // "@" means apex

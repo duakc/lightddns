@@ -2,7 +2,6 @@ package ddnsx
 
 import (
 	"context"
-	"net/netip"
 )
 
 type RecordType string
@@ -25,26 +24,33 @@ type RecordKey struct {
 type RecordSpec struct {
 	RecordKey
 
-	Address netip.Addr
-	TTL     uint32
+	TTL uint32
+}
+
+// DDNSRecordComparable is implemented by a provider's complete comparison
+// object. The object may contain the provider record and any fields that must
+// participate in reconciliation.
+type DDNSRecordComparable[T comparable] interface {
+	comparable
+	Compare(T) int
 }
 
 type ZoneResolver interface {
 	ResolveZone(ctx context.Context, fqdn string) (Zone, error)
 }
 
-type RecordReader[R any] interface {
-	Records(ctx context.Context, key RecordKey) ([]Existing[R], error)
+type RecordReader[T DDNSRecordComparable[T]] interface {
+	Records(ctx context.Context, key RecordKey) ([]T, error)
 }
 
-type RecordWriter[R any] interface {
-	Create(ctx context.Context, target RecordSpec) error
-	Update(ctx context.Context, target RecordSpec, record R) error
-	Delete(ctx context.Context, key RecordKey, record R) error
+type RecordWriter[T DDNSRecordComparable[T]] interface {
+	Create(ctx context.Context, target RecordSpec, desired T) error
+	Update(ctx context.Context, target RecordSpec, desired T, existing T) error
+	Delete(ctx context.Context, key RecordKey, existing T) error
 }
 
-type DDNSClient[R any] interface {
+type DDNSClient[T DDNSRecordComparable[T]] interface {
 	ZoneResolver
-	RecordReader[R]
-	RecordWriter[R]
+	RecordReader[T]
+	RecordWriter[T]
 }

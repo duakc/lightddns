@@ -56,6 +56,7 @@ type Record struct {
 	Type     string `json:"Type"`
 	Value    string `json:"Value"`
 	Line     string `json:"Line"`
+	TTL      uint32 `json:"TTL"`
 
 	// uncomment when needed.
 	// DomainName string `json:"DomainName"`

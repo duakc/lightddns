@@ -30,7 +30,7 @@ var _ adapter.Provider = (*TencentCloud)(nil)
 type TencentCloud struct {
 	adapter.AbstractManagedType
 
-	reconciler *ddnsx.Reconciler[Record]
+	reconciler *ddnsx.Reconciler[ComparedRecord]
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudProviderOption) (adapter.Provider, error) {
@@ -50,19 +50,24 @@ func New(ctx context.Context, logger *zap.Logger, option options.TencentCloudPro
 
 	apiClient := NewAPIClient(logger, httpClient, option.SecretId, option.SecretKey)
 	client := NewClient(logger, apiClient)
-	observed := providerx.NewMetricsClientFromContext[Record](
+	observed := providerx.NewMetricsClientFromContext[ComparedRecord](
 		ctx, option.Name, ProviderType, client,
 	)
 	return &TencentCloud{
 		AbstractManagedType: adapter.NewManagedType(ProviderType, option.Name),
-		reconciler:          ddnsx.NewReconciler[Record](logger, observed),
+		reconciler: ddnsx.NewReconciler[ComparedRecord](
+			logger, observed,
+			func(addr netip.Addr, ttl uint32) ComparedRecord {
+				return ComparedRecord{Addr: addr.Unmap(), TTL: ttl, Line: DefaultRecordLine}
+			},
+		),
 	}, nil
 }
 
 func (t *TencentCloud) Close() error { return nil }
 
-func (t *TencentCloud) Diff(ctx context.Context, domain string, addr []netip.Addr) (bool, error) {
-	return t.reconciler.Diff(ctx, domain, addr)
+func (t *TencentCloud) Diff(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {
+	return t.reconciler.Diff(ctx, domain, ttl, addr)
 }
 
 func (t *TencentCloud) Update(ctx context.Context, domain string, ttl uint32, addr []netip.Addr) (bool, error) {

@@ -10,7 +10,7 @@ import (
 )
 
 type reconcileClient struct {
-	existing     []Existing[int]
+	existing     []testComparedRecord
 	deleteErr    error
 	deleteCall   int
 	resolvedFQDN string
@@ -22,20 +22,20 @@ func (c *reconcileClient) ResolveZone(_ context.Context, fqdn string) (Zone, err
 	return Zone{Fqdn: "example.com.", ID: "zone-id"}, nil
 }
 
-func (c *reconcileClient) Records(_ context.Context, key RecordKey) ([]Existing[int], error) {
+func (c *reconcileClient) Records(_ context.Context, key RecordKey) ([]testComparedRecord, error) {
 	c.recordFQDN = key.FQDN
 	return c.existing, nil
 }
 
-func (c *reconcileClient) Create(context.Context, RecordSpec) error {
+func (c *reconcileClient) Create(context.Context, RecordSpec, testComparedRecord) error {
 	return nil
 }
 
-func (c *reconcileClient) Update(context.Context, RecordSpec, int) error {
+func (c *reconcileClient) Update(context.Context, RecordSpec, testComparedRecord, testComparedRecord) error {
 	return nil
 }
 
-func (c *reconcileClient) Delete(context.Context, RecordKey, int) error {
+func (c *reconcileClient) Delete(context.Context, RecordKey, testComparedRecord) error {
 	c.deleteCall++
 	if c.deleteCall == 2 {
 		return c.deleteErr
@@ -48,14 +48,18 @@ func TestReconcilerReportsPartialSuccess(t *testing.T) {
 
 	mutationErr := errors.New("second delete failed")
 	client := &reconcileClient{
-		existing: []Existing[int]{
+		existing: []testComparedRecord{
 			{Addr: netip.MustParseAddr("192.0.2.1"), Record: 1},
 			{Addr: netip.MustParseAddr("192.0.2.2"), Record: 2},
 		},
 		deleteErr: mutationErr,
 	}
 
-	changed, err := NewReconciler[int](nil, client).Update(
+	changed, err := NewReconciler[testComparedRecord](nil, client,
+		func(addr netip.Addr, ttl uint32) testComparedRecord {
+			return testComparedRecord{Addr: addr, TTL: ttl}
+		},
+	).Update(
 		context.Background(), "Host.Example.COM.", 300, nil,
 	)
 	require.True(t, changed)

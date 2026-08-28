@@ -11,27 +11,31 @@ import (
 	"go.uber.org/zap"
 )
 
-type Reconciler[R any] struct {
-	logger *zap.Logger
-	client DDNSClient[R]
+type Reconciler[T DDNSRecordComparable[T]] struct {
+	logger      *zap.Logger
+	client      DDNSClient[T]
+	buildTarget func(netip.Addr, uint32) T
 }
 
-func NewReconciler[R any](logger *zap.Logger, client DDNSClient[R]) *Reconciler[R] {
-	return &Reconciler[R]{
-		logger: zaplog.DoNotPanic(logger).Named("reconciler"),
-		client: client,
+func NewReconciler[T DDNSRecordComparable[T]](logger *zap.Logger, client DDNSClient[T],
+	buildTarget func(netip.Addr, uint32) T,
+) *Reconciler[T] {
+	return &Reconciler[T]{
+		logger:      zaplog.DoNotPanic(logger).Named("reconciler"),
+		client:      client,
+		buildTarget: buildTarget,
 	}
 }
 
-func (r *Reconciler[R]) Diff(ctx context.Context, fqdn string, addr []netip.Addr) (bool, error) {
-	diffs, err := r.diffs(ctx, fqdn, addr)
+func (r *Reconciler[T]) Diff(ctx context.Context, fqdn string, ttl uint32, addr []netip.Addr) (bool, error) {
+	diffs, err := r.diffs(ctx, fqdn, ttl, addr)
 	if err != nil {
 		return false, err
 	}
 	return len(diffs) > 0, nil
 }
 
-func (r *Reconciler[R]) Update(ctx context.Context, fqdn string, ttl uint32, addr []netip.Addr) (bool, error) {
+func (r *Reconciler[T]) Update(ctx context.Context, fqdn string, ttl uint32, addr []netip.Addr) (bool, error) {
 	logger := r.logger.With(zap.String("domain", fqdn))
 	logger.Debug("new update request",
 		zap.Stringers("addresses", addr),
@@ -42,7 +46,7 @@ func (r *Reconciler[R]) Update(ctx context.Context, fqdn string, ttl uint32, add
 		return false, err
 	}
 
-	diffs, err := BuildDiffs(ctx, key, addr, r.client)
+	diffs, err := BuildDiffs(ctx, key, addr, ttl, r.client, r.buildTarget)
 	if err != nil {
 		return false, fmt.Errorf("diff: %w", err)
 	}
@@ -61,15 +65,15 @@ func (r *Reconciler[R]) Update(ctx context.Context, fqdn string, ttl uint32, add
 	return changed, nil
 }
 
-func (r *Reconciler[R]) diffs(ctx context.Context, fqdn string, addr []netip.Addr) ([]Diff[R], error) {
+func (r *Reconciler[T]) diffs(ctx context.Context, fqdn string, ttl uint32, addr []netip.Addr) ([]Diff[T], error) {
 	key, err := r.resolve(ctx, fqdn)
 	if err != nil {
 		return nil, err
 	}
-	return BuildDiffs(ctx, key, addr, r.client)
+	return BuildDiffs(ctx, key, addr, ttl, r.client, r.buildTarget)
 }
 
-func (r *Reconciler[R]) resolve(ctx context.Context, fqdn string) (RecordKey, error) {
+func (r *Reconciler[T]) resolve(ctx context.Context, fqdn string) (RecordKey, error) {
 	fqdn = mDns.Fqdn(fqdn)
 
 	zone, err := r.client.ResolveZone(ctx, fqdn)
@@ -82,18 +86,19 @@ func (r *Reconciler[R]) resolve(ctx context.Context, fqdn string) (RecordKey, er
 	return RecordKey{FQDN: fqdn, Zone: zone}, nil
 }
 
-func (r *Reconciler[R]) applyDiff(ctx context.Context, logger *zap.Logger,
-	key RecordKey, ttl uint32, diff Diff[R],
+func (r *Reconciler[T]) applyDiff(ctx context.Context, logger *zap.Logger,
+	key RecordKey, ttl uint32, diff Diff[T],
 ) error {
 	fields := []zap.Field{
-		zap.String("domain", diff.Domain),
 		zap.Stringer("action", diff.Action),
 	}
-	if diff.Target.IsValid() {
-		fields = append(fields, zap.Stringer("target", diff.Target))
-	}
-	if diff.Source.IsValid() {
-		fields = append(fields, zap.Stringer("source", diff.Source))
+	switch diff.Action {
+	case DDNSActionCreate:
+		fields = append(fields, zap.Any("target", diff.Target))
+	case DDNSActionUpdate:
+		fields = append(fields, zap.Any("source", diff.Source), zap.Any("target", diff.Target))
+	case DDNSActionDelete:
+		fields = append(fields, zap.Any("source", diff.Source))
 	}
 	logger = logger.WithLazy(fields...)
 	key.Type = diff.Type
@@ -104,19 +109,17 @@ func (r *Reconciler[R]) applyDiff(ctx context.Context, logger *zap.Logger,
 		logger.Info("create")
 		err = r.client.Create(ctx, RecordSpec{
 			RecordKey: key,
-			Address:   diff.Target.Unmap(),
 			TTL:       ttl,
-		})
+		}, diff.Target)
 	case DDNSActionUpdate:
 		logger.Info("update")
 		err = r.client.Update(ctx, RecordSpec{
 			RecordKey: key,
-			Address:   diff.Target.Unmap(),
 			TTL:       ttl,
-		}, diff.Record)
+		}, diff.Target, diff.Source)
 	case DDNSActionDelete:
 		logger.Info("delete")
-		err = r.client.Delete(ctx, key, diff.Record)
+		err = r.client.Delete(ctx, key, diff.Source)
 	default:
 		return fmt.Errorf("unknown DDNS action: %s", diff.Action)
 	}
