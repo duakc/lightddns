@@ -1,0 +1,10 @@
+{
+  "inbounds": [
+    {
+      "type": "http",
+      "tag": "http-in",
+      "listen": "127.0.0.1",
+      "listen_port": 9080
+    }
+  ]
+}

@@ -161,6 +161,15 @@ func doAction[Resp any](ctx context.Context, c *defaultAPIClient, action string,
 		panic("empty response with no error")
 	}
 	if resp.StatusCode >= 400 {
+		var out Response[Resp]
+		if decodeErr := json.NewDecoder(resp.Body).Decode(&out); decodeErr == nil && out.Error != nil {
+			out.Error.StatusCode = resp.StatusCode
+			logger.Warn("api returned error",
+				zap.String("error_code", out.Error.Code),
+				zap.String("error_message", out.Error.Message),
+				zap.String("request_id", out.RequestID))
+			return zero, out.Error
+		}
 		return zero, &httpx.BadStatusCodeError{Got: resp.StatusCode}
 	}
 

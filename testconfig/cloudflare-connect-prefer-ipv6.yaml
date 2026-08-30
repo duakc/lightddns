@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-connect-prefer-ipv6
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+    connect:
+      dialStrategy: prefer_ipv6
+
+datasources:
+  - type: command
+    name: ds-connect-prefer-ipv6
+    cmd: ["cat", "testconfig/testdata/ips"]
+
+domains:
+  - enabled: true
+    domain: "connect-prefer-ipv6.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-connect-prefer-ipv6
+    provider: pv-cf-connect-prefer-ipv6
+    timeout: 15s
+    interval: 30s
+
+services: []

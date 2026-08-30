@@ -19,7 +19,6 @@ const (
 
 type ComparedRecordDDNSClient ddnsx.DDNSClient[ComparedRecord]
 
-// Client implements ddnsx.DDNSClient[ComparedRecord] and ddnsx.ZoneSearcher.
 var (
 	_ ComparedRecordDDNSClient = (*Client)(nil)
 	_ ddnsx.ZoneSearcher       = (*Client)(nil)

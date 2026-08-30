@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-services-defaults
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: command
+    name: ds-services-defaults
+    cmd: ["cat", "testconfig/testdata/ips"]
+
+domains:
+  - enabled: true
+    domain: "services-defaults.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-services-defaults
+    provider: pv-cf-services-defaults
+    ipv4: true
+    ipv6: false
+    timeout: 15s
+    interval: 30s
+
+services:
+  - type: prometheus
+    enabled: true
+  - type: ipserver
+    enabled: true
+  - type: prometheus
+    name: svc-disabled
+    enabled: false

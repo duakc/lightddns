@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-http-datasource
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: http
+    name: ds-http-jq
+    url: https://api.ip.sb/jsonip
+    method: GET
+    headers:
+      X-Lightddns-Test: [jq, proxy]
+    match:
+      jq: ".ip"
+    connect:
+      dialStrategy: ipv4_only
+    dns:
+      enabled: true
+      type: tls
+      server: "{{ .Env.TEST_DNS_SERVER }}"
+      port: 853
+    http:
+      httpProxy: "{{ .Env.TEST_HTTP_PROXY }}"
+      httpsProxy: "{{ .Env.TEST_HTTP_PROXY }}"
+      httpDebug: true
+  - type: http
+    name: ds-http-regex
+    url: https://api.ip.sb/ip
+    headers:
+      User-Agent: Lightddns/http-test
+      X-Lightddns-Test: [regex, direct]
+    match:
+      regex: "(\\d{1,3}(\\.\\d{1,3}){3})"
+  - type: http
+    name: ds-http-post
+    url: https://httpbin.org/anything
+    method: POST
+    match:
+      jq: ".origin"
+
+domains:
+  - enabled: true
+    domain: "http-jq.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-http-jq
+    provider: pv-cf-http-datasource
+    timeout: 30s
+    interval: 1m
+  - enabled: true
+    domain: "http-regex.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-http-regex
+    provider: pv-cf-http-datasource
+    timeout: 30s
+    interval: 1m
+  - enabled: true
+    domain: "http-post.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-http-post
+    provider: pv-cf-http-datasource
+    timeout: 30s
+    interval: 1m
+
+services:
+  - enabled: true
+    type: prometheus
+    port: 9801
+  - enabled: true
+    type: ipserver
+    port: 8080

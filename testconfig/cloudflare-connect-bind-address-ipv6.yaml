@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-bind-address6
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+    connect:
+      dialStrategy: ipv6_only
+      bindAddress6: "{{ .Env.TEST_BIND_ADDRESS6 }}"
+
+datasources:
+  - type: command
+    name: ds-bind-address6
+    cmd: ["cat", "testconfig/testdata/ips"]
+
+domains:
+  - enabled: true
+    domain: "connect-bind-address-ipv6.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-bind-address6
+    provider: pv-cf-bind-address6
+    ipv4: false
+    ipv6: true
+    timeout: 15s
+    interval: 30s
+
+services: []

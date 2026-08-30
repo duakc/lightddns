@@ -7,17 +7,22 @@ import (
 )
 
 // APIError is the Error envelope Tencent Cloud returns inside the Response
-// body when an action fails. It uses HTTP 200 even on error, so this is the
-// authoritative failure signal.
+// body when an action fails. Tencent normally uses HTTP 200 for this envelope;
+// doAction also preserves it when the service responds with an HTTP error.
 type APIError struct {
-	Code      string `json:"Code"`
-	Message   string `json:"Message"`
-	RequestID string `json:"-"`
+	StatusCode int    `json:"-"`
+	Code       string `json:"Code"`
+	Message    string `json:"Message"`
+	RequestID  string `json:"-"`
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("tencentcloud api error: code=%s message=%s request_id=%s details=%s",
-		e.Code, e.Message, e.RequestID, DNSPodErrorCodeURL)
+	status := ""
+	if e.StatusCode != 0 {
+		status = fmt.Sprintf(" status=%d", e.StatusCode)
+	}
+	return fmt.Sprintf("tencentcloud api error:%s code=%s message=%s request_id=%s details=%s",
+		status, e.Code, e.Message, e.RequestID, DNSPodErrorCodeURL)
 }
 
 type Common struct {

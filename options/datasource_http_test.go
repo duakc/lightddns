@@ -39,15 +39,15 @@ url: https://api.ip.sb/ip
 			wantURL: "https://api.ip.sb/ip",
 		},
 		{
-			name: "api64.ipify.org JSON",
+			name: "api.ip.sb/jsonip JSON",
 			yaml: `
 type: http
 name: ipify-json
-url: https://api64.ipify.org?format=json
+url: https://api.ip.sb/jsonip
 match:
   jq: ".ip"
 `,
-			wantURL: "https://api64.ipify.org?format=json",
+			wantURL: "https://api.ip.sb/jsonip",
 			wantJQ:  true,
 		},
 		{

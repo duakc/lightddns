@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+datasources:
+  - type: netlink
+    name: data-netlink-index
+    ifIndex: "{{ .Env.TEST_NETLINK_IFINDEX }}"
+    includeBogon: true
+
+providers:
+  - type: cloudflare
+    name: pv-cf-netlink-index
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+domains:
+  - enabled: true
+    domain: "netlink-index.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    provider: pv-cf-netlink-index
+    datasource: data-netlink-index
+    timeout: 15s
+    interval: 30s
+
+services: []

@@ -46,10 +46,11 @@ func TestBuildDiffsRequiresDefaultDuringInitialization(t *testing.T) {
 	require.ErrorIs(t, err, ErrDefaultRecordLineRequired)
 
 	client = NewClient(nil, nil, []string{"default", "mobile"})
-	_, err = client.BuildDiffs(context.Background(), ddnsx.RecordKey{FQDN: "host.example.com"}, []netip.Addr{
+	diffs, err := client.BuildDiffs(context.Background(), ddnsx.RecordKey{FQDN: "host.example.com"}, []netip.Addr{
 		netip.MustParseAddr("192.0.2.1"),
 	}, 300, testRecordReader{})
-	require.ErrorIs(t, err, ErrDefaultRecordLineRequired)
+	require.NoError(t, err)
+	require.Len(t, diffs, 2)
 }
 
 func TestBuildDiffsRejectsExistingRecordsWithoutDefault(t *testing.T) {
@@ -96,4 +97,12 @@ func TestComparedRecordSortsByLineThenAddress(t *testing.T) {
 	other := netip.MustParseAddr("192.0.2.2")
 	require.Less(t, (ComparedRecord{Line: DefaultRecordLine, Addr: addr}).Compare(ComparedRecord{Line: "mobile", Addr: addr}), 0)
 	require.Less(t, (ComparedRecord{Line: "mobile", Addr: addr}).Compare(ComparedRecord{Line: "mobile", Addr: other}), 0)
+}
+
+func TestComparedRecordIgnoresProviderDefaultTTL(t *testing.T) {
+	addr := netip.MustParseAddr("192.0.2.1")
+	local := ComparedRecord{Addr: addr, TTL: 0}
+	remote := ComparedRecord{Addr: addr, TTL: 600}
+	require.Equal(t, 0, local.Compare(remote))
+	require.Equal(t, 0, remote.Compare(local))
 }

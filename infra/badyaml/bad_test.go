@@ -154,8 +154,8 @@ func TestURL_UnmarshalYAML(t *testing.T) {
 		},
 		{
 			name:        "double quoted preserves query",
-			input:       `url: "https://api64.ipify.org?format=json"`,
-			expectedRaw: "https://api64.ipify.org?format=json",
+			input:       `url: "https://api.ip.sb/jsonip"`,
+			expectedRaw: "https://api.ip.sb/jsonip",
 			expectedSch: "https",
 		},
 		{

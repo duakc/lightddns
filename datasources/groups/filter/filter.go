@@ -3,6 +3,7 @@ package filter
 import (
 	"context"
 	"fmt"
+	"hash/maphash"
 	"net/netip"
 	"sync"
 
@@ -79,12 +80,19 @@ func New(ctx context.Context, logger *zap.Logger, option options.DatasourceGroup
 		rules = append(rules, rule)
 	}
 
+	maphashSeed := maphash.MakeSeed()
+	ruleMatchCache := mt.Must(freelru.New[netip.Addr, int](1024, func(addr netip.Addr) uint32 {
+		return uint32(maphash.Comparable(maphashSeed, addr))
+	}))
+
 	return &Filter{
 		AbstractManagedType: adapter.NewManagedType(DatasourceType, option.Name),
 
 		logger:      logger,
 		datasources: datasources,
 		rules:       rules,
+
+		ruleMatchCache: ruleMatchCache,
 	}, nil
 }
 
@@ -116,25 +124,14 @@ func (f *Filter) matchRules(ips []netip.Addr) []netip.Addr {
 	var matchIP []netip.Addr
 
 	for _, ip := range ips {
-		var (
-			matchRuleIndex int
-			isCacheRule    bool
-		)
-
-		matchRuleIndex, isCacheRule = f.ruleMatchCache.Get(ip)
+		f.ruleMatchAccess.Lock()
+		matchRuleIndex, isCacheRule := f.ruleMatchCache.Get(ip)
 		if !isCacheRule {
-			f.ruleMatchAccess.Lock()
-			matchRuleIndex, isCacheRule = f.ruleMatchCache.Get(ip)
-			if isCacheRule {
-				f.ruleMatchAccess.Unlock()
-				goto SkipCache
-			}
 			matchRuleIndex = matchRulesSlow(f.rules, ip)
 			f.ruleMatchCache.Add(ip, matchRuleIndex)
-			f.ruleMatchAccess.Unlock()
 		}
+		f.ruleMatchAccess.Unlock()
 
-	SkipCache:
 		if matchRuleIndex >= 0 {
 			matchIP = append(matchIP, ip)
 		}

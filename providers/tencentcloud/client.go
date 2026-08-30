@@ -13,6 +13,7 @@ import (
 	"github.com/duakc/lightddns/adapter/ddnsx"
 	"github.com/duakc/lightddns/adapter/providerx"
 	"github.com/duakc/lightddns/infra/netx/domains"
+	"github.com/duakc/lightddns/infra/numcompare"
 	"github.com/duakc/lightddns/infra/zaplog"
 
 	mDns "github.com/miekg/dns"
@@ -38,7 +39,7 @@ func (r ComparedRecord) Compare(other ComparedRecord) int {
 	if c := r.Addr.Compare(other.Addr); c != 0 {
 		return c
 	}
-	return cmp.Compare(r.TTL, other.TTL)
+	return numcompare.TTL(r.TTL, other.TTL)
 }
 
 func lineRank(line string) string {
@@ -88,9 +89,7 @@ func (c *Client) BuildDiffs(ctx context.Context, key ddnsx.RecordKey, target []n
 	lines := c.lines
 	return ddnsx.BuildDiffsWith(ctx, key, target, ttl, reader,
 		func(key ddnsx.RecordKey, existing []ComparedRecord, target []netip.Addr, ttl uint32) ([]ddnsx.Diff[ComparedRecord], error) {
-			if len(existing) == 0 && slices.ContainsFunc(lines, func(line string) bool {
-				return line != DefaultRecordLine
-			}) {
+			if len(existing) == 0 && !slices.Contains(lines, DefaultRecordLine) {
 				return nil, fmt.Errorf("%w: the %q line record is required during initialization; add %q to the provider's \"lines\" configuration and create that default record first",
 					ErrDefaultRecordLineRequired, DefaultRecordLine, DefaultRecordLine)
 			}

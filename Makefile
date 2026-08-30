@@ -18,8 +18,10 @@ BUILDINFO_ARGS=--buildinfo_version '$(BUILD_VERSION)' \
 GOBUILD_TAGS ?=
 GOBUILD_ENV ?=
 GOBUILD_EXTRA_ARGS ?=
-GOBUILD_LDFLAGS ?= -X "$(MODULE)/constant.Version=$(patsubst v%,%,$(BUILD_VERSION))" \
-	-X "$(MODULE)/constant.Tags=$(GOBUILD_TAGS)"
+GOBUILD_LDFLAGS ?= \
+	-X "$(MODULE)/constant.Version=$(patsubst v%,%,$(BUILD_VERSION))" \
+	-X "$(MODULE)/constant.Tags=$(GOBUILD_TAGS)" \
+	-X "$(MODULE)/infra/netx/httpx.DefaultUserAgent=$(NAME)/$(BUILD_VERSION) ($(shell go env GOVERSION))"
 
 GOBUILD_ARGS=--gobuild_workdir '$(MAIN_WORKDIR)' \
 	--gobuild_output '$(BUILD_DIR)/bin' \

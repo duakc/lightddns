@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-command-jq
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: command
+    name: ds-command-jq
+    cmd: ["cat", "testconfig/testdata/ip.json"]
+    match:
+      jq: ".ip"
+
+domains:
+  - enabled: true
+    domain: "datasource-command-jq.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-command-jq
+    provider: pv-cf-command-jq
+    ipv4: true
+    ipv6: false
+    timeout: 15s
+    interval: 30s
+
+services: []

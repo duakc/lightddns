@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-dns
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+    dns:
+      enabled: true
+      type: tls
+      server: "{{ .Env.TEST_DNS_SERVER }}"
+      port: 853
+
+datasources:
+  - type: command
+    name: ds-dns
+    cmd: ["cat", "testconfig/testdata/ips"]
+
+domains:
+  - enabled: true
+    domain: "dns.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-dns
+    provider: pv-cf-dns
+    timeout: 15s
+    interval: 15s
+
+services:
+  - enabled: true
+    type: prometheus
+    port: 9801
+  - enabled: true
+    type: ipserver
+    port: 8080

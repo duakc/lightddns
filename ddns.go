@@ -15,7 +15,6 @@ import (
 	"github.com/duakc/lightddns/infra/metrics"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
-
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"
 	"github.com/duakc/mt/services/filehelper"
@@ -106,32 +105,23 @@ func New(ctx context.Context, option options.Options) (*LightDDNS, error) {
 	return ld, nil
 }
 
-func (ld *LightDDNS) StartOnce(ctx context.Context, fastfail bool) error {
-	var err error
-	for i := 0; i < len(ld.domains); i++ {
-		domain := ld.domains[i]
-		updateErr := domain.Update(ctx)
-		if fastfail && updateErr != nil {
-			return updateErr
-		}
-		err = errors.Join(err, updateErr)
+func (ld *LightDDNS) SetOnce() {
+	for _, domain := range ld.domains {
+		domain.once = true
 	}
-	return err
 }
 
 func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
-	if stage == services.StagePreStart && len(ld.domains) == 0 && len(ld.services) == 0 {
+	if len(ld.domains) == 0 && len(ld.services) == 0 {
 		return fmt.Errorf("noting to need to start")
 	}
 
-	var err error
-	for i := 0; i < len(ld.services); i++ {
-		err = errors.Join(err, services.Start(ctx, stage, ld.services[i]))
+	if err := services.StartRetry(ctx, stage, 2, ld.services...); err != nil {
+		return fmt.Errorf("start service: %w", err)
 	}
 
-	for i := 0; i < len(ld.domains); i++ {
-		domain := ld.domains[i]
-		err = errors.Join(err, domain.Start(ctx, stage))
+	if err := services.StartRetry(ctx, stage, 2, ld.domains...); err != nil {
+		return fmt.Errorf("start domain: %w", err)
 	}
 
 	if stage == services.StagePostStart {
@@ -139,7 +129,7 @@ func (ld *LightDDNS) Start(ctx context.Context, stage services.Stage) error {
 		runtimeDebug.FreeOSMemory()
 	}
 
-	return err
+	return nil
 }
 
 func (ld *LightDDNS) setupPrometheus(reg metrics.Registry) {

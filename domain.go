@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -39,9 +40,10 @@ type Domain struct {
 	taskCtx    context.Context
 	taskCancel context.CancelFunc
 
-	closed    chan struct{}
-	closeOnce sync.Once
-	closeErr  error
+	closed      chan struct{}
+	loopStarted bool
+	closeOnce   sync.Once
+	closeErr    error
 
 	activationCounter    prometheus.Counter
 	updateSuccessCounter prometheus.Counter
@@ -60,6 +62,9 @@ type Domain struct {
 	ttl            uint32
 	ipv4           bool
 	ipv6           bool
+
+	//
+	once bool
 }
 
 func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption) (*Domain, error) {
@@ -119,19 +124,6 @@ func NewDomain(ctx context.Context, logger *zap.Logger, opt options.DomainOption
 
 func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
 	var err error
-	if stage == services.StageStart {
-		o.taskCtx, o.taskCancel = context.WithCancel(ctx)
-		o.closed = make(chan struct{})
-		err = o.Update(o.taskCtx)
-		if err != nil {
-			return err
-		}
-		err = o.updateLoop()
-		if err != nil {
-			return err
-		}
-	}
-
 	if err = services.Start(ctx, stage, o.provider); err != nil {
 		return err
 	}
@@ -139,6 +131,27 @@ func (o *Domain) Start(ctx context.Context, stage services.Stage) error {
 	if err = services.Start(ctx, stage, o.datasource); err != nil {
 		return err
 	}
+
+	if stage == services.StageStart {
+		updateContext := ctx
+		if !o.once {
+			o.taskCtx, o.taskCancel = context.WithCancel(ctx)
+			o.closed = make(chan struct{})
+			updateContext = o.taskCtx
+		}
+		err = o.Update(updateContext)
+		if err != nil {
+			return err
+		}
+		if !o.once {
+			err = o.updateLoop()
+			if err != nil {
+				return err
+			}
+			o.loopStarted = true
+		}
+	}
+
 	return nil
 }
 
@@ -147,7 +160,7 @@ func (o *Domain) Close() error {
 		if o.taskCancel != nil {
 			o.taskCancel()
 		}
-		if o.closed != nil {
+		if o.loopStarted {
 			<-o.closed
 		}
 		o.closeErr = errors.Join(
@@ -162,6 +175,7 @@ func (o *Domain) Update(ctx context.Context) (err error) {
 	logger := o.logger
 	start := time.Now()
 	o.activationCounter.Inc()
+
 	defer func() {
 		o.updateDuration.Observe(time.Since(start).Seconds())
 		o.lastUpdateTimestamp.Set(float64(time.Now().Unix()))
@@ -187,6 +201,22 @@ func (o *Domain) Update(ctx context.Context) (err error) {
 		return err
 	}
 
+	// Datasources can expose the same address more than once (for example when
+	// stdout and stderr are both captured). Normalize and deduplicate before
+	// sending targets to a provider, otherwise providers may reject duplicate
+	// DNS records.
+	uniqueIPs := make([]netip.Addr, 0, len(datasourceIPs))
+	seenIPs := make(map[netip.Addr]struct{}, len(datasourceIPs))
+	for _, addr := range datasourceIPs {
+		addr = addr.Unmap()
+		if _, seen := seenIPs[addr]; seen {
+			continue
+		}
+		seenIPs[addr] = struct{}{}
+		uniqueIPs = append(uniqueIPs, addr)
+	}
+	datasourceIPs = uniqueIPs
+
 	if len(datasourceIPs) == 0 {
 		o.noIpAddressCounter.Inc()
 		if debug.Enabled {
@@ -197,7 +227,8 @@ func (o *Domain) Update(ctx context.Context) (err error) {
 		return nil
 	}
 
-	logger.Debug("found ip", zap.Stringers("ip", datasourceIPs))
+	logger.Debug("found ip",
+		zap.Stringers("ip", datasourceIPs))
 
 	changed, err := o.provider.Update(cancelContext, o.domainName, o.ttl, datasourceIPs)
 	if err != nil {

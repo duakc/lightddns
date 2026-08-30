@@ -1,10 +1,8 @@
-//go:build goexperiment.jsonv2
-
-// Build With: `GOEXPERIMENT=jsonv2 go build ...`
 package tencentcloud
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 )
 
@@ -16,9 +14,9 @@ type Response[T any] struct {
 
 func (r *Response[T]) UnmarshalJSON(data []byte) error {
 	var outer struct {
-		Resp json.RawMessage `json:"Response"`
+		Resp jsontext.Value `json:"Response"`
 	}
-	if err := json.Unmarshal(data, &outer); err != nil {
+	if err := jsonv2.Unmarshal(data, &outer); err != nil {
 		return fmt.Errorf("unmarshal outer Response: %w", err)
 	}
 
@@ -26,7 +24,7 @@ func (r *Response[T]) UnmarshalJSON(data []byte) error {
 		RequestID string    `json:"RequestId"`
 		Error     *APIError `json:"Error"`
 	}
-	if err := json.Unmarshal(outer.Resp, &meta); err != nil {
+	if err := jsonv2.Unmarshal(outer.Resp, &meta); err != nil {
 		return fmt.Errorf("unmarshal RequestId: %w", err)
 	}
 
@@ -34,39 +32,38 @@ func (r *Response[T]) UnmarshalJSON(data []byte) error {
 	if meta.Error != nil {
 		meta.Error.RequestID = meta.RequestID
 		r.Error = meta.Error
-		//nolint:nilerr
 		return nil
 	}
-	if err := json.Unmarshal(outer.Resp, &r.Data); err != nil {
+	if err := jsonv2.Unmarshal(outer.Resp, &r.Data); err != nil {
 		return fmt.Errorf("unmarshal Data: %w", err)
 	}
 	return nil
 }
 
 func (r *Response[T]) MarshalJSON() ([]byte, error) {
-	dataBytes, err := json.Marshal(r.Data)
+	dataBytes, err := jsonv2.Marshal(r.Data)
 	if err != nil {
 		return nil, fmt.Errorf("marshal Data: %w", err)
 	}
 
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(dataBytes, &fields); err != nil {
+	var fields map[string]jsontext.Value
+	if err := jsonv2.Unmarshal(dataBytes, &fields); err != nil {
 		return nil, fmt.Errorf("unmarshal Data into map: %w", err)
 	}
 	if fields == nil {
-		fields = make(map[string]json.RawMessage)
+		fields = make(map[string]jsontext.Value)
 	}
 
-	reqIDBytes, err := json.Marshal(r.RequestID)
+	reqIDBytes, err := jsonv2.Marshal(r.RequestID)
 	if err != nil {
 		return nil, err
 	}
-	fields["RequestId"] = reqIDBytes
+	fields["RequestId"] = jsontext.Value(reqIDBytes)
 
-	innerBytes, err := json.Marshal(fields)
+	innerBytes, err := jsonv2.Marshal(fields)
 	if err != nil {
 		return nil, err
 	}
-	outer := map[string]json.RawMessage{"Response": innerBytes}
-	return json.Marshal(outer)
+	outer := map[string]jsontext.Value{"Response": jsontext.Value(innerBytes)}
+	return jsonv2.Marshal(outer)
 }

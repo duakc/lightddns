@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-command-duplicates
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: command
+    name: ds-command-duplicates
+    cmd: ["cat", "testconfig/testdata/ips-duplicates"]
+
+domains:
+  - enabled: true
+    domain: "datasource-command-duplicates.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-command-duplicates
+    provider: pv-cf-command-duplicates
+    timeout: 15s
+    interval: 30s
+
+services: []

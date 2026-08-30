@@ -2,6 +2,8 @@ package cloudflare
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	urlpkg "net/url"
@@ -137,6 +139,17 @@ func doAPIRequest[Resp interface{ JoinError(error) error }](
 
 	if response != nil {
 		defer response.Body.Close()
+	}
+
+	// JSONRequest stops at an unacceptable status before decoding the body.
+	// Cloudflare's error envelope contains the actionable API code, message,
+	// and documentation URL, so decode it before returning the status error.
+	var statusError *httpx.BadStatusCodeError
+	if response != nil && errors.As(requestErr, &statusError) {
+		var errorResult Resp
+		if decodeErr := json.NewDecoder(response.Body).Decode(&errorResult); decodeErr == nil {
+			result = errorResult
+		}
 	}
 
 	if err := result.JoinError(requestErr); err != nil {

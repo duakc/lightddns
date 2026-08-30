@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+  output: stderr
+
+providers:
+  - type: cloudflare
+    name: pv-cf-domain
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: command
+    name: ds-domain
+    cmd: ["cat", "testconfig/testdata/ips"]
+
+domains:
+  - enabled: true
+    domain: "ipv4.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-domain
+    provider: pv-cf-domain
+    ttl: 0
+    ipv4: true
+    ipv6: false
+    timeout: 15s
+    interval: 30s
+  - enabled: true
+    domain: "ipv6.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-domain
+    provider: pv-cf-domain
+    ttl: 300
+    ipv4: false
+    ipv6: true
+    timeout: 15s
+    interval: 30s
+  - enabled: false
+    domain: "disabled.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-domain
+    provider: pv-cf-domain
+
+services:
+  - enabled: true
+    name: svc-metrics-test
+    type: prometheus
+    listen: 127.0.0.1
+    port: 9802
+    path: /metrics-test
+  - enabled: true
+    name: svc-ip-test
+    type: ipserver
+    listen: 127.0.0.1
+    port: 8081
+    path: /ip-test
+    dump: true

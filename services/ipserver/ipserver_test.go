@@ -3,9 +3,11 @@ package ipserver
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/duakc/lightddns/options"
 
@@ -25,6 +27,35 @@ func TestNewUsesDefaultPort(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ":9002", service.(*IPServer).addr)
 }
+
+func TestCloseBeforeServeClosesListener(t *testing.T) {
+	service := &IPServer{
+		httpserver: &http.Server{},
+		listener:   closeTestListener{},
+		serveErrC:  make(chan error, 1),
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- service.Close() }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Close blocked before Serve started")
+	}
+}
+
+type closeTestListener struct{}
+
+func (closeTestListener) Accept() (net.Conn, error) { return nil, net.ErrClosed }
+func (closeTestListener) Close() error              { return nil }
+func (closeTestListener) Addr() net.Addr            { return closeTestAddr{} }
+
+type closeTestAddr struct{}
+
+func (closeTestAddr) Network() string { return "test" }
+func (closeTestAddr) String() string  { return "test" }
 
 func newTestIPServer(dump bool) *IPServer {
 	return &IPServer{

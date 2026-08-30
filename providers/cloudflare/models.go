@@ -1,11 +1,11 @@
 package cloudflare
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"net/netip"
 
+	"github.com/duakc/lightddns/infra/numcompare"
 	"github.com/duakc/mt"
 
 	"go.uber.org/zap/zapcore"
@@ -25,22 +25,13 @@ func (r ComparedRecord) Compare(other ComparedRecord) int {
 	if c := r.Addr.Compare(other.Addr); c != 0 {
 		return c
 	}
-	if c := cmp.Compare(r.TTL, other.TTL); c != 0 {
+	if c := numcompare.TTL(r.TTL, other.TTL); c != 0 {
 		return c
 	}
-	if r.Proxied != other.Proxied {
-		if r.Proxied {
-			return 1
-		}
-		return -1
+	if c := numcompare.Bool(r.Proxied, other.Proxied); c != 0 {
+		return c
 	}
-	if r.PrivateRouting == other.PrivateRouting {
-		return 0
-	}
-	if r.PrivateRouting {
-		return 1
-	}
-	return -1
+	return numcompare.Bool(r.PrivateRouting, other.PrivateRouting)
 }
 
 func (r ComparedRecord) MarshalLogObject(enc zapcore.ObjectEncoder) error {
@@ -67,6 +58,14 @@ type MessageError struct {
 	BaseError
 
 	DocumentationUrl string `json:"documentation_url"`
+}
+
+func (e *MessageError) Error() string {
+	message := e.BaseError.Error()
+	if e.DocumentationUrl != "" {
+		message += ", documentation_url=" + e.DocumentationUrl
+	}
+	return message
 }
 
 type ResultInfo struct {

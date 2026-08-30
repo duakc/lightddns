@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+datasources:
+  - type: netlink
+    name: data-if
+    ifName: "{{ .Env.TEST_NETLINK_INTERFACE }}"
+    includeBogon: false
+  - type: filter
+    name: data-filter-ct
+    rules:
+      - prefixes: ["2408::/16"]
+    datasources: [data-if]
+  - type: filter
+    name: data-filter-cu
+    rules:
+      - prefixes: ["240e::/16"]
+    datasources: [data-if]
+
+providers:
+  - type: cloudflare
+    name: pv-cf-netlink
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+domains:
+  - enabled: true
+    domain: "netlink-ct.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    provider: pv-cf-netlink
+    datasource: data-filter-ct
+    ipv4: false
+    ipv6: true
+  - enabled: true
+    domain: "netlink-cu.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    provider: pv-cf-netlink
+    datasource: data-filter-cu
+    ipv4: false
+    ipv6: true
+
+services:
+  - enabled: true
+    type: prometheus
+    port: 9801
+  - enabled: true
+    type: ipserver
+    port: 8080

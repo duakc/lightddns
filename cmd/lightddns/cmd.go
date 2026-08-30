@@ -10,11 +10,7 @@ import (
 	"github.com/duakc/lightddns/cmd/lightddns/internal/run"
 	"github.com/duakc/lightddns/cmd/lightddns/internal/version"
 	constpkg "github.com/duakc/lightddns/constant"
-	// registry
-	_ "github.com/duakc/lightddns/datasources"
 	"github.com/duakc/lightddns/infra/zaplog"
-	_ "github.com/duakc/lightddns/providers"
-	_ "github.com/duakc/lightddns/services"
 
 	"github.com/duakc/mt/services"
 	"github.com/duakc/mt/services/closeme"
@@ -23,6 +19,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+)
+
+import (
+	// registry
+	_ "github.com/duakc/lightddns/datasources"
+	_ "github.com/duakc/lightddns/providers"
+	_ "github.com/duakc/lightddns/services"
 )
 
 var closeManager closeme.Manager
@@ -87,6 +90,6 @@ func main() {
 		}
 	}()
 	if err := rootCommand.Execute(); err != nil {
-		zaplog.Fatal("execute failed", zap.Error(err))
+		_, _ = fmt.Fprintf(os.Stderr, "execute failed: %s\n", err)
 	}
 }

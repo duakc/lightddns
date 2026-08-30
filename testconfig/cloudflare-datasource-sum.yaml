@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-datasource-sum
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: command
+    name: ds-sum-v4
+    cmd: ["cat", "testconfig/testdata/ips"]
+  - type: command
+    name: ds-sum-v6
+    cmd: ["cat", "testconfig/testdata/ips"]
+  - type: sum
+    name: ds-sum
+    datasources: [ds-sum-v4, ds-sum-v6]
+
+domains:
+  - enabled: true
+    domain: "datasource-sum-only.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-sum
+    provider: pv-cf-datasource-sum
+    timeout: 15s
+    interval: 30s
+
+services: []

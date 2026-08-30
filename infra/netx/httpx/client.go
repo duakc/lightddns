@@ -25,6 +25,13 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 }
 
 func NewClient(dialer dialerx.Dialer, opt ...HTTPClientOption) *Client {
+	// initialize Option
+	var initOpt []HTTPClientOption
+	if DefaultUserAgent != "" {
+		initOpt = append(initOpt,
+			ClientOptionWithHeader("User-Agent", DefaultUserAgent))
+	}
+
 	// modified from http.DefaultTransport
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -42,7 +49,7 @@ func NewClient(dialer dialerx.Dialer, opt ...HTTPClientOption) *Client {
 		HTTPRequester: httpClient,
 	}
 
-	for _, o := range opt {
+	for _, o := range append(initOpt, opt...) {
 		o.Apply(c)
 	}
 

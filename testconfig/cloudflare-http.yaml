@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-http
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+    http:
+      httpProxy: "{{ .Env.TEST_HTTP_PROXY }}"
+      httpsProxy: "{{ .Env.TEST_HTTP_PROXY }}"
+
+datasources:
+  - type: command
+    name: ds-http
+    cmd: ["cat", "testconfig/testdata/ips"]
+
+domains:
+  - enabled: true
+    domain: "http.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-http
+    provider: pv-cf-http
+    timeout: 15s
+    interval: 15s
+
+services:
+  - enabled: true
+    type: prometheus
+    port: 9801
+  - enabled: true
+    type: ipserver
+    port: 8080

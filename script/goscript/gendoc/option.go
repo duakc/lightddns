@@ -70,9 +70,12 @@ func (o *BaseDocument) FromToken(token *Tokenizer,
 }
 
 func identNames(ids []*goast.Ident) string {
-	return strings.Join(mt.Map(ids, func(s *goast.Ident) string {
+	var names []string
+	names = mt.Map[*goast.Ident, string](ids, func(s *goast.Ident) string {
 		return s.Name
-	}), ", ")
+	})
+
+	return strings.Join(names, ", ")
 }
 
 func docArray(s string) []string {

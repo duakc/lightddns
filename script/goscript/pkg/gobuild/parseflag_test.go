@@ -70,3 +70,18 @@ func TestBuildFlags(t *testing.T) {
 		Qualified:  true,
 	}, values.toParams())
 }
+
+func TestJoinLDFlagsPreservesWhitespace(t *testing.T) {
+	joined, err := joinLDFlags([]string{
+		"-X",
+		"github.com/duakc/lightddns/infra/netx/httpx.DefaultUserAgent=lightddns/test (go1.27.0)",
+		"-s",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "-X 'github.com/duakc/lightddns/infra/netx/httpx.DefaultUserAgent=lightddns/test (go1.27.0)' -s", joined)
+}
+
+func TestJoinLDFlagsRejectsAmbiguousQuotes(t *testing.T) {
+	_, err := joinLDFlags([]string{"value with 'single' and \"double\" quotes"})
+	require.Error(t, err)
+}

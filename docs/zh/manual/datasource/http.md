@@ -43,7 +43,7 @@ JSON 端点使用 `match.jq`。
 ```yaml
 - type: http
   name: ipify-json
-  url: https://api64.ipify.org?format=json
+  url: https://api.ip.sb/jsonip
   match:
     jq: ".ip"
 ```

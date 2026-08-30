@@ -2,13 +2,23 @@ package tencentcloud
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/duakc/lightddns/adapter/ddnsx"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
+
+type apiRequesterFunc func(*http.Request) (*http.Response, error)
+
+func (f apiRequesterFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 type testRecordReader struct {
 	records []ComparedRecord
@@ -20,6 +30,36 @@ func (r testRecordReader) Records(context.Context, ddnsx.RecordKey) ([]ComparedR
 
 func TestAPIErrorIncludesDetailsURL(t *testing.T) {
 	require.Contains(t, (&APIError{Code: DNSPodErrCodeMustAddDefaultLineFirst}).Error(), DNSPodErrorCodeURL)
+}
+
+func TestHTTPAPIErrorIncludesResponseDetails(t *testing.T) {
+	client := &defaultAPIClient{
+		logger: zap.NewNop(),
+		requester: apiRequesterFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body: io.NopCloser(strings.NewReader(`{
+					"Response": {
+						"Error": {
+							"Code": "AuthFailure.InvalidSecretId",
+							"Message": "invalid secret id"
+						},
+						"RequestId": "request-123"
+					}
+				}`)),
+			}, nil
+		}),
+	}
+
+	_, err := doAction[CreateRecordResponse](
+		context.Background(), client, DNSPodActionCreateRecord, CreateRecordRequest{},
+	)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "status=400")
+	require.ErrorContains(t, err, "AuthFailure.InvalidSecretId")
+	require.ErrorContains(t, err, "invalid secret id")
+	require.ErrorContains(t, err, "request-123")
+	require.ErrorContains(t, err, DNSPodErrorCodeURL)
 }
 
 func TestBuildDiffsCreatesOneRecordPerAddressAndLine(t *testing.T) {
@@ -47,12 +87,13 @@ func TestBuildDiffsRequiresDefaultDuringInitialization(t *testing.T) {
 	require.ErrorIs(t, err, ErrDefaultRecordLineRequired)
 
 	client = NewClient(nil, nil, []string{DefaultRecordLine, "移动"})
-	_, err = client.BuildDiffs(context.Background(),
+	diffs, err := client.BuildDiffs(context.Background(),
 		ddnsx.RecordKey{FQDN: "host.example.com"},
 		[]netip.Addr{
 			netip.MustParseAddr("192.0.2.1"),
 		}, 300, testRecordReader{})
-	require.ErrorIs(t, err, ErrDefaultRecordLineRequired)
+	require.NoError(t, err)
+	require.Len(t, diffs, 2)
 }
 
 func TestBuildDiffsRejectsExistingRecordsWithoutDefault(t *testing.T) {
@@ -99,4 +140,12 @@ func TestComparedRecordSortsByLineThenAddress(t *testing.T) {
 	other := netip.MustParseAddr("192.0.2.2")
 	require.Less(t, (ComparedRecord{Line: DefaultRecordLine, Addr: addr}).Compare(ComparedRecord{Line: "移动", Addr: addr}), 0)
 	require.Less(t, (ComparedRecord{Line: "移动", Addr: addr}).Compare(ComparedRecord{Line: "移动", Addr: other}), 0)
+}
+
+func TestComparedRecordIgnoresProviderDefaultTTL(t *testing.T) {
+	addr := netip.MustParseAddr("192.0.2.1")
+	local := ComparedRecord{Addr: addr, TTL: 0}
+	remote := ComparedRecord{Addr: addr, TTL: 600}
+	require.Equal(t, 0, local.Compare(remote))
+	require.Equal(t, 0, remote.Compare(local))
 }

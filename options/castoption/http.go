@@ -3,7 +3,6 @@ package castoption
 import (
 	"fmt"
 
-	constpkg "github.com/duakc/lightddns/constant"
 	"github.com/duakc/lightddns/infra/netx/dialerx"
 	"github.com/duakc/lightddns/infra/netx/httpx"
 	"github.com/duakc/lightddns/options"
@@ -23,10 +22,6 @@ func BuildHTTPClient(
 	if underlay == nil {
 		underlay = dialerx.NewDialerWithOption()
 	}
-
-	// Add User-Agent
-	httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithHeader(
-		httpx.HeaderUserAgent, constpkg.HTTPUserAgent))
 
 	if rawOption.HTTPDebug && logger != nil && logger.Level().Enabled(zap.DebugLevel) {
 		httpClientOptions = append(httpClientOptions, httpx.ClientOptionWithDebugLogger(logger))

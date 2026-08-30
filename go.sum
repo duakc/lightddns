@@ -41,8 +41,8 @@ github.com/cyphar/filepath-securejoin v0.6.1/go.mod h1:A8hd4EnAeyujCJRrICiOWqjS1
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/duakc/mt v0.0.0-20260807044541-747b15722101 h1:sVs5y7o5EOkBj7wiBxYz0chF+rUNi4/tHBy+BKdxk40=
-github.com/duakc/mt v0.0.0-20260807044541-747b15722101/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
+github.com/duakc/mt v0.0.0-20260830123659-ffe81e457168 h1:DpaZcki1pEeZ7pqc38rBDkrHTl1ub53ITxi1F945mWk=
+github.com/duakc/mt v0.0.0-20260830123659-ffe81e457168/go.mod h1:dRfj4WBdNNcjhICZDjRPIfHfnnBe53POqx23tXYqAQg=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
 github.com/elastic/go-freelru v0.16.0/go.mod h1:bSdWT4M0lW79K8QbX6XY2heQYSCqD7THoYf82pT/H3I=
 github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=

@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-datasources
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: command
+    name: ds-command-env
+    cmd:
+      - sh
+      - -c
+      - 'test "$LIGHTDDNS_TEST_MARKER" = enabled && cat testconfig/testdata/ips'
+    env:
+      - LIGHTDDNS_TEST_MARKER=enabled
+    output: none
+    capture: stdout
+    sync: true
+    workDir: .
+  - type: command
+    name: ds-command-stdin
+    cmd: ["cat"]
+    stdinContent: |
+      1.1.1.1
+    capture: stdout
+  - type: command
+    name: ds-command-stderr
+    cmd:
+      - sh
+      - -c
+      - 'printf "IP: %s\\n" "$(head -n 1 testconfig/testdata/ips)" >&2; exit 7'
+    exitCode: 7
+    output: stderr
+    capture: stderr
+    match:
+      regex: "IP:\\s+(\\S+)"
+  - type: command
+    name: ds-command-fail
+    cmd: ["sh", "-c", "exit 1"]
+  - type: sum
+    name: ds-sum
+    datasources: [ds-command-env, ds-command-stdin]
+  - type: filter
+    name: ds-filter
+    datasources: [ds-sum]
+    rules:
+      - prefixes: ["9.9.9.0/24"]
+        invert: true
+  - type: failover
+    name: ds-failover
+    datasources: [ds-command-fail, ds-command-env]
+
+domains:
+  - enabled: true
+    domain: "datasource-sum.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-sum
+    provider: pv-cf-datasources
+    timeout: 15s
+    interval: 15s
+  - enabled: true
+    domain: "datasource-filter.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-filter
+    provider: pv-cf-datasources
+    timeout: 15s
+    interval: 15s
+  - enabled: true
+    domain: "datasource-failover.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-failover
+    provider: pv-cf-datasources
+    timeout: 15s
+    interval: 15s
+  - enabled: true
+    domain: "datasource-command.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-command-stderr
+    provider: pv-cf-datasources
+    timeout: 15s
+    interval: 15s
+
+services:
+  - enabled: true
+    type: prometheus
+    port: 9801
+  - enabled: true
+    type: ipserver
+    port: 8080

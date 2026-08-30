@@ -85,7 +85,11 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 	}
 
 	if len(ldflags) > 0 {
-		args = append(args, "-ldflags", strings.Join(ldflags, " "))
+		joinedLDFlags, err := joinLDFlags(ldflags)
+		if err != nil {
+			return "", err
+		}
+		args = append(args, "-ldflags", joinedLDFlags)
 	}
 
 	outPath := filepath.Join(p.OutputDir, name)
@@ -101,6 +105,38 @@ func Binary(ctx context.Context, tgt target.Target, p Params) (string, error) {
 		return "", err
 	}
 	return outPath, nil
+}
+
+// joinLDFlags serializes linker flag tokens for go build's -ldflags value.
+// The go command parses this value a second time, so whitespace-containing
+// tokens must retain quoting after buildFlags has already removed input quotes.
+func joinLDFlags(flags []string) (string, error) {
+	var builder strings.Builder
+	for i, flag := range flags {
+		if i > 0 {
+			builder.WriteByte(' ')
+		}
+
+		needsQuote := strings.ContainsAny(flag, " \t\n\r'\"")
+		if !needsQuote {
+			builder.WriteString(flag)
+			continue
+		}
+
+		switch {
+		case !strings.ContainsRune(flag, '\''):
+			builder.WriteByte('\'')
+			builder.WriteString(flag)
+			builder.WriteByte('\'')
+		case !strings.ContainsRune(flag, '"'):
+			builder.WriteByte('"')
+			builder.WriteString(flag)
+			builder.WriteByte('"')
+		default:
+			return "", fmt.Errorf("ldflag %q contains both single and double quotes", flag)
+		}
+	}
+	return builder.String(), nil
 }
 
 func binaryName(tgt target.Target, p Params, version string) string {

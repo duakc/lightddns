@@ -43,9 +43,10 @@ type Prometheus struct {
 	addr   string
 	path   string
 
-	server    *http.Server
-	listener  net.Listener
-	serveErrC chan error
+	server       *http.Server
+	listener     net.Listener
+	serveErrC    chan error
+	serveStarted bool
 }
 
 func New(ctx context.Context, logger *zap.Logger, option options.PrometheusServiceOption) (adapter.Service, error) {
@@ -105,6 +106,7 @@ func (s *Prometheus) Start(ctx context.Context, stage services.Stage) error {
 			}
 			close(s.serveErrC)
 		}()
+		s.serveStarted = true
 		return nil
 	case services.StagePostStart:
 		return nil
@@ -116,6 +118,12 @@ func (s *Prometheus) Start(ctx context.Context, stage services.Stage) error {
 func (s *Prometheus) Close() error {
 	if s.server == nil {
 		return nil
+	}
+	if !s.serveStarted {
+		if s.listener == nil {
+			return nil
+		}
+		return s.listener.Close()
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

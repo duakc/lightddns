@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=../release/schema.json
+
+log:
+  level: debug
+
+providers:
+  - type: cloudflare
+    name: pv-cf-http-ds-prefer-ipv6
+    token: "{{ .Env.CLOUDFLARE_TOKEN }}"
+
+datasources:
+  - type: http
+    name: ds-http-prefer-ipv6
+    url: https://api.ip.sb/jsonip
+    connect:
+      dialStrategy: prefer_ipv6
+    match:
+      jq: ".ip"
+
+domains:
+  - enabled: true
+    domain: "http-datasource-prefer-ipv6.{{ .Env.TEST_ZONE_CLOUDFLARE }}"
+    datasource: ds-http-prefer-ipv6
+    provider: pv-cf-http-ds-prefer-ipv6
+    timeout: 30s
+    interval: 1m
+
+services: []

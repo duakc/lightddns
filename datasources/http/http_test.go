@@ -96,8 +96,8 @@ func TestRequestContextHandleCommonHTTPServiceResponses(t *testing.T) {
 			want:        parseAddrs("203.0.113.21"),
 		},
 		{
-			name:        "api64.ipify.org JSON",
-			rawURL:      "https://api64.ipify.org?format=json",
+			name:        "api.ip.sb/jsonip JSON",
+			rawURL:      "https://api.ip.sb/jsonip",
 			jq:          ".ip",
 			contentType: "application/json",
 			body:        `{"ip":"2001:db8::22"}`,

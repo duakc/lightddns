@@ -45,7 +45,7 @@ Use `match.jq` for JSON endpoints.
 ```yaml
 - type: http
   name: ipify-json
-  url: https://api64.ipify.org?format=json
+  url: https://api.ip.sb/jsonip
   match:
     jq: ".ip"
 ```

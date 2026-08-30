@@ -83,7 +83,8 @@ type IPServer struct {
 	listener   net.Listener
 	httpserver *http.Server
 
-	serveErrC chan error
+	serveErrC    chan error
+	serveStarted bool
 }
 
 func (s *IPServer) Start(ctx context.Context, stage services.Stage) error {
@@ -117,6 +118,7 @@ func (s *IPServer) Start(ctx context.Context, stage services.Stage) error {
 			}
 			close(s.serveErrC)
 		}()
+		s.serveStarted = true
 		return nil
 	default:
 	}
@@ -240,6 +242,12 @@ func extractIP(req *http.Request) (string, string, netip.Addr) {
 func (s *IPServer) Close() error {
 	if s.httpserver == nil {
 		return nil
+	}
+	if !s.serveStarted {
+		if s.listener == nil {
+			return nil
+		}
+		return s.listener.Close()
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
