@@ -42,13 +42,6 @@ easier to inspect and reuse.
 
 ## Known Limits
 
-The diff model supports provider-defined record attributes. Cloudflare
-`proxied`, and Tencent Cloud and Aliyun `lines`, can participate in diffing.
-
-The network layer still needs more field testing, especially around connection
-reuse, proxy behavior, DNS boundaries, transport retries, and how remote
-proxies should receive hostnames versus locally resolved IPs.
-
 Packaging exists, but it still needs wider testing from the community before it
 can be treated as boring.
 

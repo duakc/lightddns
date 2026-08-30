@@ -59,22 +59,10 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  approve-release:
-    name: Approve publishing ${{ needs.detect-release-tag.outputs.tag }}
-    needs: detect-release-tag
-    if: needs.detect-release-tag.outputs.tag != ''
-    runs-on: ubuntu-latest
-    environment:
-      name: release
-    steps:
-      - name: Await approval
-        run: echo "Publishing ${{ needs.detect-release-tag.outputs.tag }} after environment approval."
-
   build:
     name: Build ${{ matrix.id }}
     needs:
       - detect-release-tag
-      - approve-release
     if: needs.detect-release-tag.outputs.tag != '' && needs.approve-release.result == 'success'
     runs-on: ubuntu-latest
     strategy:
@@ -154,6 +142,19 @@ jobs:
             build/nfpm/**
           if-no-files-found: error
           retention-days: 1
+
+  approve-release:
+    name: Approve publishing ${{ needs.detect-release-tag.outputs.tag }}
+    needs:
+      - detect-release-tag
+      - build
+    if: needs.detect-release-tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    steps:
+      - name: Await approval
+        run: echo "Publishing ${{ needs.detect-release-tag.outputs.tag }} after environment approval."
 
   publish:
     name: Publish ${{ needs.detect-release-tag.outputs.tag }}
