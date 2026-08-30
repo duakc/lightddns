@@ -200,10 +200,12 @@ jobs:
             echo 'No release binaries were built.' >&2
             exit 1
           fi
+          
           if [[ "${#packages[@]}" -eq 0 ]]; then
             echo 'No Linux packages were built.' >&2
             exit 1
           fi
+          
           test -f release/schema.json
 
       - name: Generate release notes

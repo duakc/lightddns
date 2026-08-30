@@ -10,6 +10,7 @@ import (
 	"github.com/duakc/lightddns/options"
 
 	"github.com/duakc/mt/services"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )

@@ -6,9 +6,9 @@ import (
 	"github.com/duakc/lightddns/infra/gos"
 	"github.com/duakc/lightddns/infra/zaplog"
 	"github.com/duakc/lightddns/options"
-	"github.com/duakc/mt"
 
 	"github.com/duakc/lightddns"
+	"github.com/duakc/mt"
 	"github.com/duakc/mt/services"
 
 	"github.com/spf13/cobra"

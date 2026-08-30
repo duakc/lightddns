@@ -1,6 +1,4 @@
 package httpx
 
-var (
-	//DefaultUserAgent  do not modify it
-	DefaultUserAgent = ""
-)
+// DefaultUserAgent  do not modify it
+var DefaultUserAgent = ""
