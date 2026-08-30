@@ -3,7 +3,7 @@ name: Publish Release
 on:
   push:
     tags:
-      - "*"
+      - "v*"
   workflow_dispatch:
 
 # a release needs permission to create the GitHub Release and upload its assets.
@@ -63,7 +63,7 @@ jobs:
     name: Build ${{ matrix.id }}
     needs:
       - detect-release-tag
-    if: needs.detect-release-tag.outputs.tag != '' && needs.approve-release.result == 'success'
+    if: needs.detect-release-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
