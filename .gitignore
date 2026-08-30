@@ -30,3 +30,5 @@ site/
 
 *.secret.go
 *.secret_test.go
+
+.DS_Store
